@@ -20,7 +20,6 @@ import ClientDetails from "./pages/ClientDetails";
 import ResetPassword from "./pages/ResetPassword";
 import UpdatePassword from "./pages/UpdatePassword";
 import AuthDebugPage from "./pages/AuthDebugPage";
-import Settings from "./pages/Settings";
 
 // Create a client
 const queryClient = new QueryClient();
@@ -68,13 +67,6 @@ function App() {
                 <Route path="/clients/:clientId" element={
                   <ProtectedRoute allowedRoles={['client']} blockNewClients={true}>
                     <ClientDetails />
-                  </ProtectedRoute>
-                } />
-
-                {/* Settings route - client access only */}
-                <Route path="/settings" element={
-                  <ProtectedRoute allowedRoles={['client']} blockNewClients={true}>
-                    <Settings />
                   </ProtectedRoute>
                 } />
                 

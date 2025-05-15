@@ -4,9 +4,7 @@ import {
   LayoutDashboard,
   UserSearch,
   User,
-  FileText,
-  Settings,
-  ChevronLeft
+  FileText
 } from 'lucide-react';
 import { useUser } from '@/context/UserContext';
 import { useState, useEffect } from 'react';
@@ -89,9 +87,6 @@ const Sidebar = () => {
           />
           <span className="text-xl font-semibold text-valorwell-700">ValorWell</span>
         </Link>
-        <button className="ml-auto text-gray-500">
-          <ChevronLeft size={18} />
-        </button>
       </div>
       
       <nav className="flex-1 py-4 space-y-1 px-2">
@@ -130,14 +125,6 @@ const Sidebar = () => {
             >
               <FileText size={18} />
               <span>Documents</span>
-            </Link>
-            
-            <Link 
-              to="/settings" 
-              className={`sidebar-link ${isActive('/settings') ? 'active' : ''}`}
-            >
-              <Settings size={18} />
-              <span>Settings</span>
             </Link>
           </>
         )}
