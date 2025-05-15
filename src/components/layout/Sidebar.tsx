@@ -128,15 +128,13 @@ const Sidebar = () => {
               <span>Therapist Selection</span>
             </Link>
             
-            {userId && (
-              <Link 
-                to={`/clients/${userId}`} 
-                className={`sidebar-link ${isActive(`/clients/${userId}`) ? 'active' : ''}`}
-              >
-                <User size={18} />
-                <span>My Profile</span>
-              </Link>
-            )}
+            <Link 
+              to="/patient-profile" 
+              className={`sidebar-link ${isActive('/patient-profile') ? 'active' : ''}`}
+            >
+              <User size={18} />
+              <span>My Profile</span>
+            </Link>
 
             <Link 
               to="/patient-documents" 

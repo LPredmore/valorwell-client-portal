@@ -21,6 +21,7 @@ import ResetPassword from "./pages/ResetPassword";
 import UpdatePassword from "./pages/UpdatePassword";
 import AuthDebugPage from "./pages/AuthDebugPage";
 import Clients from "./pages/Clients";
+import PatientProfile from "./pages/PatientProfile";
 
 // Create a client
 const queryClient = new QueryClient();
@@ -61,6 +62,12 @@ function App() {
                 <Route path="/patient-documents" element={
                   <ProtectedRoute allowedRoles={['client']} blockNewClients={true}>
                     <PatientDocuments />
+                  </ProtectedRoute>
+                } />
+                
+                <Route path="/patient-profile" element={
+                  <ProtectedRoute allowedRoles={['client']} blockNewClients={true}>
+                    <PatientProfile />
                   </ProtectedRoute>
                 } />
                 
