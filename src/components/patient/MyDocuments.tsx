@@ -17,7 +17,12 @@ interface ClinicalDocument {
   created_at: string;
 }
 
-const MyDocuments: React.FC<{ clientId?: string }> = ({ clientId }) => {
+type MyDocumentsProps = {
+  clientId?: string;
+  excludedTypes?: string[];
+};
+
+const MyDocuments: React.FC<MyDocumentsProps> = ({ clientId, excludedTypes = [] }) => {
   const [documents, setDocuments] = useState<ClinicalDocument[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
@@ -38,8 +43,15 @@ const MyDocuments: React.FC<{ clientId?: string }> = ({ clientId }) => {
           userId = user.id;
         }
         
-        const docs = await fetchClinicalDocuments(userId);
-        setDocuments(docs);
+        // Fetch all documents
+        const allDocs = await fetchClinicalDocuments(userId);
+        
+        // Filter out excluded document types
+        const filteredDocs = excludedTypes.length > 0
+          ? allDocs.filter(doc => !excludedTypes.includes(doc.document_type))
+          : allDocs;
+        
+        setDocuments(filteredDocs);
       } catch (error) {
         console.error('Error loading documents:', error);
         toast({
@@ -53,7 +65,7 @@ const MyDocuments: React.FC<{ clientId?: string }> = ({ clientId }) => {
     };
 
     loadDocuments();
-  }, [clientId, toast]);
+  }, [clientId, excludedTypes, toast]);
 
   const handleViewDocument = async (filePath: string) => {
     try {
@@ -80,8 +92,8 @@ const MyDocuments: React.FC<{ clientId?: string }> = ({ clientId }) => {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Documents</CardTitle>
-        <CardDescription>View and download your documents</CardDescription>
+        <CardTitle>Completed Documents</CardTitle>
+        <CardDescription>View and download your completed documents</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         {isLoading ? (
@@ -93,7 +105,9 @@ const MyDocuments: React.FC<{ clientId?: string }> = ({ clientId }) => {
             <FileText className="h-12 w-12 text-gray-300 mb-3" />
             <h3 className="text-lg font-medium">No documents available</h3>
             <p className="text-sm text-gray-500 mt-1">
-              Your therapist will add documents here
+              {excludedTypes.length > 0 
+                ? "You haven't completed any documents yet" 
+                : "Your therapist will add documents here"}
             </p>
           </div>
         ) : (
@@ -111,7 +125,7 @@ const MyDocuments: React.FC<{ clientId?: string }> = ({ clientId }) => {
                 {documents.map((doc) => (
                   <TableRow key={doc.id}>
                     <TableCell className="font-medium">{doc.document_title}</TableCell>
-                    <TableCell>{doc.document_type}</TableCell>
+                    <TableCell>{formatDocumentType(doc.document_type)}</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1">
                         <Calendar className="h-4 w-4 text-gray-500" />
@@ -137,6 +151,20 @@ const MyDocuments: React.FC<{ clientId?: string }> = ({ clientId }) => {
       </CardContent>
     </Card>
   );
+};
+
+// Helper function to format document types for display
+const formatDocumentType = (type: string): string => {
+  const typeMap: Record<string, string> = {
+    'informed_consent': 'Informed Consent',
+    'client_history': 'Client History',
+    'treatment_plan': 'Treatment Plan',
+    'session_note': 'Session Note',
+    'phq9': 'PHQ-9 Assessment',
+    'gad7': 'GAD-7 Assessment',
+  };
+  
+  return typeMap[type] || type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
 };
 
 export default MyDocuments;

@@ -1,7 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
 import Layout from '@/components/layout/Layout';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { FileText, ClipboardCheck } from 'lucide-react';
 import { getCurrentUser, fetchDocumentAssignments, DocumentAssignment } from '@/integrations/supabase/client';
@@ -137,11 +136,11 @@ const PatientDocuments: React.FC = () => {
             <TabsList className="mb-6">
               <TabsTrigger value="assignments" className="flex items-center gap-1">
                 <ClipboardCheck className="h-4 w-4" />
-                Form Assignments
+                Assigned Documents
               </TabsTrigger>
               <TabsTrigger value="documents" className="flex items-center gap-1">
                 <FileText className="h-4 w-4" />
-                Medical Records
+                Completed Documents
               </TabsTrigger>
             </TabsList>
             
@@ -157,7 +156,7 @@ const PatientDocuments: React.FC = () => {
             </TabsContent>
             
             <TabsContent value="documents" className="mt-0">
-              <MyDocuments clientId={clientId || undefined} />
+              <MyDocuments clientId={clientId || undefined} excludedTypes={['session_note', 'treatment_plan']} />
             </TabsContent>
           </Tabs>
         )}

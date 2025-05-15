@@ -6,7 +6,7 @@ import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@
 import { FileCheck, FileText, ClipboardCheck } from 'lucide-react';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
-import { DocumentAssignment, updateDocumentStatus } from '@/integrations/supabase/client';
+import { DocumentAssignment } from '@/integrations/supabase/client';
 
 type DocumentAssignmentsListProps = {
   assignments: DocumentAssignment[];
@@ -62,9 +62,9 @@ const DocumentAssignmentsList: React.FC<DocumentAssignmentsListProps> = ({
     return (
       <div className="mb-6">
         <h3 className="text-lg font-medium mb-2">
-          {type === 'pending' && 'Pending Documents'}
-          {type === 'in-progress' && 'In Progress'}
-          {type === 'completed' && 'Completed Documents'}
+          {type === 'pending' && 'Documents To Complete'}
+          {type === 'in-progress' && 'Documents In Progress'}
+          {type === 'completed' && 'Recently Completed Documents'}
         </h3>
         <Table>
           <TableHeader>
@@ -124,7 +124,7 @@ const DocumentAssignmentsList: React.FC<DocumentAssignmentsListProps> = ({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Your Document Assignments</CardTitle>
+        <CardTitle>Assigned Documents</CardTitle>
         <CardDescription>
           Forms and documents assigned to you by your therapist
         </CardDescription>
