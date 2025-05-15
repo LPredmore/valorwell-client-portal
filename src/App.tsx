@@ -9,27 +9,16 @@ import ProtectedRoute from "./components/auth/ProtectedRoute";
 
 // Pages
 import Index from "./pages/Index";
-import Calendar from "./pages/Calendar";
-import Clients from "./pages/Clients";
-import ClientDetails from "./pages/ClientDetails";
-import Analytics from "./pages/Analytics";
-import Activity from "./pages/Activity";
-import Settings from "./pages/Settings";
-import Reminders from "./pages/Reminders";
-import Messages from "./pages/Messages";
 import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
-import ClinicianDetails from "./pages/ClinicianDetails";
-import MyClients from "./pages/MyClients";
 import PatientDashboard from "./pages/PatientDashboard";
 import PatientDocuments from "./pages/PatientDocuments";
 import ProfileSetup from "./pages/ProfileSetup";
 import TherapistSelection from "./pages/TherapistSelection";
-import ClinicianDashboard from "./pages/ClinicianDashboard";
+import ClientDetails from "./pages/ClientDetails";
 import ResetPassword from "./pages/ResetPassword";
 import UpdatePassword from "./pages/UpdatePassword";
-import CalendarDebugPage from "./pages/CalendarDebugPage";
 import AuthDebugPage from "./pages/AuthDebugPage";
 
 // Create a client
@@ -57,107 +46,31 @@ function App() {
                 
                 {/* Routes that block "New" clients */}
                 <Route path="/therapist-selection" element={
-                  <ProtectedRoute allowedRoles={['client', 'admin']} blockNewClients={true}>
+                  <ProtectedRoute allowedRoles={['client']} blockNewClients={true}>
                     <TherapistSelection />
                   </ProtectedRoute>
                 } />
                 
                 <Route path="/patient-dashboard" element={
-                  <ProtectedRoute allowedRoles={['client', 'admin']} blockNewClients={true}>
+                  <ProtectedRoute allowedRoles={['client']} blockNewClients={true}>
                     <PatientDashboard />
                   </ProtectedRoute>
                 } />
                 
                 <Route path="/patient-documents" element={
-                  <ProtectedRoute allowedRoles={['client', 'admin']} blockNewClients={true}>
+                  <ProtectedRoute allowedRoles={['client']} blockNewClients={true}>
                     <PatientDocuments />
                   </ProtectedRoute>
                 } />
                 
-                {/* Allow clinicians and admins to view client details */}
+                {/* Allow clients to view their details */}
                 <Route path="/clients/:clientId" element={
-                  <ProtectedRoute allowedRoles={['admin', 'moderator', 'clinician', 'client']} blockNewClients={true}>
+                  <ProtectedRoute allowedRoles={['client']} blockNewClients={true}>
                     <ClientDetails />
                   </ProtectedRoute>
                 } />
                 
-                {/* Protected routes - clinician, admin, moderator */}
-                <Route path="/clinician-dashboard" element={
-                  <ProtectedRoute allowedRoles={['admin', 'clinician']}>
-                    <ClinicianDashboard />
-                  </ProtectedRoute>
-                } />
-                
-                <Route path="/my-clients" element={
-                  <ProtectedRoute allowedRoles={['admin', 'clinician']}>
-                    <MyClients />
-                  </ProtectedRoute>
-                } />
-                
-                <Route path="/calendar" element={
-                  <ProtectedRoute allowedRoles={['admin', 'clinician']}>
-                    <Calendar />
-                  </ProtectedRoute>
-                } />
-                
-                {/* Clinicians can view their own profile */}
-                <Route path="/clinicians/:clinicianId" element={
-                  <ProtectedRoute allowedRoles={['admin', 'clinician']}>
-                    <ClinicianDetails />
-                  </ProtectedRoute>
-                } />
-                
-                {/* Protected routes - admin only */}
-                <Route path="/clients" element={
-                  <ProtectedRoute allowedRoles={['admin']}>
-                    <Clients />
-                  </ProtectedRoute>
-                } />
-                
-                <Route path="/analytics" element={
-                  <ProtectedRoute allowedRoles={['admin']}>
-                    <Analytics />
-                  </ProtectedRoute>
-                } />
-
-                <Route path="/activity" element={
-                  <ProtectedRoute allowedRoles={['admin']}>
-                    <Activity />
-                  </ProtectedRoute>
-                } />
-
-                <Route path="/settings" element={
-                  <ProtectedRoute allowedRoles={['admin']}>
-                    <Settings />
-                  </ProtectedRoute>
-                } />
-
-                <Route path="/reminders" element={
-                  <ProtectedRoute allowedRoles={['admin']}>
-                    <Reminders />
-                  </ProtectedRoute>
-                } />
-
-                <Route path="/messages" element={
-                  <ProtectedRoute allowedRoles={['admin']}>
-                    <Messages />
-                  </ProtectedRoute>
-                } />
-                
                 {/* Debug routes */}
-                <Route path="/debug/calendar" element={
-                  <ProtectedRoute allowedRoles={['admin', 'clinician']}>
-                    <CalendarDebugPage />
-                  </ProtectedRoute>
-                } />
-                
-                <Route path="/debug/auth" element={
-                  <ProtectedRoute allowedRoles={['admin']}>
-                    <AuthDebugPage />
-                  </ProtectedRoute>
-                } />
-                
-                {/* Make auth debug page accessible without login for troubleshooting */}
                 <Route path="/debug/auth-public" element={<AuthDebugPage />} />
                 
                 <Route path="*" element={<NotFound />} />

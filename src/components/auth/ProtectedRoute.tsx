@@ -9,7 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 interface ProtectedRouteProps {
   children: React.ReactNode;
   allowedRoles: string[];
-  blockNewClients?: boolean; // New prop to block "New" clients
+  blockNewClients?: boolean;
 }
 
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ 
@@ -19,7 +19,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
 }) => {
   const { userRole, clientStatus, isLoading, authInitialized } = useUser();
   const { toast } = useToast();
-  const { clinicianId, clientId } = useParams();
+  const { clientId } = useParams();
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [isCheckingUser, setIsCheckingUser] = useState(false);
   const [loadingTimeout, setLoadingTimeout] = useState(false);
@@ -52,7 +52,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
 
   useEffect(() => {
     const getCurrentUserId = async () => {
-      if (clinicianId || clientId) {
+      if (clientId) {
         console.log("[ProtectedRoute] Fetching current user ID for route validation");
         setIsCheckingUser(true);
         try {
@@ -88,7 +88,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     if (authInitialized) {
       getCurrentUserId();
     }
-  }, [clinicianId, clientId, authInitialized, toast]);
+  }, [clientId, authInitialized, toast]);
   
   // Log the current state for debugging
   console.log(`[ProtectedRoute] Status: isLoading=${isLoading}, authInitialized=${authInitialized}, userRole=${userRole}, clientStatus=${clientStatus}, blockNewClients=${blockNewClients}`);
@@ -143,18 +143,8 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   if (!userRole || !allowedRoles.includes(userRole)) {
     console.log(`[ProtectedRoute] User role '${userRole}' not in allowed roles: [${allowedRoles.join(', ')}]`);
     
-    // Admin can access all routes
-    if (userRole === 'admin') {
-      console.log("[ProtectedRoute] Admin override - allowing access");
-      return <>{children}</>;
-    }
-    // Redirect clinicians to Calendar page
-    else if (userRole === 'clinician') {
-      console.log("[ProtectedRoute] Redirecting clinician to Calendar");
-      return <Navigate to="/calendar" replace />;
-    }
     // Redirect clients to patient dashboard
-    else if (userRole === 'client') {
+    if (userRole === 'client') {
       console.log("[ProtectedRoute] Redirecting client to patient dashboard");
       return <Navigate to="/patient-dashboard" replace />;
     }

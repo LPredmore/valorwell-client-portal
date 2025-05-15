@@ -1,18 +1,10 @@
 
 import { Link, useLocation } from 'react-router-dom';
 import { 
-  Calendar, 
-  Users, 
-  BarChart2, 
-  Activity, 
-  Settings, 
-  Bell, 
-  MessageSquare,
-  ChevronLeft,
-  UserCheck,
   LayoutDashboard,
   UserSearch,
-  User
+  User,
+  ChevronLeft
 } from 'lucide-react';
 import { useUser } from '@/context/UserContext';
 import { useState, useEffect } from 'react';
@@ -25,10 +17,7 @@ const Sidebar = () => {
   const { userRole, clientStatus, isLoading, userId, authInitialized } = useUser();
   const { toast } = useToast();
   const isClient = userRole === 'client';
-  const isClinician = userRole === 'clinician';
-  const isAdmin = userRole === 'admin';
   const isNewClient = isClient && clientStatus === 'New';
-  const [clinicianId, setClinicianId] = useState<string | null>(null);
   const [loadingError, setLoadingError] = useState<string | null>(null);
   const [loadingTimeout, setLoadingTimeout] = useState(false);
   
@@ -50,41 +39,6 @@ const Sidebar = () => {
       }
     };
   }, [isLoading, authInitialized]);
-  
-  useEffect(() => {
-    const fetchUserId = async () => {
-      try {
-        console.log("[Sidebar] Fetching user ID for clinician/admin");
-        const { data, error } = await supabase.auth.getUser();
-        
-        if (error) {
-          console.error("[Sidebar] Error fetching user:", error);
-          setLoadingError("Failed to load user data");
-          toast({
-            title: "Error",
-            description: "Failed to load user data. Please refresh the page.",
-            variant: "destructive"
-          });
-          return;
-        }
-        
-        if (data?.user) {
-          console.log("[Sidebar] Successfully fetched user ID:", data.user.id);
-          setClinicianId(data.user.id);
-        } else {
-          console.warn("[Sidebar] No user data returned");
-          setLoadingError("User data not available");
-        }
-      } catch (error) {
-        console.error("[Sidebar] Exception in fetchUserId:", error);
-        setLoadingError("An unexpected error occurred");
-      }
-    };
-    
-    if ((isClinician || isAdmin) && authInitialized) {
-      fetchUserId();
-    }
-  }, [isClinician, isAdmin, authInitialized, toast]);
   
   const isActive = (path: string) => {
     return currentPath === path;
@@ -158,8 +112,7 @@ const Sidebar = () => {
               <span>Therapist Selection</span>
             </Link>
             
-            {/* Remove Patient Profile link for client role users */}
-            {userId && !isClient && (
+            {userId && (
               <Link 
                 to={`/clients/${userId}`} 
                 className={`sidebar-link ${isActive(`/clients/${userId}`) ? 'active' : ''}`}
@@ -168,108 +121,17 @@ const Sidebar = () => {
                 <span>Patient Profile</span>
               </Link>
             )}
-          </>
-        )}
-        
-        {/* Clinician and Admin links */}
-        {(isClinician || isAdmin) && (
-          <>
+
             <Link 
-              to="/clinician-dashboard" 
-              className={`sidebar-link ${isActive('/clinician-dashboard') ? 'active' : ''}`}
+              to="/patient-documents" 
+              className={`sidebar-link ${isActive('/patient-documents') ? 'active' : ''}`}
             >
-              <LayoutDashboard size={18} />
-              <span>Dashboard</span>
-            </Link>
-            
-            {clinicianId && (
-              <Link 
-                to={`/clinicians/${clinicianId}`} 
-                className={`sidebar-link ${isActive(`/clinicians/${clinicianId}`) ? 'active' : ''}`}
-              >
-                <User size={18} />
-                <span>Profile</span>
-              </Link>
-            )}
-            
-            <Link 
-              to="/my-clients" 
-              className={`sidebar-link ${isActive('/my-clients') ? 'active' : ''}`}
-            >
-              <UserCheck size={18} />
-              <span>My Clients</span>
-            </Link>
-            
-            <Link 
-              to="/calendar" 
-              className={`sidebar-link ${isActive('/calendar') ? 'active' : ''}`}
-            >
-              <Calendar size={18} />
-              <span>Calendar</span>
-            </Link>
-          </>
-        )}
-        
-        {/* Admin/Staff only links */}
-        {isAdmin && (
-          <>
-            <Link 
-              to="/clients" 
-              className={`sidebar-link ${isActive('/clients') ? 'active' : ''}`}
-            >
-              <Users size={18} />
-              <span>Clients</span>
-            </Link>
-            
-            <Link 
-              to="/analytics" 
-              className={`sidebar-link ${isActive('/analytics') ? 'active' : ''}`}
-            >
-              <BarChart2 size={18} />
-              <span>Analytics</span>
-            </Link>
-            
-            <Link 
-              to="/activity" 
-              className={`sidebar-link ${isActive('/activity') ? 'active' : ''}`}
-            >
-              <Activity size={18} />
-              <span>Activity</span>
-            </Link>
-            
-            <Link 
-              to="/settings" 
-              className={`sidebar-link ${isActive('/settings') ? 'active' : ''}`}
-            >
-              <Settings size={18} />
-              <span>Settings</span>
+              <User size={18} />
+              <span>Documents</span>
             </Link>
           </>
         )}
       </nav>
-      
-      <div className="border-t py-4 space-y-1 px-2">
-        {/* Only show these links for admin roles */}
-        {isAdmin && (
-          <>
-            <Link 
-              to="/reminders" 
-              className={`sidebar-link ${isActive('/reminders') ? 'active' : ''}`}
-            >
-              <Bell size={18} />
-              <span>Reminders</span>
-            </Link>
-            
-            <Link 
-              to="/messages" 
-              className={`sidebar-link ${isActive('/messages') ? 'active' : ''}`}
-            >
-              <MessageSquare size={18} />
-              <span>Messages</span>
-            </Link>
-          </>
-        )}
-      </div>
     </div>
   );
 };
