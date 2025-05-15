@@ -4,6 +4,8 @@ import {
   LayoutDashboard,
   UserSearch,
   User,
+  FileText,
+  Settings,
   ChevronLeft
 } from 'lucide-react';
 import { useUser } from '@/context/UserContext';
@@ -101,7 +103,7 @@ const Sidebar = () => {
               className={`sidebar-link ${isActive('/patient-dashboard') ? 'active' : ''}`}
             >
               <LayoutDashboard size={18} />
-              <span>Patient Dashboard</span>
+              <span>Dashboard</span>
             </Link>
             
             <Link 
@@ -118,7 +120,7 @@ const Sidebar = () => {
                 className={`sidebar-link ${isActive(`/clients/${userId}`) ? 'active' : ''}`}
               >
                 <User size={18} />
-                <span>Patient Profile</span>
+                <span>My Profile</span>
               </Link>
             )}
 
@@ -126,8 +128,16 @@ const Sidebar = () => {
               to="/patient-documents" 
               className={`sidebar-link ${isActive('/patient-documents') ? 'active' : ''}`}
             >
-              <User size={18} />
+              <FileText size={18} />
               <span>Documents</span>
+            </Link>
+            
+            <Link 
+              to="/settings" 
+              className={`sidebar-link ${isActive('/settings') ? 'active' : ''}`}
+            >
+              <Settings size={18} />
+              <span>Settings</span>
             </Link>
           </>
         )}

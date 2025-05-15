@@ -39,3 +39,41 @@ export const getClinicianTimeZone = async (clinicianId: string): Promise<string>
     return 'America/Chicago'; // Default to Central Time
   }
 };
+
+// Create and export the useClinicianData hook
+export const useClinicianData = (clinicianId?: string) => {
+  const [clinicianData, setClinicianData] = useState<Clinician | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [error, setError] = useState<Error | null>(null);
+
+  useEffect(() => {
+    const fetchClinicianData = async () => {
+      if (!clinicianId) {
+        setIsLoading(false);
+        return;
+      }
+
+      try {
+        setIsLoading(true);
+        const data = await getClinicianById(clinicianId);
+        
+        if (data) {
+          setClinicianData(data);
+        }
+        setIsLoading(false);
+      } catch (err) {
+        console.error('Error in useClinicianData:', err);
+        setError(err instanceof Error ? err : new Error('Unknown error fetching clinician data'));
+        setIsLoading(false);
+      }
+    };
+
+    fetchClinicianData();
+  }, [clinicianId]);
+
+  return {
+    clinicianData,
+    isLoading,
+    error
+  };
+};

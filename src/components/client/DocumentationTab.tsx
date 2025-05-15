@@ -37,12 +37,9 @@ const DocumentationTab: React.FC<DocumentationTabProps> = ({
   const [documents, setDocuments] = useState<ClinicalDocument[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
-  const {
-    clinicianData
-  } = useClinicianData();
-  const {
-    toast
-  } = useToast();
+  // Use clinician data from the assigned therapist id if available
+  const { clinicianData } = useClinicianData(clientData?.client_assigned_therapist);
+  const { toast } = useToast();
 
   useEffect(() => {
     if (clientData?.id) {
