@@ -6,7 +6,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Info, Loader2 } from 'lucide-react'; // Added Loader2 for visual feedback
+import { Info, Loader2, RefreshCw } from 'lucide-react'; // Added RefreshCw for refresh button
 import { useNavigate } from 'react-router-dom';
 import { useUser } from '@/context/UserContext'; // Import useUser
 
@@ -44,7 +44,6 @@ const TherapistSelection = () => {
   const [allTherapists, setAllTherapists] = useState<Therapist[]>([]); // To store the full list for fallback
   const [filteringApplied, setFilteringApplied] = useState(false); // To track if filters were active
   const [selectingTherapistId, setSelectingTherapistId] = useState<string | null>(null);
-
 
   // Add timeout mechanism to prevent indefinite loading
   useEffect(() => {
@@ -155,7 +154,7 @@ const TherapistSelection = () => {
         if (fetchedTherapists.length > 0) {
             console.log("[TherapistSelection] Sample therapist data from DB:", JSON.stringify(fetchedTherapists[0], null, 2));
         }
-        setAllTherapists(fetchedTherapists); // Store all for potential fallback
+        setAllTherapists(fetchedTherapists); // Store all for potential reference
 
         if (clientData && (clientData.client_state || clientData.client_age !== null)) {
           console.log('[TherapistSelection DEBUG] Using this clientData FOR FILTERING:', JSON.stringify(clientData, null, 2));
@@ -206,18 +205,13 @@ const TherapistSelection = () => {
 
           console.log(`[TherapistSelection] FILTERING COMPLETE - Filtered count: ${filtered.length}, Total active therapists: ${fetchedTherapists.length}`);
           
-          if (filtered.length === 0 && fetchedTherapists.length > 0) {
-            console.log("[TherapistSelection] No matching therapists found after filtering, showing all active therapists as fallback.");
-            setTherapists(fetchedTherapists); // Fallback to all therapists
-            toast({
-              title: "Filtered Results",
-              description: "No therapists matched all your criteria. Showing all available therapists.",
-              variant: "default"
-            });
-            setFilteringApplied(false); // Indicate that the displayed list is not the filtered list
-          } else {
-            setTherapists(filtered);
-          }
+          // CHANGE: No longer show all therapists if no matches found
+          setTherapists(filtered);
+          
+          // Keep filtering applied true even if no results
+          // This ensures we show the "no therapists in your state" message
+          setFilteringApplied(true);
+          
         } else {
           // No clientData for filtering or clientData has no state/age, so show all therapists
           console.log("[TherapistSelection DEBUG] NOT filtering. clientData:", JSON.stringify(clientData, null, 2));
@@ -378,7 +372,6 @@ const TherapistSelection = () => {
                             Showing therapists who work with clients aged <strong>{clientData.client_age}</strong> and older.
                           </>
                         ) : null }
-                         {!filteringApplied && therapists.length > 0 && therapists.length !== allTherapists.length && " (Showing all due to no exact match)"}
                       </AlertDescription>
                     </Alert>
                   </div>
@@ -386,18 +379,42 @@ const TherapistSelection = () => {
 
                 {therapists.length === 0 ? (
                   <div className="text-center py-12">
-                    <p className="text-xl text-gray-600 mb-4">
-                      {filteringApplied && (clientData?.client_state || clientData?.client_age !== null)
-                        ? `No therapists currently match your specific criteria (State: ${clientData?.client_state || 'N/A'}, Age: ${clientData?.client_age ?? 'N/A'}).`
-                        : "No therapists are currently available. Please check back later."}
-                    </p>
-                    <p className="text-gray-500">If you believe this is an error, please contact support or try refreshing.</p>
-                    <Button 
-                      className="mt-6 bg-valorwell-600 hover:bg-valorwell-700"
-                      onClick={() => window.location.reload()}
-                    >
-                      Refresh Page
-                    </Button>
+                    {filteringApplied && clientData?.client_state ? (
+                      <div className="bg-amber-50 border border-amber-200 rounded-lg p-8 max-w-3xl mx-auto">
+                        <div className="text-amber-700 mb-4 flex justify-center">
+                          <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <line x1="12" y1="8" x2="12" y2="12"></line>
+                            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                          </svg>
+                        </div>
+                        <h3 className="text-2xl font-medium text-amber-800 mb-4">No Therapists Available in {clientData.client_state}</h3>
+                        <p className="text-amber-700 mb-4 text-lg">
+                          We're sorry, but we currently don't have any therapists licensed in {clientData.client_state}.
+                        </p>
+                        <p className="text-amber-600 mb-6">
+                          Our team is working diligently to expand our network of therapists across all states. Please check back soon, or contact our support team if you need immediate assistance.
+                        </p>
+                        <Button 
+                          onClick={() => window.location.reload()}
+                          className="bg-valorwell-600 hover:bg-valorwell-700 text-white flex items-center gap-2"
+                        >
+                          <RefreshCw className="h-4 w-4" /> Refresh
+                        </Button>
+                      </div>
+                    ) : (
+                      <>
+                        <p className="text-xl text-gray-600 mb-4">
+                          No therapists are currently available. Please check back later.
+                        </p>
+                        <Button 
+                          className="mt-6 bg-valorwell-600 hover:bg-valorwell-700"
+                          onClick={() => window.location.reload()}
+                        >
+                          <RefreshCw className="h-4 w-4 mr-2" /> Refresh Page
+                        </Button>
+                      </>
+                    )}
                   </div>
                 ) : (
                   <div className="space-y-8">
