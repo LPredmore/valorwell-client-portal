@@ -4,7 +4,7 @@ import Layout from '@/components/layout/Layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { FileText, ClipboardCheck } from 'lucide-react';
-import { getCurrentUser, fetchDocumentAssignments, DocumentAssignment, fetchClinicalDocuments } from '@/integrations/supabase/client';
+import { getCurrentUser, fetchDocumentAssignments, DocumentAssignment } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import DocumentAssignmentsList from '@/components/patient/DocumentAssignmentsList';
 import DocumentFormRenderer from '@/components/patient/DocumentFormRenderer';
@@ -137,11 +137,11 @@ const PatientDocuments: React.FC = () => {
             <TabsList className="mb-6">
               <TabsTrigger value="assignments" className="flex items-center gap-1">
                 <ClipboardCheck className="h-4 w-4" />
-                Assigned Documents
+                Form Assignments
               </TabsTrigger>
               <TabsTrigger value="documents" className="flex items-center gap-1">
                 <FileText className="h-4 w-4" />
-                Completed Documents
+                Medical Records
               </TabsTrigger>
             </TabsList>
             
