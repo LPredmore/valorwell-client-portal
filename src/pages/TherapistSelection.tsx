@@ -7,7 +7,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Info, Loader2, RefreshCw } from 'lucide-react'; // Added RefreshCw for refresh button
+import { Info, Loader2, RefreshCw, AlertCircle } from 'lucide-react'; // Added AlertCircle for error display
 import { useNavigate } from 'react-router-dom';
 import { useUser } from '@/context/UserContext'; // Import useUser
 
@@ -22,7 +22,7 @@ interface Therapist {
   clinician_first_name: string | null;
   clinician_last_name: string | null;
   clinician_professional_name: string | null;
-  clinician_type: string | null; // Changed from clinician_title to clinician_type
+  clinician_type: string | null; // Confirmed: using clinician_type not clinician_title
   clinician_bio: string | null;
   clinician_bio_short: string | null;
   clinician_licensed_states: string[] | null;
@@ -45,6 +45,9 @@ const TherapistSelection = () => {
   const [allTherapists, setAllTherapists] = useState<Therapist[]>([]); // To store the full list for fallback
   const [filteringApplied, setFilteringApplied] = useState(false); // To track if filters were active
   const [selectingTherapistId, setSelectingTherapistId] = useState<string | null>(null);
+  
+  // Add a new state for database query errors
+  const [dbError, setDbError] = useState<string | null>(null);
 
   // Add timeout mechanism to prevent indefinite loading
   useEffect(() => {
@@ -136,10 +139,15 @@ const TherapistSelection = () => {
         return;
     }
 
+    // Reset the database error state before fetching
+    setDbError(null);
+
     const fetchAndFilterTherapists = async () => {
       setLoadingTherapists(true);
       setFilteringApplied(false); // Reset filtering applied flag
       try {
+        console.log("[TherapistSelection] Starting fetch therapists query...");
+        
         const { data: activeTherapists, error } = await supabase
           .from('clinicians')
           .select('id, clinician_first_name, clinician_last_name, clinician_professional_name, clinician_type, clinician_bio, clinician_bio_short, clinician_licensed_states, clinician_min_client_age, clinician_profile_image, clinician_image_url')
@@ -147,7 +155,23 @@ const TherapistSelection = () => {
 
         if (error) {
           console.error('Error fetching therapists:', error);
-          throw error;
+          
+          // Set specific error message based on the error type
+          if (error.code === '42703') {
+            setDbError(`Database column error: ${error.message}. Please contact support.`);
+          } else {
+            setDbError(`Failed to load therapists: ${error.message}`);
+          }
+          
+          toast({
+            title: "Database Error",
+            description: "There was an issue retrieving therapist data. Please try again later.",
+            variant: "destructive"
+          });
+          setTherapists([]);
+          setAllTherapists([]);
+          setLoadingTherapists(false);
+          return;
         }
         
         const fetchedTherapists = activeTherapists || [];
@@ -221,6 +245,7 @@ const TherapistSelection = () => {
         }
       } catch (error: any) {
         console.error('Error fetching or filtering therapists:', error);
+        setDbError(`Unexpected error: ${error.message}`);
         toast({
           title: 'Error Loading Therapists',
           description: error.message || 'Failed to load therapists. Please try again later.',
@@ -240,6 +265,14 @@ const TherapistSelection = () => {
     }
 
   }, [isUserContextLoading, clientData, toast]); // Removed filteringEnabled as it was causing loops
+
+  // Function to retry loading therapists if there was an error
+  const handleRetryFetch = () => {
+    console.log("[TherapistSelection] Retrying therapist fetch...");
+    setDbError(null);
+    // This will trigger the useEffect to run again
+    setClientData({...clientData!});
+  };
 
   const handleSelectTherapist = async (therapist: Therapist) => {
     if (!authUserId) {
@@ -330,6 +363,38 @@ const TherapistSelection = () => {
               Refresh Page
             </button>
           </div>
+        </div>
+      </Layout>
+    );
+  }
+
+  // New: Handle database error state
+  if (dbError) {
+    return (
+      <Layout>
+        <div className="container max-w-6xl mx-auto py-6">
+          <Card className="shadow-lg border-valorwell-300">
+            <CardHeader className="text-center bg-gradient-to-r from-valorwell-50 to-valorwell-100 rounded-t-lg py-8">
+              <CardTitle className="text-3xl md:text-4xl font-bold text-valorwell-700">Select Your Therapist</CardTitle>
+              <CardDescription className="text-lg md:text-xl mt-2 text-valorwell-600">
+                Choose a therapist who best fits your needs and preferences.
+              </CardDescription>
+            </CardHeader>
+            
+            <CardContent className="pt-8 px-4 md:px-6">
+              <div className="bg-red-50 p-6 rounded-lg border border-red-200 my-4 text-center">
+                <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-3" />
+                <h3 className="text-xl font-medium text-red-800 mb-2">Database Error</h3>
+                <p className="text-red-600 mb-6">{dbError}</p>
+                <Button 
+                  onClick={handleRetryFetch}
+                  className="bg-valorwell-600 hover:bg-valorwell-700 text-white"
+                >
+                  <RefreshCw className="mr-2 h-4 w-4" /> Retry
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </Layout>
     );
