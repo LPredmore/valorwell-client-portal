@@ -273,15 +273,22 @@ export const submitInformedConsentForm = async (clientId: string, formData: any)
   }
 };
 
-// New function to fetch clinical documents for a client
-export const fetchClinicalDocuments = async (clientId: string) => {
+// Modified function to fetch clinical documents with filtering
+export const fetchClinicalDocuments = async (clientId: string, excludeTypes?: string[]) => {
   try {
-    const { data, error } = await supabase
+    let query = supabase
       .from('clinical_documents')
       .select('*')
       .eq('client_id', clientId)
       .order('document_date', { ascending: false });
-      
+    
+    // Apply filter to exclude specific document types if provided
+    if (excludeTypes && excludeTypes.length > 0) {
+      query = query.not('document_type', 'in', `(${excludeTypes.join(',')})`);
+    }
+    
+    const { data, error } = await query;
+    
     if (error) throw error;
     return data || [];
   } catch (error) {

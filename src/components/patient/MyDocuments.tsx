@@ -38,7 +38,8 @@ const MyDocuments: React.FC<{ clientId?: string }> = ({ clientId }) => {
           userId = user.id;
         }
         
-        const docs = await fetchClinicalDocuments(userId);
+        // Exclude Patient Treatment Plan and Session Notes by default for patient view
+        const docs = await fetchClinicalDocuments(userId, ['treatment_plan', 'session_note']);
         setDocuments(docs);
       } catch (error) {
         console.error('Error loading documents:', error);
@@ -80,8 +81,8 @@ const MyDocuments: React.FC<{ clientId?: string }> = ({ clientId }) => {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Documents</CardTitle>
-        <CardDescription>View and download your documents</CardDescription>
+        <CardTitle>Completed Documents</CardTitle>
+        <CardDescription>View and download your completed documents</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         {isLoading ? (
@@ -93,7 +94,7 @@ const MyDocuments: React.FC<{ clientId?: string }> = ({ clientId }) => {
             <FileText className="h-12 w-12 text-gray-300 mb-3" />
             <h3 className="text-lg font-medium">No documents available</h3>
             <p className="text-sm text-gray-500 mt-1">
-              Your therapist will add documents here
+              Complete your assigned documents to see them here
             </p>
           </div>
         ) : (
