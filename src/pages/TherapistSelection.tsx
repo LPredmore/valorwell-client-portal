@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState, useCallback } from 'react'; // Added useCallback
 import Layout from '@/components/layout/Layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -21,7 +22,7 @@ interface Therapist {
   clinician_first_name: string | null;
   clinician_last_name: string | null;
   clinician_professional_name: string | null;
-  clinician_title: string | null;
+  clinician_type: string | null; // Changed from clinician_title to clinician_type
   clinician_bio: string | null;
   clinician_bio_short: string | null;
   clinician_licensed_states: string[] | null;
@@ -141,7 +142,7 @@ const TherapistSelection = () => {
       try {
         const { data: activeTherapists, error } = await supabase
           .from('clinicians')
-          .select('id, clinician_first_name, clinician_last_name, clinician_professional_name, clinician_title, clinician_bio, clinician_bio_short, clinician_licensed_states, clinician_min_client_age, clinician_profile_image, clinician_image_url')
+          .select('id, clinician_first_name, clinician_last_name, clinician_professional_name, clinician_type, clinician_bio, clinician_bio_short, clinician_licensed_states, clinician_min_client_age, clinician_profile_image, clinician_image_url')
           .eq('clinician_status', 'Active');
 
         if (error) {
@@ -436,7 +437,7 @@ const TherapistSelection = () => {
                               <h3 className="text-xl font-semibold text-center text-valorwell-700">
                                 {displayTherapistName(therapist)}
                               </h3>
-                              <p className="text-sm text-gray-500 mt-1 text-center">{therapist.clinician_title || 'Therapist'}</p>
+                              <p className="text-sm text-gray-500 mt-1 text-center">{therapist.clinician_type || 'Therapist'}</p>
                               
                               <Button 
                                 className="mt-4 w-full bg-valorwell-600 hover:bg-valorwell-700 text-white"
