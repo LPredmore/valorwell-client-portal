@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { DocumentAssignment } from '@/integrations/supabase/client';
 import InformedConsentTemplate from '../templates/InformedConsentTemplate';
@@ -24,9 +24,6 @@ const DocumentFormRenderer: React.FC<DocumentFormRendererProps> = ({
   onCancel,
   onComplete,
 }) => {
-  // Adding a default clinician name - this would ideally come from a context or prop
-  const defaultClinicianName = "Provider"; // Default value
-  
   // Render the appropriate form based on document name/type
   const renderFormTemplate = () => {
     switch (assignment.document_name) {
@@ -46,14 +43,12 @@ const DocumentFormRenderer: React.FC<DocumentFormRendererProps> = ({
         return (
           <PHQ9Template 
             onClose={onComplete}
-            clinicianName={defaultClinicianName}
           />
         );
       case 'GAD-7 Assessment':
         return (
           <GAD7Template 
             onClose={onComplete}
-            clinicianName={defaultClinicianName}
           />
         );
       default:
