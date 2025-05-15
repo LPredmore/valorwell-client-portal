@@ -4,7 +4,8 @@ import {
   LayoutDashboard,
   UserSearch,
   User,
-  FileText
+  FileText,
+  Users
 } from 'lucide-react';
 import { useUser } from '@/context/UserContext';
 import { useState, useEffect } from 'react';
@@ -17,6 +18,7 @@ const Sidebar = () => {
   const { userRole, clientStatus, isLoading, userId, authInitialized } = useUser();
   const { toast } = useToast();
   const isClient = userRole === 'client';
+  const isStaff = ['staff', 'admin', 'clinician'].includes(userRole || '');
   const isNewClient = isClient && clientStatus === 'New';
   const [loadingError, setLoadingError] = useState<string | null>(null);
   const [loadingTimeout, setLoadingTimeout] = useState(false);
@@ -41,6 +43,10 @@ const Sidebar = () => {
   }, [isLoading, authInitialized]);
   
   const isActive = (path: string) => {
+    // For client detail pages, check if we're in any client page
+    if (path === '/clients' && currentPath.startsWith('/clients/')) {
+      return true;
+    }
     return currentPath === path;
   };
 
@@ -90,7 +96,20 @@ const Sidebar = () => {
       </div>
       
       <nav className="flex-1 py-4 space-y-1 px-2">
-        {/* Links only visible to non-new clients */}
+        {/* Links for staff users */}
+        {isStaff && (
+          <>
+            <Link 
+              to="/clients" 
+              className={`sidebar-link ${isActive('/clients') ? 'active' : ''}`}
+            >
+              <Users size={18} />
+              <span>My Patients</span>
+            </Link>
+          </>
+        )}
+        
+        {/* Links for non-new client users */}
         {isClient && !isNewClient && (
           <>
             <Link 
