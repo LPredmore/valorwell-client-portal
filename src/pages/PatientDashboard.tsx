@@ -10,7 +10,7 @@ import {
   CardTitle 
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Calendar } from 'lucide-react';
+import { Calendar, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/NewAuthContext';
 import { toast } from 'sonner';
@@ -20,20 +20,25 @@ const PatientDashboard = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
   const { clientStatus, authState, isLoading } = useAuth();
   
-  // Redirect to profile setup if client status is "New"
   useEffect(() => {
+    console.log("[PatientDashboard] Current state: clientStatus=", clientStatus, "isLoading=", isLoading);
+    
+    // Redirect to profile setup if client status is "New"
     if (!isLoading && clientStatus === 'New') {
-      console.log("User has New status, redirecting to profile setup");
+      console.log("[PatientDashboard] User has New status, redirecting to profile setup");
       toast.info("Please complete your profile setup first");
-      navigate('/profile-setup');
+      navigate('/profile-setup', { replace: true });
     }
   }, [clientStatus, navigate, isLoading]);
   
-  // If still loading, show nothing to prevent flash
+  // If still loading, show loading indicator
   if (isLoading) {
-    return <div className="flex items-center justify-center h-screen">
-      <div className="animate-spin h-10 w-10 border-4 border-blue-500 rounded-full border-t-transparent"></div>
-    </div>;
+    return (
+      <div className="flex items-center justify-center h-screen flex-col">
+        <Loader2 className="h-12 w-12 animate-spin text-blue-500 mb-4" />
+        <p className="text-gray-600">Loading your dashboard...</p>
+      </div>
+    );
   }
   
   return (

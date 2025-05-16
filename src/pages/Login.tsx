@@ -12,19 +12,29 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 
 const Login = () => {
   const navigate = useNavigate();
-  const { login, authState, userRole, clientStatus, authInitialized } = useAuth();
+  const { login, authState, userRole, clientStatus, authInitialized, isLoading } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [loginTimeout, setLoginTimeout] = useState<NodeJS.Timeout | null>(null);
   
   // Reset form state when auth state changes
   useEffect(() => {
-    console.log("Auth state changed in Login component:", authState, "userRole:", userRole, "clientStatus:", clientStatus);
+    console.log("Auth state changed in Login component:", authState, "userRole:", userRole, 
+      "clientStatus:", clientStatus, "isLoading:", isLoading);
     
-    // If we're authenticated and form was submitting, handle redirection
-    if (authState === AuthState.AUTHENTICATED && isSubmitting) {
+    // If we're authenticated, client status is loaded, and form was submitting, handle redirection
+    if (authState === AuthState.AUTHENTICATED && !isLoading && isSubmitting) {
+      console.log("Auth complete and client data loaded. Ready for redirection.");
       setIsSubmitting(false);
+      
+      // Clear safety timeout if it exists
+      if (loginTimeout) {
+        clearTimeout(loginTimeout);
+        setLoginTimeout(null);
+      }
+      
       handleSuccessfulLogin();
     }
     
@@ -32,8 +42,23 @@ const Login = () => {
     if (authState === AuthState.ERROR && isSubmitting) {
       setIsSubmitting(false);
       setError("Authentication error. Please try again.");
+      
+      // Clear safety timeout if it exists
+      if (loginTimeout) {
+        clearTimeout(loginTimeout);
+        setLoginTimeout(null);
+      }
     }
-  }, [authState, userRole, clientStatus]);
+  }, [authState, userRole, clientStatus, isLoading, loginTimeout]);
+
+  // Clean up timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (loginTimeout) {
+        clearTimeout(loginTimeout);
+      }
+    };
+  }, [loginTimeout]);
 
   const handleSuccessfulLogin = () => {
     console.log("Handling successful login. userRole:", userRole, "clientStatus:", clientStatus);
@@ -74,22 +99,26 @@ const Login = () => {
       console.log("Login result:", success, error);
       
       if (success) {
-        // Don't navigate here - let the useEffect handle it
-        // The loading state will be reset by the useEffect
-        console.log("Login successful, waiting for auth state update");
-        
-        // Set a safety timeout to reset loading state if auth state doesn't change
-        setTimeout(() => {
+        // Set a safety timeout to reset loading state if client data loading doesn't complete
+        const timeout = setTimeout(() => {
+          console.log("Safety timeout reached - force handling login completion");
+          
           if (isSubmitting) {
-            console.log("Safety timeout reached, forcing loading state reset");
             setIsSubmitting(false);
             
-            // If we're already authenticated but stuck, try redirecting
+            // If we're already authenticated but client data is taking too long, try redirecting anyway
             if (authState === AuthState.AUTHENTICATED) {
+              console.log("Auth is complete but client data may be incomplete. Forcing redirection.");
               handleSuccessfulLogin();
+            } else {
+              console.log("Auth still not complete after timeout. Showing error message.");
+              setError("Login process is taking longer than expected. Please try again.");
             }
           }
-        }, 3000);
+        }, 5000); // 5 second timeout
+        
+        setLoginTimeout(timeout);
+        
       } else {
         setError(error?.message || "Invalid login credentials. Please try again.");
         setIsSubmitting(false);
