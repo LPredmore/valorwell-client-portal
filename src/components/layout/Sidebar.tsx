@@ -1,152 +1,174 @@
 
-import { Link, useLocation } from 'react-router-dom';
-import { 
+import { useState } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
+import {
   LayoutDashboard,
-  UserSearch,
-  User,
   FileText,
-  Users
+  MessageSquare,
+  Calendar,
+  Users,
+  Settings,
+  Menu,
+  X
 } from 'lucide-react';
-import { useUser } from '@/context/UserContext';
-import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
+
+type NavItem = {
+  label: string;
+  href: string;
+  icon: React.ReactNode;
+  roles?: string[];
+};
 
 const Sidebar = () => {
+  const navigate = useNavigate();
   const location = useLocation();
-  const currentPath = location.pathname;
-  const { userRole, clientStatus, isLoading, userId, authInitialized } = useUser();
-  const { toast } = useToast();
-  const isClient = userRole === 'client';
-  const isStaff = ['staff', 'admin', 'clinician'].includes(userRole || '');
-  const isNewClient = isClient && clientStatus === 'New';
-  const [loadingError, setLoadingError] = useState<string | null>(null);
-  const [loadingTimeout, setLoadingTimeout] = useState(false);
-  
-  // Add timeout mechanism to prevent indefinite loading
-  useEffect(() => {
-    let timeoutId: NodeJS.Timeout;
-    
-    if (isLoading || !authInitialized) {
-      console.log("[Sidebar] Starting loading timeout check");
-      timeoutId = setTimeout(() => {
-        console.log("[Sidebar] Loading timeout reached after 10 seconds");
-        setLoadingTimeout(true);
-      }, 10000); // 10 seconds timeout
+  const [expanded, setExpanded] = useState(true);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const role = 'client'; // Default role for placeholders
+
+  // Navigation items
+  const navItems: NavItem[] = [
+    {
+      label: 'Dashboard',
+      href: '/patient-dashboard',
+      icon: <LayoutDashboard className="h-5 w-5" />,
+      roles: ['client']
+    },
+    {
+      label: 'Documents',
+      href: '/patient-documents',
+      icon: <FileText className="h-5 w-5" />,
+      roles: ['client']
+    },
+    {
+      label: 'Messages',
+      href: '/messages',
+      icon: <MessageSquare className="h-5 w-5" />,
+      roles: ['client', 'clinician']
+    },
+    {
+      label: 'Appointments',
+      href: '/appointments',
+      icon: <Calendar className="h-5 w-5" />,
+      roles: ['client', 'clinician']
+    },
+    {
+      label: 'Clients',
+      href: '/clients',
+      icon: <Users className="h-5 w-5" />,
+      roles: ['clinician', 'admin']
+    },
+    {
+      label: 'Settings',
+      href: '/settings',
+      icon: <Settings className="h-5 w-5" />
     }
-    
-    return () => {
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-      }
-    };
-  }, [isLoading, authInitialized]);
-  
-  const isActive = (path: string) => {
-    // For client detail pages, check if we're in any client page
-    if (path === '/clients' && currentPath.startsWith('/clients/')) {
-      return true;
-    }
-    return currentPath === path;
+  ];
+
+  // Filter navigation items based on role (for UI demo purposes only)
+  const filteredNavItems = navItems.filter(
+    item => !item.roles || item.roles.includes(role)
+  );
+
+  const toggleExpanded = () => {
+    setExpanded(prev => !prev);
   };
 
-  if (isLoading || !authInitialized) {
-    return (
-      <div className="w-[220px] min-h-screen border-r bg-white flex flex-col items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-valorwell-600 mb-4"></div>
-        <p className="text-sm text-valorwell-600">
-          {loadingTimeout ? "Taking longer than expected..." : "Loading..."}
-        </p>
-      </div>
-    );
-  }
-  
-  if (loadingError) {
-    return (
-      <div className="w-[220px] min-h-screen border-r bg-white flex flex-col items-center justify-center p-4">
-        <div className="text-red-500 mb-4">
-          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="12" cy="12" r="10"></circle>
-            <line x1="12" y1="8" x2="12" y2="12"></line>
-            <line x1="12" y1="16" x2="12.01" y2="16"></line>
-          </svg>
-        </div>
-        <p className="text-sm text-center text-red-600">{loadingError}</p>
-        <button
-          onClick={() => window.location.reload()}
-          className="mt-4 px-4 py-2 bg-valorwell-600 text-white rounded-md text-sm"
-        >
-          Refresh Page
-        </button>
-      </div>
-    );
-  }
+  const toggleMobileMenu = () => {
+    setIsMobileMenuOpen(prev => !prev);
+  };
 
   return (
-    <div className="w-[220px] min-h-screen border-r bg-white flex flex-col">
-      <div className="p-4 flex items-center gap-2 border-b">
-        <Link to="/" className="flex items-center gap-2">
-          <img 
-            src="/lovable-uploads/47fe3428-4c8d-48fd-9f59-8040e817c9a8.png" 
-            alt="ValorWell" 
-            className="h-8 w-8" 
-          />
-          <span className="text-xl font-semibold text-valorwell-700">ValorWell</span>
-        </Link>
-      </div>
-      
-      <nav className="flex-1 py-4 space-y-1 px-2">
-        {/* Links for staff users */}
-        {isStaff && (
-          <>
-            <Link 
-              to="/clients" 
-              className={`sidebar-link ${isActive('/clients') ? 'active' : ''}`}
-            >
-              <Users size={18} />
-              <span>My Patients</span>
-            </Link>
-          </>
-        )}
-        
-        {/* Links for non-new client users */}
-        {isClient && !isNewClient && (
-          <>
-            <Link 
-              to="/patient-dashboard" 
-              className={`sidebar-link ${isActive('/patient-dashboard') ? 'active' : ''}`}
-            >
-              <LayoutDashboard size={18} />
-              <span>Dashboard</span>
-            </Link>
-            
-            <Link 
-              to="/therapist-selection" 
-              className={`sidebar-link ${isActive('/therapist-selection') ? 'active' : ''}`}
-            >
-              <UserSearch size={18} />
-              <span>Therapist Selection</span>
-            </Link>
-            
-            <Link 
-              to="/patient-profile" 
-              className={`sidebar-link ${isActive('/patient-profile') ? 'active' : ''}`}
-            >
-              <User size={18} />
-              <span>My Profile</span>
-            </Link>
+    <>
+      {/* Mobile menu button */}
+      <Button
+        variant="ghost"
+        size="icon"
+        className="fixed top-4 left-4 z-50 md:hidden"
+        onClick={toggleMobileMenu}
+      >
+        {isMobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+      </Button>
 
-            <Link 
-              to="/patient-documents" 
-              className={`sidebar-link ${isActive('/patient-documents') ? 'active' : ''}`}
-            >
-              <FileText size={18} />
-              <span>Documents</span>
-            </Link>
-          </>
+      {/* Mobile sidebar backdrop */}
+      {isMobileMenuOpen && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-40 md:hidden"
+          onClick={toggleMobileMenu}
+        />
+      )}
+
+      {/* Sidebar */}
+      <aside
+        className={cn(
+          "bg-white border-r h-screen transition-all duration-300 fixed md:static z-50",
+          expanded ? "w-64" : "w-[70px]",
+          isMobileMenuOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
         )}
-      </nav>
-    </div>
+      >
+        <div className="flex flex-col h-full">
+          {/* Logo area */}
+          <div 
+            className={cn(
+              "flex items-center h-16 px-4 border-b",
+              expanded ? "justify-between" : "justify-center"
+            )}
+          >
+            {expanded && <span className="text-lg font-semibold">Valorwell</span>}
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={toggleExpanded}
+              className="hidden md:flex"
+            >
+              <Menu className="h-5 w-5" />
+            </Button>
+          </div>
+
+          {/* Navigation links */}
+          <nav className="flex-1 overflow-y-auto p-2">
+            <ul className="space-y-1">
+              {filteredNavItems.map((item) => (
+                <li key={item.href}>
+                  <Button
+                    variant={location.pathname === item.href ? "secondary" : "ghost"}
+                    className={cn(
+                      "w-full justify-start",
+                      expanded ? "px-3" : "px-2"
+                    )}
+                    onClick={() => {
+                      navigate(item.href);
+                      if (isMobileMenuOpen) setIsMobileMenuOpen(false);
+                    }}
+                  >
+                    {item.icon}
+                    {expanded && <span className="ml-2">{item.label}</span>}
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          </nav>
+
+          {/* Footer */}
+          <div className="p-4 border-t">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="w-full"
+              onClick={() => {
+                navigate('/login');
+                if (isMobileMenuOpen) setIsMobileMenuOpen(false);
+              }}
+            >
+              <LogOut className="h-4 w-4 mr-2" />
+              {expanded && "Logout"}
+            </Button>
+          </div>
+        </div>
+      </aside>
+    </>
   );
 };
 
