@@ -1,29 +1,62 @@
 
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
+import { useAuth, AuthState } from '@/context/NewAuthContext';
+import { AlertCircle, Loader2 } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 const Login = () => {
   const navigate = useNavigate();
+  const { login, authState, userRole, clientStatus } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError(null);
+    
+    if (!email || !password) {
+      setError("Please enter both email and password");
+      return;
+    }
     
     setIsSubmitting(true);
     
-    // Simulate login process
-    setTimeout(() => {
-      toast.success("Login successful", { description: "Welcome back!" });
+    try {
+      const { success, error } = await login(email, password);
+      
+      if (success) {
+        toast.success("Login successful", { description: "Welcome back!" });
+        
+        // Handle redirection based on role and client status
+        if (userRole === 'client') {
+          if (clientStatus === 'New') {
+            navigate("/profile-setup");
+          } else {
+            navigate("/patient-dashboard");
+          }
+        } else if (userRole === 'clinician') {
+          navigate("/clients");
+        } else if (userRole === 'admin') {
+          navigate("/settings");
+        } else {
+          navigate("/");
+        }
+      } else {
+        setError(error?.message || "Invalid login credentials. Please try again.");
+      }
+    } catch (err: any) {
+      setError(err.message || "An unexpected error occurred. Please try again.");
+    } finally {
       setIsSubmitting(false);
-      navigate("/patient-dashboard");
-    }, 1000);
+    }
   };
 
   return (
@@ -36,6 +69,13 @@ const Login = () => {
           </CardDescription>
         </CardHeader>
         <CardContent>
+          {error && (
+            <Alert variant="destructive" className="mb-4">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+          
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
@@ -69,7 +109,12 @@ const Login = () => {
             </div>
             
             <Button type="submit" className="w-full" disabled={isSubmitting}>
-              {isSubmitting ? "Signing in..." : "Sign in"}
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Signing in...
+                </>
+              ) : "Sign in"}
             </Button>
           </form>
         </CardContent>

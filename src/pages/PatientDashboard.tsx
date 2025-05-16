@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import NewLayout from '@/components/layout/NewLayout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
@@ -12,10 +12,19 @@ import {
 import { Button } from '@/components/ui/button';
 import { Calendar } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/context/NewAuthContext';
 
 const PatientDashboard = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('dashboard');
+  const { clientStatus } = useAuth();
+  
+  // Redirect to profile setup if client status is "New"
+  useEffect(() => {
+    if (clientStatus === 'New') {
+      navigate('/profile-setup');
+    }
+  }, [clientStatus, navigate]);
   
   return (
     <NewLayout>
