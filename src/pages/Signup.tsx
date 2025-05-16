@@ -62,6 +62,11 @@ const Signup = () => {
     try {
       console.log("[Signup] Starting client registration with values:", values);
       
+      // If preferredName is empty, use firstName instead
+      const preferredName = values.preferredName?.trim() 
+        ? values.preferredName 
+        : values.firstName;
+      
       // Generate a random password (will be reset later)
       const tempPassword = Math.random().toString(36).slice(-8) + Math.random().toString(36).slice(-8);
       
@@ -85,6 +90,7 @@ const Signup = () => {
               data: {
                 first_name: values.firstName,
                 last_name: values.lastName,
+                preferred_name: preferredName, // Use firstName if preferredName is empty
                 phone: values.phone,
                 role: "client",
                 state: values.state,
