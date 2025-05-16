@@ -1,9 +1,8 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { ClinicianQueryDebugger } from '@/debug/clinicianQueryDebugger';
 import { useToast } from '@/hooks/use-toast';
-import { Client } from '@/types/client';
+import { ClientDetails } from '@/types/client';
 
 export interface Therapist {
   id: string;
@@ -12,7 +11,7 @@ export interface Therapist {
   clinician_professional_name: string | null;
   clinician_type: string | null; 
   clinician_bio: string | null;
-  clinician_bio_short: string | null;
+  clinician_bio_short?: string | null;
   clinician_licensed_states: string[] | null;
   clinician_min_client_age: number | null;
   clinician_profile_image: string | null;
@@ -71,7 +70,7 @@ export const useTherapistSelection = ({
       const result = await ClinicianQueryDebugger.debugQuery<Therapist>(
         'clinicians',
         (query) => query
-          .select('id, clinician_first_name, clinician_last_name, clinician_professional_name, clinician_type, clinician_bio, clinician_bio_short, clinician_licensed_states, clinician_min_client_age, clinician_profile_image, clinician_image_url')
+          .select('id, clinician_first_name, clinician_last_name, clinician_professional_name, clinician_type, clinician_bio, clinician_licensed_states, clinician_min_client_age, clinician_profile_image, clinician_image_url')
           .eq('clinician_status', 'Active')
       );
       
@@ -86,7 +85,7 @@ export const useTherapistSelection = ({
         const compatResult = await ClinicianQueryDebugger.debugQuery<Therapist>(
           'clinicians_compatibility_view',
           (query) => query
-            .select('id, clinician_first_name, clinician_last_name, clinician_professional_name, clinician_type, clinician_bio, clinician_bio_short, clinician_licensed_states, clinician_min_client_age, clinician_profile_image, clinician_image_url')
+            .select('id, clinician_first_name, clinician_last_name, clinician_professional_name, clinician_type, clinician_bio, clinician_licensed_states, clinician_min_client_age, clinician_profile_image, clinician_image_url')
             .eq('clinician_status', 'Active')
         );
         
@@ -101,7 +100,7 @@ export const useTherapistSelection = ({
           const noStatusResult = await ClinicianQueryDebugger.debugQuery<Therapist>(
             'clinicians',
             (query) => query
-              .select('id, clinician_first_name, clinician_last_name, clinician_professional_name, clinician_type, clinician_bio, clinician_bio_short, clinician_licensed_states, clinician_min_client_age, clinician_profile_image, clinician_image_url')
+              .select('id, clinician_first_name, clinician_last_name, clinician_professional_name, clinician_type, clinician_bio, clinician_licensed_states, clinician_min_client_age, clinician_profile_image, clinician_image_url')
           );
           
           if (!noStatusResult.error) {
@@ -116,7 +115,7 @@ export const useTherapistSelection = ({
             // Strategy 4: Direct query as a last resort
             const directResult = await supabase
               .from('clinicians')
-              .select('id, clinician_first_name, clinician_last_name, clinician_professional_name, clinician_type, clinician_bio, clinician_bio_short, clinician_licensed_states, clinician_min_client_age, clinician_profile_image, clinician_image_url');
+              .select('id, clinician_first_name, clinician_last_name, clinician_professional_name, clinician_type, clinician_bio, clinician_licensed_states, clinician_min_client_age, clinician_profile_image, clinician_image_url');
             
             if (!directResult.error) {
               console.log('[useTherapistSelection] Strategy 4 succeeded (direct query)');

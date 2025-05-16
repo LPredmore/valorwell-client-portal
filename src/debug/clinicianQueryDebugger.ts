@@ -1,8 +1,17 @@
 
 import { DebugUtils } from './debugUtils';
 import { supabase } from '@/integrations/supabase/client';
+import { PostgrestSingleResponse } from '@supabase/supabase-js';
 
 const CONTEXT = 'ClinicianQueryDebugger';
+
+/**
+ * Interface to ensure consistent return types
+ */
+export interface QueryResult<T> {
+  data: T[] | null;
+  error: any;
+}
 
 /**
  * Debugging utility to help identify where "clinician_title" references are coming from
@@ -20,7 +29,7 @@ export class ClinicianQueryDebugger {
   public static async debugQuery<T>(
     tableName: string,
     queryBuilder: (query: any) => any
-  ): Promise<{ data: T[] | null; error: any }> {
+  ): Promise<QueryResult<T>> {
     try {
       // Start with the base query
       const baseQuery = supabase.from(tableName).select();
@@ -244,7 +253,7 @@ export class ClinicianQueryDebugger {
     tableName: string,
     columns: string,
     filters: Record<string, any>
-  ): Promise<{ data: T[] | null; error: any }> {
+  ): Promise<QueryResult<T>> {
     try {
       console.log(`[ClinicianQueryDebugger] Performing direct query on ${tableName} with fresh client`);
       
@@ -262,7 +271,10 @@ export class ClinicianQueryDebugger {
       // Execute
       const result = await query;
       
-      return result;
+      return { 
+        data: result.data as T[] | null, 
+        error: result.error 
+      };
     } catch (error) {
       console.error('[ClinicianQueryDebugger] Error in direct query:', error);
       return { data: null, error };
@@ -272,11 +284,11 @@ export class ClinicianQueryDebugger {
   /**
    * Wraps the specific query in TherapistSelection.tsx to debug it
    */
-  public static async wrapTherapistSelectionQuery() {
-    return this.debugQuery(
+  public static async wrapTherapistSelectionQuery<T>(): Promise<QueryResult<T>> {
+    return this.debugQuery<T>(
       'clinicians',
       (query) => query
-        .select('id, clinician_first_name, clinician_last_name, clinician_professional_name, clinician_type, clinician_bio, clinician_bio_short, clinician_licensed_states, clinician_min_client_age, clinician_profile_image, clinician_image_url')
+        .select('id, clinician_first_name, clinician_last_name, clinician_professional_name, clinician_type, clinician_bio, clinician_licensed_states, clinician_min_client_age, clinician_profile_image, clinician_image_url')
         .eq('clinician_status', 'Active')
     );
   }
@@ -284,12 +296,12 @@ export class ClinicianQueryDebugger {
   /**
    * NEW: Attempt to query using the compatibility view
    */
-  public static async queryWithCompatibilityView() {
+  public static async queryWithCompatibilityView<T>(): Promise<QueryResult<T>> {
     console.log('[ClinicianQueryDebugger] Attempting query with compatibility view');
-    return this.debugQuery(
+    return this.debugQuery<T>(
       'clinicians_compatibility_view',
       (query) => query
-        .select('id, clinician_first_name, clinician_last_name, clinician_professional_name, clinician_type, clinician_bio, clinician_bio_short, clinician_licensed_states, clinician_min_client_age, clinician_profile_image, clinician_image_url')
+        .select('id, clinician_first_name, clinician_last_name, clinician_professional_name, clinician_type, clinician_bio, clinician_licensed_states, clinician_min_client_age, clinician_profile_image, clinician_image_url')
         .eq('clinician_status', 'Active')
     );
   }
@@ -297,41 +309,44 @@ export class ClinicianQueryDebugger {
   /**
    * NEW: Test if the clinician_status enum is causing issues by using a different filter
    */
-  public static async queryWithoutStatusFilter() {
+  public static async queryWithoutStatusFilter<T>(): Promise<QueryResult<T>> {
     console.log('[ClinicianQueryDebugger] Attempting query without status filter');
-    return this.debugQuery(
+    return this.debugQuery<T>(
       'clinicians',
       (query) => query
-        .select('id, clinician_first_name, clinician_last_name, clinician_professional_name, clinician_type, clinician_bio, clinician_bio_short, clinician_licensed_states, clinician_min_client_age, clinician_profile_image, clinician_image_url')
+        .select('id, clinician_first_name, clinician_last_name, clinician_professional_name, clinician_type, clinician_bio, clinician_licensed_states, clinician_min_client_age, clinician_profile_image, clinician_image_url')
     );
   }
   
   /**
    * NEW: Create a specialized hook for troubleshooting the therapist selection
    */
-  public static async createTherapistSelectionDebugHook() {
+  public static async createTherapistSelectionDebugHook<T>(): Promise<QueryResult<T>> {
     // First, try the normal query
     console.log('[ClinicianQueryDebugger] Starting therapist selection debug process');
-    const normalResult = await this.wrapTherapistSelectionQuery();
+    const normalResult = await this.wrapTherapistSelectionQuery<T>();
     
     // If it fails, try the compatibility view
     if (normalResult.error) {
       console.log('[ClinicianQueryDebugger] Normal query failed, trying compatibility view');
-      const compatResult = await this.queryWithCompatibilityView();
+      const compatResult = await this.queryWithCompatibilityView<T>();
       
       // If that also fails, try without the status filter
       if (compatResult.error) {
         console.log('[ClinicianQueryDebugger] Compatibility view failed, trying without status filter');
-        const noFilterResult = await this.queryWithoutStatusFilter();
+        const noFilterResult = await this.queryWithoutStatusFilter<T>();
         
         // If that also fails, try a direct non-wrapped query as a last resort
         if (noFilterResult.error) {
           console.log('[ClinicianQueryDebugger] All attempts failed, trying direct query');
           const directResult = await supabase
             .from('clinicians')
-            .select('id, clinician_first_name, clinician_last_name, clinician_professional_name, clinician_type, clinician_bio, clinician_bio_short, clinician_licensed_states, clinician_min_client_age, clinician_profile_image, clinician_image_url');
+            .select('id, clinician_first_name, clinician_last_name, clinician_professional_name, clinician_type, clinician_bio, clinician_licensed_states, clinician_min_client_age, clinician_profile_image, clinician_image_url');
             
-          return directResult;
+          return { 
+            data: directResult.data as T[] | null, 
+            error: directResult.error 
+          };
         }
         
         return noFilterResult;
@@ -350,13 +365,13 @@ export class ClinicianQueryDebugger {
 export function withQueryDebugging<T>(
   tableName: string,
   queryBuilder: (query: any) => any
-): Promise<{ data: T[] | null; error: any }> {
-  return ClinicianQueryDebugger.debugQuery(tableName, queryBuilder);
+): Promise<QueryResult<T>> {
+  return ClinicianQueryDebugger.debugQuery<T>(tableName, queryBuilder);
 }
 
 /**
  * NEW: Hook to use therapist data with enhanced error recovery
  */
-export async function useDebugTherapistsData() {
-  return await ClinicianQueryDebugger.createTherapistSelectionDebugHook();
+export async function useDebugTherapistsData<T>() {
+  return await ClinicianQueryDebugger.createTherapistSelectionDebugHook<T>();
 }

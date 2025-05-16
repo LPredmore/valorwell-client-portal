@@ -1,9 +1,7 @@
-
 import React, { useState, useEffect } from 'react';
 import Layout from '@/components/layout/Layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -102,7 +100,7 @@ const TherapistSelection = () => {
     }
   }, [authUserId, isUserContextLoading, userClientProfile, navigate, toast, authInitialized]);
 
-  // Use our new custom hook for therapist data with enhanced error handling
+  // Use our custom hook for therapist data with enhanced error handling
   const {
     therapists,
     allTherapists,
@@ -141,7 +139,10 @@ const TherapistSelection = () => {
   };
   
   const displayTherapistName = (therapist: Therapist) => {
-    return therapist.clinician_professional_name || `${therapist.clinician_first_name || ''} ${therapist.clinician_last_name || ''}`.trim();
+    if (!therapist) return "Unknown";
+    return therapist.clinician_professional_name || 
+           `${therapist.clinician_first_name || ''} ${therapist.clinician_last_name || ''}`.trim() || 
+           "Unknown Therapist";
   };
 
   if (isUserContextLoading || !authInitialized) {
@@ -289,7 +290,7 @@ const TherapistSelection = () => {
                   </div>
                 )}
 
-                {therapists.length === 0 ? (
+                {!therapists || therapists.length === 0 ? (
                   <div className="text-center py-12">
                     {filteringApplied && clientData?.client_state ? (
                       <div className="bg-amber-50 border border-amber-200 rounded-lg p-8 max-w-3xl mx-auto">
@@ -337,8 +338,8 @@ const TherapistSelection = () => {
                                   alt={displayTherapistName(therapist)}
                                 />
                                 <AvatarFallback className="text-4xl bg-valorwell-100 text-valorwell-600">
-                                  {therapist.clinician_first_name?.[0]?.toUpperCase()}
-                                  {therapist.clinician_last_name?.[0]?.toUpperCase()}
+                                  {(therapist.clinician_first_name?.[0] || '').toUpperCase()}
+                                  {(therapist.clinician_last_name?.[0] || '').toUpperCase()}
                                 </AvatarFallback>
                               </Avatar>
                               <h3 className="text-xl font-semibold text-center text-valorwell-700">
@@ -362,7 +363,7 @@ const TherapistSelection = () => {
                                 <h4 className="text-lg font-semibold mb-2 text-valorwell-600 border-b pb-1">Biography</h4>
                                 <p className="text-gray-700 text-sm leading-relaxed">
                                   {therapist.clinician_bio || 
-                                   therapist.clinician_bio_short || 
+                                   (therapist as any).clinician_bio_short || 
                                    'No biography available for this therapist.'}
                                 </p>
                                 
