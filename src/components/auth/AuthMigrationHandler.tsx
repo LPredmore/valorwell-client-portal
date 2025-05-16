@@ -1,36 +1,60 @@
 
 import React, { useEffect, useState } from 'react';
 import { migrateStoredAuthData, diagnoseAuthIssues, resetAuthState } from '@/utils/authMigration';
+import { useAuth, AuthState } from '@/context/NewAuthContext';
+import { toast } from 'sonner';
 
 interface AuthMigrationHandlerProps {
   children: React.ReactNode;
 }
 
 const AuthMigrationHandler: React.FC<AuthMigrationHandlerProps> = ({ children }) => {
+  const { authState, authInitialized } = useAuth();
   const [migrationComplete, setMigrationComplete] = useState(false);
   const [issues, setIssues] = useState<string[]>([]);
   const [showDetails, setShowDetails] = useState(false);
+  const [diagnosticRun, setDiagnosticRun] = useState(false);
 
   useEffect(() => {
     // Run migration logic
     const didMigrate = migrateStoredAuthData();
+    console.log("[AuthMigrationHandler] Migration completed:", didMigrate);
     
-    // Check for issues
-    const { issues } = diagnoseAuthIssues();
-    setIssues(issues);
+    // Only check for issues if auth is initialized or we have an error
+    if (authInitialized || authState === AuthState.ERROR) {
+      runDiagnostics();
+    }
     
     // Mark migration as complete
     setMigrationComplete(true);
-  }, []);
+  }, [authInitialized, authState]);
+
+  // Run diagnostics when auth state changes to error or when explicitly called
+  const runDiagnostics = () => {
+    if (diagnosticRun) return; // Don't run diagnostics more than once
+    
+    const { issues } = diagnoseAuthIssues();
+    setIssues(issues);
+    setDiagnosticRun(true);
+    
+    // If there are critical issues, show a toast notification
+    if (issues.length > 0) {
+      toast.error("Authentication Configuration Issue", {
+        description: "There might be an issue with your authentication setup",
+        duration: 6000,
+      });
+    }
+  };
+
+  const handleReset = async () => {
+    toast.loading("Resetting authentication state...");
+    await resetAuthState();
+  };
 
   // If there are no issues or migration is complete, render children
   if (migrationComplete && issues.length === 0) {
     return <>{children}</>;
   }
-
-  const handleReset = async () => {
-    await resetAuthState();
-  };
 
   // If there are issues, show a helpful dialog
   return (
@@ -70,6 +94,8 @@ const AuthMigrationHandler: React.FC<AuthMigrationHandlerProps> = ({ children })
                       {`Environment: ${process.env.NODE_ENV}
 Current URL: ${window.location.href}
 Browser: ${navigator.userAgent}
+Auth State: ${authState}
+Auth Initialized: ${authInitialized}
 Issues: ${issues.join('\n')}`}
                     </pre>
                   </div>

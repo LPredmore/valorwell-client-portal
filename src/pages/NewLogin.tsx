@@ -17,10 +17,10 @@ const NewLogin = () => {
   useEffect(() => {
     console.log("[NewLogin] Checking auth state, userId:", userId, "authState:", authState, "authInitialized:", authInitialized, "isLoading:", isLoading);
     
-    // Redirect if already authenticated
+    // Only redirect if auth is fully initialized and we know the user is authenticated
     if (authInitialized && !isLoading && authState === AuthState.AUTHENTICATED && userId) {
       console.log("[NewLogin] User is already authenticated, redirecting to home");
-      navigate("/");
+      navigate("/", { replace: true });
     }
   }, [userId, authState, authInitialized, isLoading, navigate]);
 
@@ -28,7 +28,7 @@ const NewLogin = () => {
   useEffect(() => {
     let timeoutId: NodeJS.Timeout;
     
-    if ((authState === AuthState.INITIALIZING || isLoading) && !authCheckTimeout) {
+    if ((authState === AuthState.INITIALIZING || !authInitialized || isLoading) && !authCheckTimeout) {
       timeoutId = setTimeout(() => {
         console.log("[NewLogin] Auth check timeout reached after 5 seconds");
         setAuthCheckTimeout(true);
@@ -40,21 +40,21 @@ const NewLogin = () => {
         clearTimeout(timeoutId);
       }
     };
-  }, [authState, isLoading, authCheckTimeout]);
+  }, [authState, authInitialized, isLoading, authCheckTimeout]);
 
   const handleForgotPassword = () => {
     setIsResetDialogOpen(true);
   };
 
   // Show loading indicator if auth context is initializing
-  if (authState === AuthState.INITIALIZING || isLoading) {
+  if (authState === AuthState.INITIALIZING || !authInitialized || isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100">
         <div className="text-center">
           <div className="flex flex-col items-center">
             <Loader2 className="h-12 w-12 animate-spin text-blue-500 mb-4" />
             <p className="text-gray-600 mb-2">
-              {authState === AuthState.INITIALIZING
+              {authState === AuthState.INITIALIZING || !authInitialized
                 ? "Initializing authentication..."
                 : "Loading user data..."}
             </p>

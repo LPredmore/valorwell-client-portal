@@ -70,6 +70,19 @@ export const diagnoseAuthIssues = (): { issues: string[] } => {
       issues.push(`Auth service error: ${currentError.message}`);
     }
     
+    // Check for inconsistent state between service and stored data
+    const storedAuthData = localStorage.getItem('auth_session_cache');
+    if (storedAuthData) {
+      try {
+        const parsedData = JSON.parse(storedAuthData);
+        if (!parsedData.user && AuthService.currentState === AuthState.AUTHENTICATED) {
+          issues.push('Inconsistent auth state: service thinks user is authenticated but no user data found');
+        }
+      } catch (e) {
+        issues.push('Corrupted auth data in localStorage');
+      }
+    }
+    
     return { issues };
   } catch (e) {
     issues.push(`Exception during diagnosis: ${(e as Error).message}`);
@@ -96,13 +109,25 @@ export const getAuthStateInfo = () => {
  */
 export const resetAuthState = async () => {
   try {
-    // Clear local storage related to auth
+    // Clear all local storage related to auth
     localStorage.removeItem('auth_session_cache');
     localStorage.removeItem('valorwell_auth_state');
     localStorage.removeItem('supabase.auth.token');
     
+    // Try to sign out via auth service first
+    try {
+      await AuthService.signOut();
+    } catch (err) {
+      console.log('[AuthMigration] Error signing out via service:', err);
+      // Continue with reset anyway
+    }
+    
+    console.log('[AuthMigration] Auth state reset complete, reloading page');
+    
     // Reload the page to ensure clean state
-    window.location.reload();
+    setTimeout(() => {
+      window.location.reload();
+    }, 500);
     
     return { success: true };
   } catch (error) {
@@ -110,6 +135,33 @@ export const resetAuthState = async () => {
     return {
       success: false,
       error: `Failed to reset auth state: ${(error as Error).message}`
+    };
+  }
+};
+
+/**
+ * Force initialization to complete
+ * This is a last-resort function to help recover from stuck initialization
+ */
+export const forceAuthInitialization = () => {
+  try {
+    // This is a bit of a hack, but it helps recover from stuck initialization
+    const currentState = AuthService.currentState;
+    console.log(`[AuthMigration] Forcing auth initialization from state: ${currentState}`);
+    
+    // Update localStorage to match current state
+    // This will be picked up on next page load
+    localStorage.setItem('auth_initialization_forced', 'true');
+    
+    // Reload the page to pick up changes
+    window.location.reload();
+    
+    return { success: true };
+  } catch (error) {
+    console.error('[AuthMigration] Error forcing auth initialization:', error);
+    return {
+      success: false,
+      error: `Failed to force auth initialization: ${(error as Error).message}`
     };
   }
 };

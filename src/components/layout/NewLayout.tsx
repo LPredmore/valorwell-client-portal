@@ -16,27 +16,27 @@ const NewLayout: React.FC<LayoutProps> = ({ children }) => {
   const { userId, authState, authInitialized, isLoading } = useAuth();
 
   useEffect(() => {
-    console.log("[NewLayout] Initializing layout, userContextLoading:", isLoading, "authInitialized:", authInitialized);
+    console.log("[NewLayout] Initializing layout, authState:", authState, "authInitialized:", authInitialized);
     
     if (authInitialized) {
       if (authState === AuthState.UNAUTHENTICATED) {
         console.log("[NewLayout] No authenticated user found, redirecting to login");
-        navigate('/login');
+        navigate('/login', { replace: true });
       } else if (authState === AuthState.ERROR) {
         toast.error("Authentication Error", {
           description: "There was a problem with your authentication. Please try again."
         });
       }
     }
-  }, [navigate, authState, authInitialized, isLoading]);
+  }, [navigate, authState, authInitialized]);
 
   // Show loading state while checking auth
-  if (authState === AuthState.INITIALIZING || isLoading) {
+  if (!authInitialized || authState === AuthState.INITIALIZING || isLoading) {
     return (
       <div className="flex h-screen w-full items-center justify-center flex-col">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-valorwell-600 mb-4"></div>
         <p className="text-valorwell-600">
-          {authState === AuthState.INITIALIZING ? "Initializing authentication..." : "Loading user data..."}
+          {!authInitialized || authState === AuthState.INITIALIZING ? "Initializing authentication..." : "Loading user data..."}
         </p>
       </div>
     );

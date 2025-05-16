@@ -9,6 +9,26 @@ const Index = () => {
   const navigate = useNavigate();
   const { userRole, authState, authInitialized, isLoading, clientStatus, userId } = useAuth();
   const [authError, setAuthError] = useState<string | null>(null);
+  const [timeoutReached, setTimeoutReached] = useState(false);
+
+  // Add timeout detection for waiting too long
+  useEffect(() => {
+    let timeoutId: NodeJS.Timeout | null = null;
+    
+    // If we're still loading or initializing after 8 seconds, show timeout message
+    if (!authInitialized || authState === AuthState.INITIALIZING || isLoading) {
+      timeoutId = setTimeout(() => {
+        setTimeoutReached(true);
+        console.log("[Index] Auth initialization timeout reached");
+      }, 8000);
+    }
+    
+    return () => {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+    };
+  }, [authInitialized, authState, isLoading]);
 
   // Log the current state on each render for debugging
   useEffect(() => {
@@ -21,15 +41,17 @@ const Index = () => {
       "clientStatus:", clientStatus
     );
 
-    // Only proceed if authentication has been initialized and context is not actively loading
-    if (authState === AuthState.INITIALIZING || isLoading) {
-      console.log("[Index] Waiting: Auth initializing or context is loading.");
+    // Only proceed with redirect logic if auth is truly ready
+    // (initialized and not actively loading)
+    if (!authInitialized || authState === AuthState.INITIALIZING || isLoading) {
+      console.log("[Index] Waiting for auth to stabilize...");
       return;
     }
 
     console.log("[Index] Auth state ready, proceeding with redirect logic.");
 
-    if (authState === AuthState.AUTHENTICATED && userId) { // User is authenticated
+    // Handle redirect logic based on auth state
+    if (authState === AuthState.AUTHENTICATED && userId) {
       if (userRole === 'admin') {
         console.log("[Index] Redirecting admin to /settings");
         navigate('/settings', { replace: true });
@@ -49,10 +71,10 @@ const Index = () => {
         setAuthError(`Account has no recognized role: ${userRole || 'undefined'}`);
         navigate('/login', { replace: true });
       }
-    } else if (authState === AuthState.UNAUTHENTICATED) { // No userId, so not authenticated
+    } else if (authState === AuthState.UNAUTHENTICATED) {
       console.log("[Index] User not authenticated. Redirecting to /login.");
       navigate('/login', { replace: true });
-    } else if (authState === AuthState.ERROR) { // Authentication error
+    } else if (authState === AuthState.ERROR) {
       console.log("[Index] Authentication error. Redirecting to /login.");
       setAuthError("Authentication error occurred. Please try logging in again.");
       navigate('/login', { replace: true });
@@ -65,14 +87,28 @@ const Index = () => {
       {/* Set AuthStateMonitor to be visible in development environment for debugging */}
       <AuthStateMonitor visible={process.env.NODE_ENV === 'development'} />
       <div className="text-center">
-        {(authState === AuthState.INITIALIZING || isLoading) && (
+        {(!authInitialized || authState === AuthState.INITIALIZING || isLoading) && (
           <div className="flex flex-col items-center">
             <Loader2 className="h-12 w-12 animate-spin text-blue-500 mb-4" />
             <p className="text-gray-600 mb-2">
-              {authState === AuthState.INITIALIZING
+              {!authInitialized || authState === AuthState.INITIALIZING
                 ? "Initializing authentication..."
                 : "Loading user data..."}
             </p>
+            
+            {timeoutReached && (
+              <div className="mt-6">
+                <p className="text-amber-600 mb-3">
+                  This is taking longer than expected.
+                </p>
+                <button
+                  onClick={() => window.location.reload()}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                >
+                  Refresh Page
+                </button>
+              </div>
+            )}
           </div>
         )}
         

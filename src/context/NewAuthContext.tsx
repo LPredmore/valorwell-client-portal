@@ -64,6 +64,42 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
   // Flag to track initial client data load
   const [loadingClientData, setLoadingClientData] = useState<boolean>(false);
   
+  // Force authInitialized to match AuthService.isInitialized
+  const [authInitialized, setAuthInitialized] = useState<boolean>(AuthService.isInitialized);
+  
+  // Safety timeout for initialization
+  useEffect(() => {
+    // If initialization takes too long, consider it done anyway
+    const timeoutId = setTimeout(() => {
+      if (!authInitialized) {
+        console.log('[AuthContext] Initialization timeout reached, forcing initialized state');
+        setAuthInitialized(true);
+        if (authState === AuthState.INITIALIZING) {
+          // Default to unauthenticated if we can't determine state
+          setAuthState(AuthState.UNAUTHENTICATED);
+        }
+      }
+    }, 8000); // 8 seconds timeout
+    
+    return () => clearTimeout(timeoutId);
+  }, [authInitialized, authState]);
+  
+  // Sync with AuthService initialization state
+  useEffect(() => {
+    setAuthInitialized(AuthService.isInitialized);
+    console.log(`[AuthContext] AuthService.isInitialized: ${AuthService.isInitialized}`);
+    
+    // Monitor changes to initialization state
+    const checkInitInterval = setInterval(() => {
+      if (AuthService.isInitialized !== authInitialized) {
+        console.log(`[AuthContext] AuthService initialization changed: ${AuthService.isInitialized}`);
+        setAuthInitialized(AuthService.isInitialized);
+      }
+    }, 500); // Check every 500ms
+    
+    return () => clearInterval(checkInitInterval);
+  }, [authInitialized]);
+  
   // Subscribe to auth service state changes
   useEffect(() => {
     // Update our context state when auth service state changes
@@ -74,6 +110,7 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
       setUserId(AuthService.userId);
       setUserRole(AuthService.userRole);
       setAuthError(AuthService.error);
+      setAuthInitialized(AuthService.isInitialized); // Sync initialization state
       
       // Trigger client profile load if authenticated
       if (newState === AuthState.AUTHENTICATED) {
@@ -134,13 +171,13 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
 
   // Effect to update isLoading state based on initialization and client data loading
   useEffect(() => {
-    const isStillInitializing = authState === AuthState.INITIALIZING;
+    const isStillInitializing = !authInitialized || authState === AuthState.INITIALIZING;
     const isClientDataLoading = authState === AuthState.AUTHENTICATED && loadingClientData;
     
     setIsLoading(isStillInitializing || isClientDataLoading);
     
     console.log(`[AuthContext] Updated loading state: ${isStillInitializing || isClientDataLoading} (initializing=${isStillInitializing}, clientDataLoading=${isClientDataLoading})`);
-  }, [authState, loadingClientData]);
+  }, [authState, authInitialized, loadingClientData]);
 
   // Load initial client data if user is already present
   useEffect(() => {
@@ -148,11 +185,6 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
       loadClientData(AuthService.userId);
     }
   }, [authState, clientProfile, loadingClientData]);
-
-  // Check if auth is initialized
-  const authInitialized = useMemo(() => {
-    return AuthService.isInitialized;
-  }, []);
 
   // Login handler
   const login = async (email: string, password: string) => {

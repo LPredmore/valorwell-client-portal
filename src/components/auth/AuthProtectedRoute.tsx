@@ -33,16 +33,48 @@ const AuthProtectedRoute: React.FC<AuthProtectedRouteProps> = ({
     console.log(`[AuthProtectedRoute] Status: authState=${authState}, isLoading=${isLoading}, authInitialized=${authInitialized}, userRole=${userRole}, clientStatus=${clientStatus}, blockNewClients=${blockNewClients}`);
   }, [authState, isLoading, authInitialized, userRole, clientStatus, blockNewClients]);
 
-  // Handle initialization state
-  if (!authInitialized || authState === AuthState.INITIALIZING || isLoading) {
+  // Handle initialization and loading state with a time limit
+  const [showLoadingTimeout, setShowLoadingTimeout] = React.useState(false);
+  
+  useEffect(() => {
+    let timeoutId: NodeJS.Timeout | null = null;
+    
+    if (!authInitialized || isLoading) {
+      timeoutId = setTimeout(() => {
+        setShowLoadingTimeout(true);
+      }, 5000); // Show timeout message after 5 seconds
+    }
+    
+    return () => {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+    };
+  }, [authInitialized, isLoading]);
+
+  // Handle loading state
+  if (!authInitialized || isLoading) {
     return (
       <div className="flex h-screen w-full items-center justify-center flex-col">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-valorwell-600 mb-4"></div>
         <p className="text-valorwell-600 mb-2">
-          {!authInitialized || authState === AuthState.INITIALIZING
+          {!authInitialized
             ? "Initializing authentication..."
             : "Loading user data..."}
         </p>
+        
+        {showLoadingTimeout && (
+          <div className="mt-6 text-center max-w-md px-4">
+            <p className="text-amber-600 mb-2">This is taking longer than expected.</p>
+            <p className="text-gray-600 mb-4">There might be an issue with your connection.</p>
+            <button
+              onClick={() => window.location.reload()}
+              className="px-4 py-2 bg-valorwell-600 text-white rounded-md hover:bg-valorwell-700 transition-colors"
+            >
+              Refresh Page
+            </button>
+          </div>
+        )}
       </div>
     );
   }
@@ -62,12 +94,20 @@ const AuthProtectedRoute: React.FC<AuthProtectedRouteProps> = ({
         <p className="text-center text-gray-600 mb-6 max-w-md px-4">
           {authError?.message || "There was a problem verifying your access"}
         </p>
-        <button
-          onClick={() => window.location.reload()}
-          className="px-4 py-2 bg-valorwell-600 text-white rounded-md"
-        >
-          Refresh Page
-        </button>
+        <div className="space-y-2">
+          <button
+            onClick={() => window.location.reload()}
+            className="px-4 py-2 bg-valorwell-600 text-white rounded-md hover:bg-valorwell-700 transition-colors block w-full"
+          >
+            Refresh Page
+          </button>
+          <button
+            onClick={() => window.location.href = '/login'}
+            className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors block w-full"
+          >
+            Go to Login
+          </button>
+        </div>
       </div>
     );
   }
