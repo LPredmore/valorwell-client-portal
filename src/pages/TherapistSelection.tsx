@@ -1,55 +1,30 @@
 
-import React, { useEffect, useState, useCallback } from 'react'; // Added useCallback
+import React, { useState, useEffect } from 'react';
 import Layout from '@/components/layout/Layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
-import { ClinicianQueryDebugger } from '@/debug/clinicianQueryDebugger';
 import { useToast } from '@/hooks/use-toast';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Info, Loader2, RefreshCw, AlertCircle } from 'lucide-react'; // Added AlertCircle for error display
+import { Info, Loader2, RefreshCw, AlertCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { useUser } from '@/context/UserContext'; // Import useUser
+import { useUser } from '@/context/UserContext';
+import { useTherapistSelection, Therapist } from '@/hooks/useTherapistSelection';
 
 interface Client {
   client_state: string | null;
   client_age: number | null;
-  // Add other client fields if needed by this component
-}
-
-interface Therapist {
-  id: string;
-  clinician_first_name: string | null;
-  clinician_last_name: string | null;
-  clinician_professional_name: string | null;
-  clinician_type: string | null; // Confirmed: using clinician_type not clinician_title
-  clinician_bio: string | null;
-  clinician_bio_short: string | null;
-  clinician_licensed_states: string[] | null;
-  clinician_min_client_age: number | null;
-  clinician_profile_image: string | null; // Kept for potential legacy use
-  clinician_image_url: string | null; // Preferred field for profile image
-  // Add other therapist fields if needed
 }
 
 const TherapistSelection = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
-  const { user, userId: authUserId, isLoading: isUserContextLoading, authInitialized, clientProfile: userClientProfile, refreshUserData } = useUser(); // Use UserContext with refreshUserData
+  const { user, userId: authUserId, isLoading: isUserContextLoading, authInitialized, clientProfile: userClientProfile, refreshUserData } = useUser();
   const [authError, setAuthError] = useState<string | null>(null);
   const [loadingTimeout, setLoadingTimeout] = useState(false);
-
-  const [loadingTherapists, setLoadingTherapists] = useState(true); // For therapist list
   const [clientData, setClientData] = useState<Client | null>(null);
-  const [therapists, setTherapists] = useState<Therapist[]>([]);
-  const [allTherapists, setAllTherapists] = useState<Therapist[]>([]); // To store the full list for fallback
-  const [filteringApplied, setFilteringApplied] = useState(false); // To track if filters were active
-  const [selectingTherapistId, setSelectingTherapistId] = useState<string | null>(null);
   
-  // Add a new state for database query errors
-  const [dbError, setDbError] = useState<string | null>(null);
-
   // Add timeout mechanism to prevent indefinite loading
   useEffect(() => {
     let timeoutId: NodeJS.Timeout;
@@ -100,7 +75,7 @@ const TherapistSelection = () => {
         
         setClientData({
           client_state: userClientProfile.client_state || null,
-          client_age: userClientProfile.client_age === undefined || userClientProfile.client_age === null ? null : Number(userClientProfile.client_age), // Ensure age is number or null
+          client_age: userClientProfile.client_age === undefined || userClientProfile.client_age === null ? null : Number(userClientProfile.client_age),
         });
         
         console.log('[TherapistSelection] Using clientProfile from UserContext:', JSON.stringify({
@@ -108,16 +83,13 @@ const TherapistSelection = () => {
           client_age: userClientProfile.client_age
         }, null, 2));
       } else {
-        // This case might indicate profile setup isn't complete or UserContext isn't fully synced
         console.warn('[TherapistSelection DEBUG] userClientProfile from UserContext is null/undefined.');
         toast({
             title: "Profile Incomplete",
             description: "Please complete your profile setup to select a therapist.",
             variant: "destructive",
         });
-        // Optionally navigate to profile setup if status indicates 'New'
-        // if (userClientProfile?.client_status === 'New') navigate('/profile-setup');
-        setClientData(null); // Ensure clientData is null if no profile
+        setClientData(null);
       }
     } else if (!isUserContextLoading && !authUserId) {
         console.log("[TherapistSelection] No authenticated user. Redirecting to login.");
@@ -128,233 +100,23 @@ const TherapistSelection = () => {
         });
         navigate('/login');
     }
-  }, [authUserId, isUserContextLoading, userClientProfile, navigate, toast]);
+  }, [authUserId, isUserContextLoading, userClientProfile, navigate, toast, authInitialized]);
 
-
-  // Effect to fetch therapists and apply filters
-  useEffect(() => {
-    // Only fetch therapists if clientData has been determined (even if null, indicating no specific filters apply)
-    // and user context is no longer loading.
-    if (isUserContextLoading) {
-        console.log("[TherapistSelection] Waiting for UserContext to load before fetching therapists.");
-        return;
-    }
-
-    // Reset the database error state before fetching
-    setDbError(null);
-
-    const fetchAndFilterTherapists = async () => {
-      setLoadingTherapists(true);
-      setFilteringApplied(false); // Reset filtering applied flag
-      try {
-        console.log("[TherapistSelection] Starting fetch therapists query with debug wrapper...");
-        
-        // Use the enhanced debug wrapper to capture the exact query and any transformations
-        // This will help identify any issues with column references
-        let activeTherapists = null;
-        let error = null;
-        
-        try {
-          // First attempt: Use the standard query with debugging
-          const result = await ClinicianQueryDebugger.debugQuery(
-            'clinicians',
-            (query) => query
-              .select('id, clinician_first_name, clinician_last_name, clinician_professional_name, clinician_type, clinician_bio, clinician_bio_short, clinician_licensed_states, clinician_min_client_age, clinician_profile_image, clinician_image_url')
-              .eq('clinician_status', 'Active')
-          );
-          
-          activeTherapists = result.data;
-          error = result.error;
-          
-          // If we get a column does not exist error specifically for clinician_title
-          if (error && error.code === '42703' && error.message && error.message.includes('clinician_title')) {
-            console.warn("[TherapistSelection] Detected clinician_title error, trying fallback query...");
-            
-            // Second attempt: Try using the compatibility view we created in the migration
-            const fallbackResult = await ClinicianQueryDebugger.debugQuery(
-              'clinicians_compatibility_view',
-              (query) => query
-                .select('id, clinician_first_name, clinician_last_name, clinician_professional_name, clinician_type, clinician_bio, clinician_bio_short, clinician_licensed_states, clinician_min_client_age, clinician_profile_image, clinician_image_url')
-                .eq('clinician_status', 'Active')
-            );
-            
-            if (!fallbackResult.error) {
-              console.log("[TherapistSelection] Fallback query successful using compatibility view");
-              activeTherapists = fallbackResult.data;
-              error = null;
-            } else {
-              console.error("[TherapistSelection] Fallback query also failed:", fallbackResult.error);
-            }
-          }
-        } catch (queryError) {
-          console.error("[TherapistSelection] Exception during query execution:", queryError);
-          error = queryError;
-        }
-
-        if (error) {
-          console.error('Error fetching therapists:', error);
-          
-          // Enhanced error handling with our debugging utility
-          if (error.code === '42703') {
-            // This is likely a column does not exist error - exactly what we're looking for
-            const errorMessage = `Database column error: ${error.message}. Please contact support.`;
-            setDbError(errorMessage);
-            
-            // Check if the error is related to clinician_title
-            if (error.message && error.message.includes('clinician_title')) {
-              console.error(`
-[CRITICAL DEBUG INFO] Found 'clinician_title' reference in error message.
-This confirms the issue is with a non-existent column being referenced.
-The correct column name is 'clinician_type'.
-              `);
-              
-              // Try one more fallback approach - direct query without the compatibility view
-              try {
-                console.log("[TherapistSelection] Attempting direct fallback query without debugging wrapper");
-                const lastResortResult = await supabase
-                  .from('clinicians')
-                  .select('id, clinician_first_name, clinician_last_name, clinician_professional_name, clinician_type, clinician_bio, clinician_bio_short, clinician_licensed_states, clinician_min_client_age, clinician_profile_image, clinician_image_url')
-                  .eq('clinician_status', 'Active');
-                
-                if (!lastResortResult.error && lastResortResult.data) {
-                  console.log("[TherapistSelection] Direct fallback query successful");
-                  activeTherapists = lastResortResult.data;
-                  error = null;
-                  // Clear the error since we recovered
-                  setDbError(null);
-                } else {
-                  console.error("[TherapistSelection] All fallback attempts failed");
-                }
-              } catch (fallbackError) {
-                console.error("[TherapistSelection] Exception during direct fallback query:", fallbackError);
-              }
-            }
-          }
-          
-          // Only set error state and show toast if we couldn't recover
-          if (error) {
-            setDbError(`Failed to load therapists: ${error.message}`);
-            toast({
-              title: "Database Error",
-              description: "There was an issue retrieving therapist data. Please try again later.",
-              variant: "destructive"
-            });
-            setTherapists([]);
-            setAllTherapists([]);
-            setLoadingTherapists(false);
-            return;
-          }
-        }
-        
-        // Process the therapists data (whether from primary query or fallback)
-        const fetchedTherapists = activeTherapists || [];
-        console.log("[TherapistSelection] Total active therapists fetched:", fetchedTherapists.length);
-        if (fetchedTherapists.length > 0) {
-            console.log("[TherapistSelection] Sample therapist data from DB:", JSON.stringify(fetchedTherapists[0], null, 2));
-            
-            // Verify the clinician_type field is present
-            if (fetchedTherapists[0].clinician_type === undefined && fetchedTherapists[0].clinician_title !== undefined) {
-                console.warn("[TherapistSelection] Data contains clinician_title instead of clinician_type - mapping fields");
-                // Map clinician_title to clinician_type for consistency
-                fetchedTherapists.forEach(therapist => {
-                    therapist.clinician_type = therapist.clinician_title;
-                });
-            }
-        }
-        setAllTherapists(fetchedTherapists); // Store all for potential reference
-
-        if (clientData && (clientData.client_state || clientData.client_age !== null)) {
-          console.log('[TherapistSelection DEBUG] Using this clientData FOR FILTERING:', JSON.stringify(clientData, null, 2));
-          setFilteringApplied(true);
-
-          const filtered = fetchedTherapists.filter(therapist => {
-            let matchesState = !clientData.client_state; // If client has no state, don't filter by state (or consider it a match)
-            let matchesAge = true; // Default to true, will be set by specific conditions
-
-            // State Matching Logic
-            if (clientData.client_state && therapist.clinician_licensed_states && therapist.clinician_licensed_states.length > 0) {
-              const clientStateNormalized = clientData.client_state.toLowerCase().trim();
-              matchesState = therapist.clinician_licensed_states.some(state => {
-                if (!state) return false;
-                const stateNormalized = state.toLowerCase().trim();
-                return stateNormalized.includes(clientStateNormalized) || clientStateNormalized.includes(stateNormalized);
-              });
-            } else if (clientData.client_state && (!therapist.clinician_licensed_states || therapist.clinician_licensed_states.length === 0)) {
-                matchesState = false; // Client has a state, therapist has no licensed states listed
-            }
-            // If clientData.client_state is null/empty, matchesState remains true (or its initial value based on above)
-
-            // Age Matching Logic
-            const currentClientAge = clientData.client_age; // This is number | null
-            const therapistMinAge = therapist.clinician_min_client_age; // This is number | null
-
-            console.log(`[TherapistSelection] FILTER - Therapist ID: ${therapist.id} (${therapist.clinician_professional_name || therapist.clinician_first_name})`);
-            console.log(`  Client State: ${clientData.client_state}, Therapist States: ${therapist.clinician_licensed_states}, Matches State: ${matchesState}`);
-            
-            if (currentClientAge !== null && currentClientAge !== undefined) {
-              if (therapistMinAge !== null && therapistMinAge !== undefined) {
-                matchesAge = currentClientAge >= therapistMinAge;
-                console.log(`  Client Age: ${currentClientAge}, Min Therapist Age: ${therapistMinAge}, Matches Age: ${matchesAge}`);
-              } else {
-                // Therapist has no min age requirement, so age matches by default
-                matchesAge = true;
-                console.log(`  Client Age: ${currentClientAge}, Min Therapist Age: null, Matches Age: true (therapist has no min age)`);
-              }
-            } else {
-              // Client age is null/undefined, so age filter effectively passes (therapist is considered a match age-wise)
-              // This means if client_age is not set, we don't filter out therapists based on age.
-              matchesAge = true;
-              console.log(`  Client Age: null/undefined, Matches Age: true (client age not set - not filtering by age)`);
-            }
-            
-            return matchesState && matchesAge;
-          });
-
-          console.log(`[TherapistSelection] FILTERING COMPLETE - Filtered count: ${filtered.length}, Total active therapists: ${fetchedTherapists.length}`);
-          
-          // CHANGE: No longer show all therapists if no matches found
-          setTherapists(filtered);
-          
-          // Keep filtering applied true even if no results
-          // This ensures we show the "no therapists in your state" message
-          setFilteringApplied(true);
-          
-        } else {
-          // No clientData for filtering or clientData has no state/age, so show all therapists
-          console.log("[TherapistSelection DEBUG] NOT filtering. clientData:", JSON.stringify(clientData, null, 2));
-          setTherapists(fetchedTherapists);
-          setFilteringApplied(false);
-        }
-      } catch (error: any) {
-        console.error('Error fetching or filtering therapists:', error);
-        setDbError(`Unexpected error: ${error.message}`);
-        toast({
-          title: 'Error Loading Therapists',
-          description: error.message || 'Failed to load therapists. Please try again later.',
-          variant: 'destructive'
-        });
-        setTherapists([]); // Clear therapists on error
-        setAllTherapists([]);
-      } finally {
-        setLoadingTherapists(false);
-        console.log("[TherapistSelection] fetchAndFilterTherapists finished. loadingTherapists: false");
-      }
-    };
-
-    // Only run if UserContext is initialized and we have clientData (or know it's null)
-    if (!isUserContextLoading) {
-        fetchAndFilterTherapists();
-    }
-
-  }, [isUserContextLoading, clientData, toast]); // Removed filteringEnabled as it was causing loops
-
-  // Function to retry loading therapists if there was an error
-  const handleRetryFetch = () => {
-    console.log("[TherapistSelection] Retrying therapist fetch...");
-    setDbError(null);
-    // This will trigger the useEffect to run again
-    setClientData({...clientData!});
-  };
+  // Use our new custom hook for therapist data with enhanced error handling
+  const {
+    therapists,
+    allTherapists,
+    loading: loadingTherapists,
+    error: dbError,
+    filteringApplied,
+    retryFetch: handleRetryFetch,
+    selectTherapist,
+    selectingTherapistId
+  } = useTherapistSelection({
+    clientState: clientData?.client_state || null,
+    clientAge: clientData?.client_age !== null ? Number(clientData.client_age) : null,
+    enableFiltering: true
+  });
 
   const handleSelectTherapist = async (therapist: Therapist) => {
     if (!authUserId) {
@@ -362,24 +124,10 @@ The correct column name is 'clinician_type'.
       navigate('/login');
       return;
     }
-    setSelectingTherapistId(therapist.id); // Show loading state for this specific therapist
-    try {
-      const { error } = await supabase
-        .from('clients')
-        .update({ client_assigned_therapist: therapist.id, client_status: 'Therapist Selected' }) // Optionally update status
-        .eq('id', authUserId);
-
-      if (error) {
-        console.error("Error selecting therapist:", error);
-        toast({ title: "Error", description: "Failed to select therapist. Please try again.", variant: "destructive" });
-        return;
-      }
-      
-      toast({
-        title: "Therapist Selected!",
-        description: `You have selected ${therapist.clinician_professional_name || `${therapist.clinician_first_name} ${therapist.clinician_last_name}`}.`,
-      });
-
+    
+    const success = await selectTherapist(therapist.id);
+    
+    if (success) {
       // Refresh user context to get updated client_status
       if (refreshUserData) {
         console.log("[TherapistSelection] Refreshing user data after therapist selection");
@@ -387,13 +135,8 @@ The correct column name is 'clinician_type'.
       } else {
         console.warn("[TherapistSelection] refreshUserData function not available from UserContext");
       }
-
-      navigate('/patient-dashboard'); // Or to a confirmation page
-    } catch (error: any) {
-      console.error("Exception in handleSelectTherapist:", error);
-      toast({ title: "Error", description: error.message || "An unexpected error occurred.", variant: "destructive" });
-    } finally {
-      setSelectingTherapistId(null);
+      
+      navigate('/patient-dashboard');
     }
   };
   
@@ -430,11 +173,7 @@ The correct column name is 'clinician_type'.
         <div className="container max-w-6xl mx-auto py-6 flex justify-center items-center min-h-[calc(100vh-200px)]">
           <div className="bg-red-50 p-8 rounded-lg border border-red-200 max-w-md text-center">
             <div className="text-red-500 mb-4 flex justify-center">
-              <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="10"></circle>
-                <line x1="12" y1="8" x2="12" y2="12"></line>
-                <line x1="12" y1="16" x2="12.01" y2="16"></line>
-              </svg>
+              <AlertCircle size={32} />
             </div>
             <h3 className="text-xl font-medium text-red-800 mb-2">Authentication Error</h3>
             <p className="text-red-600 mb-6">{authError}</p>
@@ -555,11 +294,7 @@ The correct column name is 'clinician_type'.
                     {filteringApplied && clientData?.client_state ? (
                       <div className="bg-amber-50 border border-amber-200 rounded-lg p-8 max-w-3xl mx-auto">
                         <div className="text-amber-700 mb-4 flex justify-center">
-                          <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <circle cx="12" cy="12" r="10"></circle>
-                            <line x1="12" y1="8" x2="12" y2="12"></line>
-                            <line x1="12" y1="16" x2="12.01" y2="16"></line>
-                          </svg>
+                          <AlertCircle size={48} className="text-amber-500" />
                         </div>
                         <h3 className="text-2xl font-medium text-amber-800 mb-4">No Therapists Available in {clientData.client_state}</h3>
                         <p className="text-amber-700 mb-4 text-lg">
@@ -569,10 +304,10 @@ The correct column name is 'clinician_type'.
                           Our team is working diligently to expand our network of therapists across all states. Please check back soon, or contact our support team if you need immediate assistance.
                         </p>
                         <Button 
-                          onClick={() => window.location.reload()}
+                          onClick={handleRetryFetch}
                           className="bg-valorwell-600 hover:bg-valorwell-700 text-white flex items-center gap-2"
                         >
-                          <RefreshCw className="h-4 w-4" /> Refresh
+                          <RefreshCw className="h-4 w-4" /> Retry
                         </Button>
                       </div>
                     ) : (
@@ -582,9 +317,9 @@ The correct column name is 'clinician_type'.
                         </p>
                         <Button 
                           className="mt-6 bg-valorwell-600 hover:bg-valorwell-700"
-                          onClick={() => window.location.reload()}
+                          onClick={handleRetryFetch}
                         >
-                          <RefreshCw className="h-4 w-4 mr-2" /> Refresh Page
+                          <RefreshCw className="h-4 w-4 mr-2" /> Refresh
                         </Button>
                       </>
                     )}

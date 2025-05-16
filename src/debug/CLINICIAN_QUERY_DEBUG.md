@@ -1,3 +1,4 @@
+
 # Clinician Query Debugger
 
 This utility was created to help identify where the "clinician_title" reference is coming from in the TherapistSelection page.
@@ -11,6 +12,20 @@ Based on our investigation:
 - There are no direct references to "clinician_title" in the codebase except for a comment
 - The Supabase client configuration doesn't have any query transformations
 - The database schema confirms that "clinician_type" is the correct column name
+
+## Latest Findings (2025-05-16)
+
+After examining the complete database schema, we've confirmed:
+- The column `clinician_type` exists (text data type)
+- There is no `clinician_title` column in the clinicians table
+- The `clinician_status` column is a USER-DEFINED enum type (clinician_status_enum)
+- The compatibility view we created should handle any references to the non-existent column
+
+The issue persists despite these findings, suggesting:
+1. The migration script might not have been fully applied
+2. There could be cached query plans in the database
+3. There might be database objects (views, functions, triggers) still using the old column name
+4. The Supabase client might be caching or transforming the query
 
 ## How the Debugging Utility Works
 
@@ -43,6 +58,7 @@ The most likely causes for the "clinician_title" reference are:
 
 4. **PostgreSQL RLS Policies**: Row-level security policies might reference the non-existent column
 5. **Database Migrations**: A failed or incomplete migration might have left references to the old column name
+6. **Query Caching**: The database or client might be caching the query plan with the old column reference
 
 ## Next Steps
 
@@ -53,6 +69,7 @@ After running the application with this debugging utility:
 3. Look for any middleware or transformations that might be modifying the query
 4. Consider examining the database directly for views, functions, or triggers that might reference "clinician_title"
 5. Check for any type definitions or generated code that might be using the wrong column name
+6. Implement the enhanced error handling and fallback strategies in this update
 
 ## Additional Debugging Tips
 
@@ -62,3 +79,4 @@ If the utility doesn't immediately identify the source of the issue:
 2. **Network Monitoring**: Use browser developer tools to monitor the network requests being made to the Supabase API
 3. **Supabase Logs**: Check the Supabase logs for any errors or warnings related to the query
 4. **Temporary Column Addition**: As a temporary workaround, consider adding a "clinician_title" column to the database that mirrors "clinician_type" to identify if the issue is with the query or something else
+5. **Client Side Cache Busting**: Implement measures to refresh the Supabase client and clear any cached schema information

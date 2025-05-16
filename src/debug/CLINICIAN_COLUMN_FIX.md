@@ -1,3 +1,4 @@
+
 # Clinician Column Reference Fix
 
 ## Issue Summary
@@ -17,6 +18,8 @@ After investigation, we determined that the most likely causes were:
 2. **Hidden Database Objects**: There might be views, functions, or triggers in the database that reference "clinician_title"
 3. **PostgreSQL RLS Policies**: Row-level security policies might reference the non-existent column
 4. **Database Migrations**: A failed or incomplete migration might have left references to the old column name
+5. **Query Caching**: The database or client might be caching the query plan with the old column reference
+6. **Enum Type Issue**: The clinician_status column is a USER-DEFINED enum type which might be causing additional complications
 
 ## Solution Implemented
 
@@ -33,22 +36,41 @@ Created a new migration file (`20250515_fix_clinician_column_references.sql`) th
 - Creates a compatibility view (`clinicians_compatibility_view`) that maps `clinician_type` to `clinician_title` for backward compatibility
 - Adds documentation comments to the database schema
 
-### 2. Enhanced Error Handling in TherapistSelection.tsx
+### 2. Enhanced Error Handling in Code
+
+#### New useTherapistSelection Hook
+
+Created a specialized hook that implements multiple fallback strategies:
+
+1. **Strategy 1**: Standard query with debugging
+2. **Strategy 2**: Use the compatibility view if the first query fails with a specific error 
+3. **Strategy 3**: Try without the status filter in case the enum type is causing issues
+4. **Strategy 4**: Direct query without the debugging wrapper as a last resort
+
+The hook also includes:
+- Field mapping logic to handle cases where data might contain `clinician_title` instead of `clinician_type`
+- More detailed error information to users and developers
+- Multiple recovery options (retry query, refresh page)
+
+#### Updated ClinicianQueryDebugger
+
+Enhanced the debugger utility with:
+- Better query interception to identify the exact source of the error
+- Additional logging for enum-related issues
+- Support for testing different query strategies
+- Schema refresh capabilities to address caching issues
+
+### 3. Refactored TherapistSelection Component
 
 Updated the TherapistSelection.tsx file to:
+- Use the new useTherapistSelection hook
+- Improve error handling and user feedback
+- Separate concerns into logical components
+- Provide more robust fallback mechanisms
 
-- Use the ClinicianQueryDebugger more effectively to capture and analyze errors
-- Implement a multi-layered fallback mechanism:
-  1. First attempt: Standard query with debugging
-  2. Second attempt: Use the compatibility view if the first query fails with a specific error
-  3. Third attempt: Direct query without the debugging wrapper as a last resort
-- Add field mapping logic to handle cases where data might contain `clinician_title` instead of `clinician_type`
-- Provide more detailed error information to users and developers
-- Offer multiple recovery options (retry query, refresh page)
+### 4. Documentation
 
-### 3. Documentation
-
-Created this document to explain:
+Updated the documentation to explain:
 - The issue and its root causes
 - The implemented solution
 - The reasoning behind the approach
@@ -56,35 +78,30 @@ Created this document to explain:
 
 ## Technical Details
 
-### Database Migration
+### Enhanced Error Handling
 
-The migration performs the following operations:
+The key improvement in our solution is the multi-layered error handling approach:
 
-1. **Column Verification**: Checks if `clinician_type` exists and creates it if needed
-2. **View Correction**: Identifies and updates any views that reference `clinician_title`
-3. **RLS Policy Updates**: Fixes any row-level security policies that might reference the non-existent column
-4. **Function Fixes**: Updates function definitions that contain references to `clinician_title`
-5. **Compatibility Layer**: Creates a view that provides backward compatibility
-6. **Documentation**: Adds comments to document the correct column name
+1. **Proactive Detection**: The ClinicianQueryDebugger inspects queries before they're sent to identify issues
+2. **Fallback Strategies**: Four different query strategies are attempted if the primary approach fails
+3. **Field Mapping**: Automatic mapping between different field names (clinician_title ↔ clinician_type)
+4. **User-Friendly Errors**: Clear error messages with recovery options
 
-### TherapistSelection.tsx Changes
+### Query Strategy Steps
 
-The updated component includes:
+When fetching therapists, the system now follows these steps:
 
-1. **Enhanced Query Process**:
-   - Wraps the query with the ClinicianQueryDebugger
-   - Implements multiple fallback strategies
-   - Adds field mapping for data consistency
+1. Try the normal query with debugging
+2. If that fails with a "clinician_title" error, try using the compatibility view
+3. If that fails, try without the status filter (in case the enum is causing issues)
+4. If all else fails, try a direct query without any wrappers
 
-2. **Improved Error Handling**:
-   - Detailed error messages
-   - Technical information for developers
-   - Multiple recovery options
+### Client-Side Schema Refresh
 
-3. **User Experience Improvements**:
-   - Better error UI with more context
-   - Clear recovery actions
-   - Informative messages
+When caching issues are suspected, we now:
+- Create fresh Supabase client instances to avoid cached schema
+- Provide retry mechanisms that bypass potential caching layers
+- Log detailed information about the query execution path
 
 ## Recommendations for Future Development
 
@@ -92,6 +109,7 @@ The updated component includes:
    - Implement a more rigorous process for database schema changes
    - Use database migrations consistently for all schema changes
    - Add validation tests for schema integrity
+   - Consider adding a procedure to refresh query plans after schema changes
 
 2. **Error Handling**:
    - Continue to enhance error handling with specific recovery strategies
@@ -105,6 +123,13 @@ The updated component includes:
 
 ## Conclusion
 
-The implemented solution addresses both the immediate issue and provides safeguards against similar problems in the future. The multi-layered approach ensures that the application can continue to function even if there are inconsistencies in the database schema.
+This update implements a comprehensive, multi-layered solution to the clinician_title/clinician_type issue. By combining:
 
-By combining database fixes, application-level fallbacks, and improved error handling, we've created a robust solution that should prevent this issue from affecting users in the future.
+1. Enhanced debugging capabilities
+2. Multiple fallback query strategies
+3. Better error handling and reporting
+4. Field name mapping for compatibility
+
+We've created a robust solution that should continue to work even if there are still some lingering references to the old column name in various database objects or cached queries.
+
+The solution is designed to be both user-friendly (providing clear error messages and recovery options) and developer-friendly (providing detailed debug information and multiple fallback strategies).

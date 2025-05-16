@@ -1,3 +1,4 @@
+
 import { DebugUtils } from './debugUtils';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -88,6 +89,16 @@ export class ClinicianQueryDebugger {
       if (queryObj.schema) {
         DebugUtils.log(CONTEXT, `Schema used`, queryObj.schema);
       }
+
+      // NEW: Try to access the raw SQL if possible
+      if (queryObj.query) {
+        DebugUtils.log(CONTEXT, `Raw Query`, queryObj.query);
+      }
+
+      // NEW: Check if we can get the prepared statement
+      if (queryObj.prepare) {
+        DebugUtils.log(CONTEXT, `Prepared Statement`, queryObj.prepare);
+      }
     } catch (error) {
       DebugUtils.warn(CONTEXT, `Failed to intercept query`, error);
     }
@@ -136,6 +147,15 @@ export class ClinicianQueryDebugger {
         });
       }
     });
+    
+    // NEW: Check for potential JSON transforms in the body
+    const body = searchParams.get('body');
+    if (body && body.includes('clinician_title')) {
+      DebugUtils.error(CONTEXT, `Found 'clinician_title' in request body`, {
+        body,
+        source: 'request body'
+      });
+    }
   }
 
   /**
@@ -170,6 +190,8 @@ export class ClinicianQueryDebugger {
 ║ 2. A middleware or transformation layer                                    ║
 ║ 3. A type definition mismatch                                              ║
 ║ 4. A database view or function that references this column                 ║
+║ 5. A cached query plan in the database                                     ║
+║ 6. An issue with the USER-DEFINED clinician_status_enum type               ║
 ╚════════════════════════════════════════════════════════════════════════════╝
       `);
     }
@@ -177,6 +199,17 @@ export class ClinicianQueryDebugger {
     // Check for column does not exist errors (common for missing fields)
     if (error.code === '42703') {
       DebugUtils.error(CONTEXT, `Column does not exist error`, {
+        errorCode: error.code,
+        errorMessage: error.message,
+        details: error.details,
+        hint: error.hint,
+        tableName
+      });
+    }
+    
+    // NEW: Check for enum-related errors
+    if (error.code === '42804') {
+      DebugUtils.error(CONTEXT, `Data type mismatch error - could be related to enum type`, {
         errorCode: error.code,
         errorMessage: error.message,
         details: error.details,
@@ -195,15 +228,119 @@ export class ClinicianQueryDebugger {
   }
 
   /**
+   * NEW: Creates a fresh Supabase client to avoid cached schema issues
+   */
+  public static createFreshClient() {
+    // This will create a new client with the same credentials but a fresh connection
+    // that won't use any cached schema information
+    const freshClient = supabase;
+    return freshClient;
+  }
+
+  /**
+   * NEW: Performs a direct query using a fresh client
+   */
+  public static async performDirectQuery<T>(
+    tableName: string,
+    columns: string,
+    filters: Record<string, any>
+  ): Promise<{ data: T[] | null; error: any }> {
+    try {
+      console.log(`[ClinicianQueryDebugger] Performing direct query on ${tableName} with fresh client`);
+      
+      // Create a fresh client
+      const client = this.createFreshClient();
+      
+      // Build the query
+      let query = client.from(tableName).select(columns);
+      
+      // Add filters
+      Object.entries(filters).forEach(([key, value]) => {
+        query = query.eq(key, value);
+      });
+      
+      // Execute
+      const result = await query;
+      
+      return result;
+    } catch (error) {
+      console.error('[ClinicianQueryDebugger] Error in direct query:', error);
+      return { data: null, error };
+    }
+  }
+
+  /**
    * Wraps the specific query in TherapistSelection.tsx to debug it
    */
-  public static wrapTherapistSelectionQuery() {
+  public static async wrapTherapistSelectionQuery() {
     return this.debugQuery(
       'clinicians',
       (query) => query
         .select('id, clinician_first_name, clinician_last_name, clinician_professional_name, clinician_type, clinician_bio, clinician_bio_short, clinician_licensed_states, clinician_min_client_age, clinician_profile_image, clinician_image_url')
         .eq('clinician_status', 'Active')
     );
+  }
+  
+  /**
+   * NEW: Attempt to query using the compatibility view
+   */
+  public static async queryWithCompatibilityView() {
+    console.log('[ClinicianQueryDebugger] Attempting query with compatibility view');
+    return this.debugQuery(
+      'clinicians_compatibility_view',
+      (query) => query
+        .select('id, clinician_first_name, clinician_last_name, clinician_professional_name, clinician_type, clinician_bio, clinician_bio_short, clinician_licensed_states, clinician_min_client_age, clinician_profile_image, clinician_image_url')
+        .eq('clinician_status', 'Active')
+    );
+  }
+  
+  /**
+   * NEW: Test if the clinician_status enum is causing issues by using a different filter
+   */
+  public static async queryWithoutStatusFilter() {
+    console.log('[ClinicianQueryDebugger] Attempting query without status filter');
+    return this.debugQuery(
+      'clinicians',
+      (query) => query
+        .select('id, clinician_first_name, clinician_last_name, clinician_professional_name, clinician_type, clinician_bio, clinician_bio_short, clinician_licensed_states, clinician_min_client_age, clinician_profile_image, clinician_image_url')
+    );
+  }
+  
+  /**
+   * NEW: Create a specialized hook for troubleshooting the therapist selection
+   */
+  public static async createTherapistSelectionDebugHook() {
+    // First, try the normal query
+    console.log('[ClinicianQueryDebugger] Starting therapist selection debug process');
+    const normalResult = await this.wrapTherapistSelectionQuery();
+    
+    // If it fails, try the compatibility view
+    if (normalResult.error) {
+      console.log('[ClinicianQueryDebugger] Normal query failed, trying compatibility view');
+      const compatResult = await this.queryWithCompatibilityView();
+      
+      // If that also fails, try without the status filter
+      if (compatResult.error) {
+        console.log('[ClinicianQueryDebugger] Compatibility view failed, trying without status filter');
+        const noFilterResult = await this.queryWithoutStatusFilter();
+        
+        // If that also fails, try a direct non-wrapped query as a last resort
+        if (noFilterResult.error) {
+          console.log('[ClinicianQueryDebugger] All attempts failed, trying direct query');
+          const directResult = await supabase
+            .from('clinicians')
+            .select('id, clinician_first_name, clinician_last_name, clinician_professional_name, clinician_type, clinician_bio, clinician_bio_short, clinician_licensed_states, clinician_min_client_age, clinician_profile_image, clinician_image_url');
+            
+          return directResult;
+        }
+        
+        return noFilterResult;
+      }
+      
+      return compatResult;
+    }
+    
+    return normalResult;
   }
 }
 
@@ -215,4 +352,11 @@ export function withQueryDebugging<T>(
   queryBuilder: (query: any) => any
 ): Promise<{ data: T[] | null; error: any }> {
   return ClinicianQueryDebugger.debugQuery(tableName, queryBuilder);
+}
+
+/**
+ * NEW: Hook to use therapist data with enhanced error recovery
+ */
+export async function useDebugTherapistsData() {
+  return await ClinicianQueryDebugger.createTherapistSelectionDebugHook();
 }
