@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState, useCallback } from 'react';
 import Layout from '@/components/layout/Layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -37,7 +38,8 @@ const TherapistSelection = () => {
     userId: authUserId, 
     isLoading: isUserContextLoading, 
     clientProfile: userClientProfile,
-    authInitialized 
+    authInitialized,
+    refreshUserData // Make sure to extract refreshUserData from UserContext
   } = useUser();
 
   const [clientDataForFilter, setClientDataForFilter] = useState<ClientDataForFiltering | null>(null);
@@ -185,30 +187,45 @@ const TherapistSelection = () => {
   }, [clientDataForFilter, isUserContextLoading, toast]); // Depends on clientDataForFilter now
 
   const handleSelectTherapist = async (therapist: Therapist) => {
-    // ... (implementation as before, ensure authUserId is used)
-    if (!authUserId) { /* ... */ return; }
+    if (!authUserId) {
+      toast({ 
+        title: "Authentication Required", 
+        description: "You need to be logged in to select a therapist", 
+        variant: "destructive" 
+      });
+      navigate('/login');
+      return;
+    }
+    
     setSelectingTherapistId(therapist.id);
     try {
       const { error } = await supabase
         .from('clients')
         .update({ client_assigned_therapist: therapist.id, client_status: 'Therapist Selected' })
         .eq('id', authUserId);
+        
       if (error) throw error;
+      
       toast({
         title: "Therapist Selected!",
         description: `You have selected ${therapist.clinician_professional_name || `${therapist.clinician_first_name} ${therapist.clinician_last_name}`}.`,
       });
+      
       if (refreshUserData) await refreshUserData(); // Refresh context
       navigate('/patient-dashboard');
     } catch (error: any) {
       console.error("Exception in handleSelectTherapist:", error);
-      toast({ title: "Error", description: error.message || "An unexpected error occurred.", variant: "destructive" });
+      toast({ 
+        title: "Error", 
+        description: error.message || "An unexpected error occurred.", 
+        variant: "destructive" 
+      });
     } finally {
       setSelectingTherapistId(null);
     }
   };
   
-  const displayTherapistName = (therapist: Therapist) => { /* ... as before ... */ 
+  const displayTherapistName = (therapist: Therapist) => { 
     return therapist.clinician_professional_name || `${therapist.clinician_first_name || ''} ${therapist.clinician_last_name || ''}`.trim();
   };
 
