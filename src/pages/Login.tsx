@@ -30,31 +30,37 @@ const Login = () => {
     setIsSubmitting(true);
     
     try {
+      console.log("Attempting login with:", email);
       const { success, error } = await login(email, password);
+      console.log("Login result:", success, error);
       
       if (success) {
         toast.success("Login successful", { description: "Welcome back!" });
+        console.log("Login successful, userRole:", userRole, "clientStatus:", clientStatus);
         
-        // Handle redirection based on role and client status
-        if (userRole === 'client') {
-          if (clientStatus === 'New') {
-            navigate("/profile-setup");
+        // Wait briefly to allow auth state to update
+        setTimeout(() => {
+          // Handle redirection based on role and client status
+          if (userRole === 'client') {
+            if (clientStatus === 'New') {
+              navigate("/profile-setup");
+            } else {
+              navigate("/patient-dashboard");
+            }
+          } else if (userRole === 'clinician') {
+            navigate("/clients");
+          } else if (userRole === 'admin') {
+            navigate("/settings");
           } else {
-            navigate("/patient-dashboard");
+            navigate("/");
           }
-        } else if (userRole === 'clinician') {
-          navigate("/clients");
-        } else if (userRole === 'admin') {
-          navigate("/settings");
-        } else {
-          navigate("/");
-        }
+        }, 500);
       } else {
         setError(error?.message || "Invalid login credentials. Please try again.");
+        setIsSubmitting(false);
       }
     } catch (err: any) {
       setError(err.message || "An unexpected error occurred. Please try again.");
-    } finally {
       setIsSubmitting(false);
     }
   };

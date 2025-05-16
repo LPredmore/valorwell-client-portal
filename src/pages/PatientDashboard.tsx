@@ -13,18 +13,28 @@ import { Button } from '@/components/ui/button';
 import { Calendar } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/NewAuthContext';
+import { toast } from 'sonner';
 
 const PatientDashboard = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('dashboard');
-  const { clientStatus } = useAuth();
+  const { clientStatus, authState, isLoading } = useAuth();
   
   // Redirect to profile setup if client status is "New"
   useEffect(() => {
-    if (clientStatus === 'New') {
+    if (!isLoading && clientStatus === 'New') {
+      console.log("User has New status, redirecting to profile setup");
+      toast.info("Please complete your profile setup first");
       navigate('/profile-setup');
     }
-  }, [clientStatus, navigate]);
+  }, [clientStatus, navigate, isLoading]);
+  
+  // If still loading, show nothing to prevent flash
+  if (isLoading) {
+    return <div className="flex items-center justify-center h-screen">
+      <div className="animate-spin h-10 w-10 border-4 border-blue-500 rounded-full border-t-transparent"></div>
+    </div>;
+  }
   
   return (
     <NewLayout>
