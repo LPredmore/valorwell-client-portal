@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import Layout from '@/components/layout/Layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,6 +11,7 @@ import { useNavigate } from 'react-router-dom';
 import { useUser } from '@/context/UserContext';
 import { useTherapistSelection, Therapist } from '@/hooks/useTherapistSelection';
 
+// Define interface for the client data structure
 interface Client {
   client_state: string | null;
   client_age: number | null;
@@ -65,20 +67,23 @@ const TherapistSelection = () => {
   useEffect(() => {
     if (!isUserContextLoading && authInitialized && authUserId) {
       // Add the requested debug logging
-      console.log('[TherapistSelection DEBUG] userClientProfile from UserContext:', JSON.stringify(userClientProfile, null, 2));
+      console.log('[TherapistSelection DEBUG] userClientProfile from UserContext:', userClientProfile ? JSON.stringify(userClientProfile, null, 2) : 'null/undefined');
       
       if (userClientProfile) {
-        console.log(`[TherapistSelection DEBUG] userClientProfile.client_age: ${userClientProfile.client_age} (Type: ${typeof userClientProfile.client_age})`);
-        console.log(`[TherapistSelection DEBUG] userClientProfile.client_state: ${userClientProfile.client_state} (Type: ${typeof userClientProfile.client_state})`);
+        const clientAge = userClientProfile.client_age;
+        const clientState = userClientProfile.client_state;
+        
+        console.log(`[TherapistSelection DEBUG] userClientProfile.client_age: ${clientAge} (Type: ${typeof clientAge})`);
+        console.log(`[TherapistSelection DEBUG] userClientProfile.client_state: ${clientState} (Type: ${typeof clientState})`);
         
         setClientData({
-          client_state: userClientProfile.client_state || null,
-          client_age: userClientProfile.client_age === undefined || userClientProfile.client_age === null ? null : Number(userClientProfile.client_age),
+          client_state: clientState || null,
+          client_age: clientAge === undefined || clientAge === null ? null : Number(clientAge),
         });
         
         console.log('[TherapistSelection] Using clientProfile from UserContext:', JSON.stringify({
-          client_state: userClientProfile.client_state,
-          client_age: userClientProfile.client_age
+          client_state: clientState,
+          client_age: clientAge
         }, null, 2));
       } else {
         console.warn('[TherapistSelection DEBUG] userClientProfile from UserContext is null/undefined.');
@@ -101,6 +106,7 @@ const TherapistSelection = () => {
   }, [authUserId, isUserContextLoading, userClientProfile, navigate, toast, authInitialized]);
 
   // Use our custom hook for therapist data with enhanced error handling
+  // Add defensive checks to prevent null values causing errors
   const {
     therapists,
     allTherapists,
@@ -112,7 +118,9 @@ const TherapistSelection = () => {
     selectingTherapistId
   } = useTherapistSelection({
     clientState: clientData?.client_state || null,
-    clientAge: clientData?.client_age !== null ? Number(clientData.client_age) : null,
+    clientAge: clientData?.client_age !== undefined && clientData?.client_age !== null 
+              ? Number(clientData.client_age) 
+              : null,
     enableFiltering: true
   });
 

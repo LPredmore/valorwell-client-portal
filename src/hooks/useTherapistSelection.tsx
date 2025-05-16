@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { ClinicianQueryDebugger } from '@/debug/clinicianQueryDebugger';
@@ -192,7 +193,15 @@ export const useTherapistSelection = ({
   
   // Filter therapists based on client state and age
   const filterTherapists = (therapistList: Therapist[], state: string | null, age: number | null): Therapist[] => {
+    // Add defensive check for null therapist list
+    if (!therapistList || therapistList.length === 0) {
+      return [];
+    }
+    
     return therapistList.filter(therapist => {
+      // Skip null therapist entries
+      if (!therapist) return false;
+      
       let matchesState = !state; // If client has no state, don't filter by state
       let matchesAge = true;
       
@@ -255,10 +264,21 @@ export const useTherapistSelection = ({
         return false;
       }
       
-      const therapist = therapists.find(t => t.id === therapistId);
-      const displayName = therapist
-        ? (therapist.clinician_professional_name || `${therapist.clinician_first_name || ''} ${therapist.clinician_last_name || ''}`.trim())
-        : 'the selected therapist';
+      // Find the therapist object safely
+      const therapist = therapists.find(t => t && t.id === therapistId);
+      
+      // Handle display name with null safety
+      let displayName = 'the selected therapist';
+      if (therapist) {
+        if (therapist.clinician_professional_name) {
+          displayName = therapist.clinician_professional_name;
+        } else {
+          const firstName = therapist.clinician_first_name || '';
+          const lastName = therapist.clinician_last_name || '';
+          const fullName = `${firstName} ${lastName}`.trim();
+          if (fullName) displayName = fullName;
+        }
+      }
         
       toast({
         title: "Therapist Selected!",
