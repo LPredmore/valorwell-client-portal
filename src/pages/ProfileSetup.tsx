@@ -649,8 +649,10 @@ const ProfileSetup = () => {
     if (!clientId) { toast({ title: "Error", description: "No client record found. Please contact support.", variant: "destructive" }); return; }
     try {
       const { error } = await supabase.from('clients').update({
-          client_self_goal: values.client_self_goal || null, client_referral_source: values.client_referral_source || null,
-          client_status: 'Profile Complete', client_is_profile_complete: true 
+          client_self_goal: values.client_self_goal || null, 
+          client_referral_source: values.client_referral_source || null,
+          client_status: 'Profile Complete', // Change status from "New" to "Profile Complete"
+          client_is_profile_complete: true 
         }).eq('id', clientId);
       if (error) throw error; 
       console.log("[ProfileSetup] Profile completed successfully in DB. Refreshing UserContext...");

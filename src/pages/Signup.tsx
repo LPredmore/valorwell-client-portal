@@ -94,7 +94,8 @@ const Signup = () => {
                 phone: values.phone,
                 role: "client",
                 state: values.state,
-                temp_password: tempPassword
+                temp_password: tempPassword,
+                client_status: "New" // Set initial status to New
               }
             }
           });
@@ -118,11 +119,11 @@ const Signup = () => {
           
           toast({
             title: "Account created successfully",
-            description: "You can now log in to access your patient portal.",
+            description: "You'll be redirected to complete your profile setup.",
           });
           
-          // Redirect to login page
-          navigate("/login");
+          // Redirect to profile setup page instead of login
+          navigate("/profile-setup");
           
         } catch (attemptError: any) {
           console.error(`[Signup] Error during registration attempt ${attempt + 1}:`, attemptError);

@@ -51,14 +51,14 @@ const Sidebar = () => {
   
   // Determine which navigation items to show based on user type
   let navItems = [...commonNavItems];
-  if (userType === 'clinician' || userType === 'admin') {
+  if (userType === 'clinician') {
     navItems = [...navItems, ...clinicianNavItems];
   } else if (userType === 'patient') {
     navItems = [...patientNavItems];
   }
 
   // Define action buttons based on user type
-  const actionButtons = userType === 'clinician' || userType === 'admin' ? [
+  const actionButtons = userType === 'clinician' ? [
     {
       name: 'New Client',
       action: () => navigate('/clients/new'),

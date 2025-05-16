@@ -16,6 +16,8 @@ DECLARE
   v_phone text;
   v_state text;
   v_temp_password text;
+  v_preferred_name text;
+  v_client_status text;
 BEGIN
   -- Extract the role from user metadata with fallback to 'client' if missing
   v_role := COALESCE(NEW.raw_user_meta_data->>'role', 'client');
@@ -23,9 +25,11 @@ BEGIN
   -- Extract other common fields with null handling
   v_first_name := NEW.raw_user_meta_data->>'first_name';
   v_last_name := NEW.raw_user_meta_data->>'last_name';
+  v_preferred_name := NEW.raw_user_meta_data->>'preferred_name';
   v_phone := NEW.raw_user_meta_data->>'phone';
   v_state := NEW.raw_user_meta_data->>'state';
   v_temp_password := NEW.raw_user_meta_data->>'temp_password';
+  v_client_status := COALESCE(NEW.raw_user_meta_data->>'client_status', 'New'); -- Default to 'New' if not specified
   
   -- If role is missing or invalid, set it to 'client' and update user metadata
   IF v_role IS NULL OR v_role NOT IN ('admin', 'clinician', 'client') THEN
@@ -132,6 +136,7 @@ BEGIN
         client_email,
         client_first_name,
         client_last_name,
+        client_preferred_name,
         client_phone,
         role,
         client_state,
@@ -143,10 +148,11 @@ BEGIN
         NEW.email,
         v_first_name,
         v_last_name,
+        v_preferred_name,
         v_phone,
         'client'::app_role,
         v_state,
-        'New',
+        v_client_status, -- Use the client_status variable
         v_temp_password
       );
     EXCEPTION WHEN OTHERS THEN
@@ -176,7 +182,8 @@ BEGIN
       'Client user created successfully',
       jsonb_build_object(
         'user_id', NEW.id,
-        'email', NEW.email
+        'email', NEW.email,
+        'client_status', v_client_status
       )
     );
   END IF;
@@ -194,6 +201,6 @@ CREATE TRIGGER on_auth_user_created
 INSERT INTO public.migration_logs (migration_name, description, details)
 VALUES (
   '20250508_update_handle_new_user',
-  'Updated handle_new_user function and trigger',
-  jsonb_build_object('action', 'update_trigger')
+  'Updated handle_new_user function and trigger with client status support',
+  jsonb_build_object('action', 'update_trigger', 'added_features', 'client_status')
 );
