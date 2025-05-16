@@ -4,6 +4,7 @@ import Layout from '@/components/layout/Layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
+import { ClinicianQueryDebugger } from '@/debug/clinicianQueryDebugger';
 import { useToast } from '@/hooks/use-toast';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -146,38 +147,119 @@ const TherapistSelection = () => {
       setLoadingTherapists(true);
       setFilteringApplied(false); // Reset filtering applied flag
       try {
-        console.log("[TherapistSelection] Starting fetch therapists query...");
+        console.log("[TherapistSelection] Starting fetch therapists query with debug wrapper...");
         
-        const { data: activeTherapists, error } = await supabase
-          .from('clinicians')
-          .select('id, clinician_first_name, clinician_last_name, clinician_professional_name, clinician_type, clinician_bio, clinician_bio_short, clinician_licensed_states, clinician_min_client_age, clinician_profile_image, clinician_image_url')
-          .eq('clinician_status', 'Active');
+        // Use the enhanced debug wrapper to capture the exact query and any transformations
+        // This will help identify any issues with column references
+        let activeTherapists = null;
+        let error = null;
+        
+        try {
+          // First attempt: Use the standard query with debugging
+          const result = await ClinicianQueryDebugger.debugQuery(
+            'clinicians',
+            (query) => query
+              .select('id, clinician_first_name, clinician_last_name, clinician_professional_name, clinician_type, clinician_bio, clinician_bio_short, clinician_licensed_states, clinician_min_client_age, clinician_profile_image, clinician_image_url')
+              .eq('clinician_status', 'Active')
+          );
+          
+          activeTherapists = result.data;
+          error = result.error;
+          
+          // If we get a column does not exist error specifically for clinician_title
+          if (error && error.code === '42703' && error.message && error.message.includes('clinician_title')) {
+            console.warn("[TherapistSelection] Detected clinician_title error, trying fallback query...");
+            
+            // Second attempt: Try using the compatibility view we created in the migration
+            const fallbackResult = await ClinicianQueryDebugger.debugQuery(
+              'clinicians_compatibility_view',
+              (query) => query
+                .select('id, clinician_first_name, clinician_last_name, clinician_professional_name, clinician_type, clinician_bio, clinician_bio_short, clinician_licensed_states, clinician_min_client_age, clinician_profile_image, clinician_image_url')
+                .eq('clinician_status', 'Active')
+            );
+            
+            if (!fallbackResult.error) {
+              console.log("[TherapistSelection] Fallback query successful using compatibility view");
+              activeTherapists = fallbackResult.data;
+              error = null;
+            } else {
+              console.error("[TherapistSelection] Fallback query also failed:", fallbackResult.error);
+            }
+          }
+        } catch (queryError) {
+          console.error("[TherapistSelection] Exception during query execution:", queryError);
+          error = queryError;
+        }
 
         if (error) {
           console.error('Error fetching therapists:', error);
           
-          // Set specific error message based on the error type
+          // Enhanced error handling with our debugging utility
           if (error.code === '42703') {
-            setDbError(`Database column error: ${error.message}. Please contact support.`);
-          } else {
-            setDbError(`Failed to load therapists: ${error.message}`);
+            // This is likely a column does not exist error - exactly what we're looking for
+            const errorMessage = `Database column error: ${error.message}. Please contact support.`;
+            setDbError(errorMessage);
+            
+            // Check if the error is related to clinician_title
+            if (error.message && error.message.includes('clinician_title')) {
+              console.error(`
+[CRITICAL DEBUG INFO] Found 'clinician_title' reference in error message.
+This confirms the issue is with a non-existent column being referenced.
+The correct column name is 'clinician_type'.
+              `);
+              
+              // Try one more fallback approach - direct query without the compatibility view
+              try {
+                console.log("[TherapistSelection] Attempting direct fallback query without debugging wrapper");
+                const lastResortResult = await supabase
+                  .from('clinicians')
+                  .select('id, clinician_first_name, clinician_last_name, clinician_professional_name, clinician_type, clinician_bio, clinician_bio_short, clinician_licensed_states, clinician_min_client_age, clinician_profile_image, clinician_image_url')
+                  .eq('clinician_status', 'Active');
+                
+                if (!lastResortResult.error && lastResortResult.data) {
+                  console.log("[TherapistSelection] Direct fallback query successful");
+                  activeTherapists = lastResortResult.data;
+                  error = null;
+                  // Clear the error since we recovered
+                  setDbError(null);
+                } else {
+                  console.error("[TherapistSelection] All fallback attempts failed");
+                }
+              } catch (fallbackError) {
+                console.error("[TherapistSelection] Exception during direct fallback query:", fallbackError);
+              }
+            }
           }
           
-          toast({
-            title: "Database Error",
-            description: "There was an issue retrieving therapist data. Please try again later.",
-            variant: "destructive"
-          });
-          setTherapists([]);
-          setAllTherapists([]);
-          setLoadingTherapists(false);
-          return;
+          // Only set error state and show toast if we couldn't recover
+          if (error) {
+            setDbError(`Failed to load therapists: ${error.message}`);
+            toast({
+              title: "Database Error",
+              description: "There was an issue retrieving therapist data. Please try again later.",
+              variant: "destructive"
+            });
+            setTherapists([]);
+            setAllTherapists([]);
+            setLoadingTherapists(false);
+            return;
+          }
         }
         
+        // Process the therapists data (whether from primary query or fallback)
         const fetchedTherapists = activeTherapists || [];
         console.log("[TherapistSelection] Total active therapists fetched:", fetchedTherapists.length);
         if (fetchedTherapists.length > 0) {
             console.log("[TherapistSelection] Sample therapist data from DB:", JSON.stringify(fetchedTherapists[0], null, 2));
+            
+            // Verify the clinician_type field is present
+            if (fetchedTherapists[0].clinician_type === undefined && fetchedTherapists[0].clinician_title !== undefined) {
+                console.warn("[TherapistSelection] Data contains clinician_title instead of clinician_type - mapping fields");
+                // Map clinician_title to clinician_type for consistency
+                fetchedTherapists.forEach(therapist => {
+                    therapist.clinician_type = therapist.clinician_title;
+                });
+            }
         }
         setAllTherapists(fetchedTherapists); // Store all for potential reference
 
@@ -368,7 +450,7 @@ const TherapistSelection = () => {
     );
   }
 
-  // New: Handle database error state
+  // Enhanced: Handle database error state with more information and options
   if (dbError) {
     return (
       <Layout>
@@ -382,16 +464,41 @@ const TherapistSelection = () => {
             </CardHeader>
             
             <CardContent className="pt-8 px-4 md:px-6">
-              <div className="bg-red-50 p-6 rounded-lg border border-red-200 my-4 text-center">
-                <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-3" />
-                <h3 className="text-xl font-medium text-red-800 mb-2">Database Error</h3>
-                <p className="text-red-600 mb-6">{dbError}</p>
-                <Button 
-                  onClick={handleRetryFetch}
-                  className="bg-valorwell-600 hover:bg-valorwell-700 text-white"
-                >
-                  <RefreshCw className="mr-2 h-4 w-4" /> Retry
-                </Button>
+              <div className="bg-red-50 p-6 rounded-lg border border-red-200 my-4">
+                <div className="text-center">
+                  <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-3" />
+                  <h3 className="text-xl font-medium text-red-800 mb-2">Database Error</h3>
+                  <p className="text-red-600 mb-6">{dbError}</p>
+                </div>
+                
+                <div className="bg-white p-4 rounded-md mb-6 text-left">
+                  <h4 className="font-medium text-gray-800 mb-2">Technical Details</h4>
+                  <p className="text-sm text-gray-600 mb-2">
+                    This error may be related to a database schema mismatch. Our system is looking for the correct column
+                    <code className="bg-gray-100 px-1 py-0.5 rounded mx-1">clinician_type</code>
+                    but encountered an error.
+                  </p>
+                  <p className="text-sm text-gray-600">
+                    A database migration has been created to fix this issue. Please contact the development team if this error persists.
+                  </p>
+                </div>
+                
+                <div className="flex justify-center space-x-4">
+                  <Button
+                    onClick={handleRetryFetch}
+                    className="bg-valorwell-600 hover:bg-valorwell-700 text-white"
+                  >
+                    <RefreshCw className="mr-2 h-4 w-4" /> Retry Query
+                  </Button>
+                  
+                  <Button
+                    onClick={() => window.location.reload()}
+                    variant="outline"
+                    className="border-valorwell-300 text-valorwell-700"
+                  >
+                    Refresh Page
+                  </Button>
+                </div>
               </div>
             </CardContent>
           </Card>
