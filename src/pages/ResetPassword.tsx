@@ -1,13 +1,17 @@
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { toast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { supabase, testResendEmailService } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { debugAuthOperation } from "@/debug/authDebugUtils";
+import { AlertCircle, Loader2, Bug } from "lucide-react";
+import { runAuthDiagnostics, testPasswordResetFlow } from "@/utils/authTroubleshooter";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import AuthDiagnostics from "@/components/auth/AuthDiagnostics";
+import { debugAuthOperation } from "@/utils/authDebugUtils";
 
 const ResetPassword = () => {
   const navigate = useNavigate();
@@ -18,7 +22,27 @@ const ResetPassword = () => {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [debugInfo, setDebugInfo] = useState<any>({});
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [activeTab, setActiveTab] = useState<string>("reset");
   const timeoutRef = useRef<number | null>(null);
+
+  // Add console logs to trace page load and state changes
+  useEffect(() => {
+    console.log("[ResetPassword] Page loaded, email param:", emailParam);
+    
+    // Check for Supabase URL to verify config
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    console.log("[ResetPassword] Supabase URL configured:", supabaseUrl ? "Yes" : "No");
+    
+    // Log the current origin for redirect URL validation
+    console.log("[ResetPassword] Current origin:", window.location.origin);
+    
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+  }, [emailParam]);
 
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -52,10 +76,8 @@ const ResetPassword = () => {
           message: "Operation timed out after 45 seconds"
         }
       }));
-      toast({
-        title: "Request timed out",
-        description: "The password reset request took too long. Please try again.",
-        variant: "destructive",
+      toast("Request timed out", {
+        description: "The password reset request took too long. Please try again."
       });
     }, 45000) as unknown as number;  // Increased to 45 seconds
     
@@ -100,9 +122,6 @@ const ResetPassword = () => {
         }
       }));
       
-      // IMPORTANT: Removed the test email functionality completely
-      // Proceed directly with password reset
-
       // Call Supabase Auth API directly with explicit redirect URL
       console.log("[ResetPassword] Calling supabase.auth.resetPasswordForEmail with:", {
         email: email,
@@ -154,9 +173,8 @@ const ResetPassword = () => {
         }
       }));
       
-      toast({
-        title: "Password reset email sent",
-        description: "Please check your email for the password reset link. Be sure to click the complete link in the email.",
+      toast("Password reset email sent", {
+        description: "Please check your email for the password reset link. Be sure to click the complete link in the email."
       });
     } catch (error: any) {
       console.error("[ResetPassword] Error details:", error);
@@ -166,10 +184,8 @@ const ResetPassword = () => {
         timeoutRef.current = null;
       }
       
-      toast({
-        title: "Failed to send reset email",
-        description: error.message || "There was a problem sending the reset email. Please try again.",
-        variant: "destructive",
+      toast("Failed to send reset email", {
+        description: error.message || "There was a problem sending the reset email. Please try again."
       });
     } finally {
       setIsLoading(false);
@@ -194,23 +210,18 @@ const ResetPassword = () => {
       }));
       
       if (result.success) {
-        toast({
-          title: "Test email sent",
-          description: "A test email was sent successfully. Please check your inbox.",
+        toast("Test email sent", {
+          description: "A test email was sent successfully. Please check your inbox."
         });
       } else {
-        toast({
-          title: "Test email failed",
-          description: result.error || "Failed to send test email",
-          variant: "destructive",
+        toast("Test email failed", {
+          description: result.error || "Failed to send test email"
         });
       }
     } catch (error: any) {
       console.error("[ResetPassword] Test email error:", error);
-      toast({
-        title: "Test email failed",
-        description: error.message || "There was a problem sending the test email",
-        variant: "destructive",
+      toast("Test email failed", {
+        description: error.message || "There was a problem sending the test email"
       });
     } finally {
       setIsLoading(false);
@@ -223,7 +234,8 @@ const ResetPassword = () => {
       setIsLoading(true);
       setDebugInfo(prev => ({ ...prev, edgeFunctionTest: { status: 'testing' } }));
       
-      const response = await fetch(`https://gqlkritspnhjxfejvgfg.supabase.co/functions/v1/test-resend`, {
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const response = await fetch(`${supabaseUrl}/functions/v1/test-resend`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json'
@@ -240,10 +252,8 @@ const ResetPassword = () => {
         }
       }));
       
-      toast({
-        title: "Edge Function Test",
-        description: result.status === 'ok' ? "Edge function is operational" : "Edge function test failed",
-        variant: result.status === 'ok' ? "default" : "destructive"
+      toast("Edge Function Test", {
+        description: result.status === 'ok' ? "Edge function is operational" : "Edge function test failed"
       });
     } catch (error) {
       setDebugInfo(prev => ({
@@ -254,10 +264,29 @@ const ResetPassword = () => {
           timestamp: new Date().toISOString()
         }
       }));
-      toast({
-        title: "Edge Function Test Failed",
-        description: "Could not connect to the edge function",
-        variant: "destructive"
+      toast("Edge Function Test Failed", {
+        description: "Could not connect to the edge function"
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const runDiagnostic = async () => {
+    setIsLoading(true);
+    try {
+      const diagnosticResults = await runAuthDiagnostics();
+      setDebugInfo(prev => ({
+        ...prev,
+        diagnosticResults
+      }));
+      toast("Diagnostics Complete", {
+        description: "Authentication system diagnostics have been run."
+      });
+    } catch (error) {
+      console.error("[ResetPassword] Diagnostic error:", error);
+      toast("Diagnostic Failed", {
+        description: "There was a problem running the diagnostics"
       });
     } finally {
       setIsLoading(false);
@@ -265,94 +294,130 @@ const ResetPassword = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
+    <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 p-4">
       <Card className="w-full max-w-md">
-        <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl font-bold text-center">Reset Password</CardTitle>
-          <CardDescription className="text-center">
-            Enter your email address and we'll send you a link to reset your password
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {errorMessage && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-800 rounded-md">
-              <p className="text-sm font-medium">{errorMessage}</p>
-            </div>
-          )}
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList className="w-full">
+            <TabsTrigger value="reset" className="flex-1">Reset Password</TabsTrigger>
+            <TabsTrigger value="debug" className="flex-1">Diagnostics</TabsTrigger>
+          </TabsList>
           
-          {successMessage && (
-            <div className="mb-4 p-3 bg-green-50 border border-green-200 text-green-800 rounded-md">
-              <p className="text-sm font-medium">{successMessage}</p>
-              <p className="text-xs mt-1">Please check your email for further instructions.</p>
-            </div>
-          )}
+          <CardHeader className="space-y-1">
+            <CardTitle className="text-2xl font-bold text-center">
+              {activeTab === "reset" ? "Reset Password" : "Auth Diagnostics"}
+            </CardTitle>
+            <CardDescription className="text-center">
+              {activeTab === "reset" 
+                ? "Enter your email address and we'll send you a link to reset your password"
+                : "Run diagnostics to troubleshoot authentication issues"
+              }
+            </CardDescription>
+          </CardHeader>
           
-          <form onSubmit={handleResetPassword} className="space-y-4">
-            <div className="space-y-2">
-              <label htmlFor="email" className="text-sm font-medium">Email</label>
-              <Input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="Enter your email address"
-                required
-                disabled={isLoading || !!successMessage}
-              />
-            </div>
-            <Button type="submit" className="w-full" disabled={isLoading || !!successMessage}>
-              {isLoading ? "Sending..." : "Send Reset Link"}
+          <CardContent>
+            <TabsContent value="reset" className="mt-0">
+              {errorMessage && (
+                <Alert variant="destructive" className="mb-4">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>{errorMessage}</AlertDescription>
+                </Alert>
+              )}
+              
+              {successMessage && (
+                <div className="mb-4 p-3 bg-green-50 border border-green-200 text-green-800 rounded-md">
+                  <p className="text-sm font-medium">{successMessage}</p>
+                  <p className="text-xs mt-1">Please check your email for further instructions.</p>
+                </div>
+              )}
+              
+              <form onSubmit={handleResetPassword} className="space-y-4">
+                <div className="space-y-2">
+                  <label htmlFor="email" className="text-sm font-medium">Email</label>
+                  <Input
+                    id="email"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="Enter your email address"
+                    required
+                    disabled={isLoading || !!successMessage}
+                  />
+                </div>
+                <Button type="submit" className="w-full" disabled={isLoading || !!successMessage}>
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Sending...
+                    </>
+                  ) : "Send Reset Link"}
+                </Button>
+                
+                <div className="pt-2">
+                  <Button
+                    type="button"
+                    variant="outline" 
+                    size="sm"
+                    className="w-full text-xs"
+                    onClick={() => setShowAdvanced(!showAdvanced)}
+                  >
+                    {showAdvanced ? "Hide Advanced Options" : "Show Advanced Options"}
+                  </Button>
+                </div>
+                
+                {showAdvanced && (
+                  <div className="space-y-2 pt-2 border-t border-gray-100">
+                    <p className="text-xs text-gray-500">Advanced diagnostic tools:</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button 
+                        type="button" 
+                        variant="outline" 
+                        size="sm"
+                        className="text-xs"
+                        onClick={handleTestEmail}
+                        disabled={isLoading || !email}
+                      >
+                        Test Email Delivery
+                      </Button>
+                      
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="text-xs"
+                        onClick={testEdgeFunction}
+                        disabled={isLoading}
+                      >
+                        Test Edge Function
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </form>
+              
+              {/* Debug info */}
+              {showAdvanced && Object.keys(debugInfo).length > 0 && (
+                <div className="mt-4 p-3 bg-gray-50 border border-gray-200 rounded-md">
+                  <details>
+                    <summary className="text-xs font-medium text-gray-500 cursor-pointer">Debug Info:</summary>
+                    <pre className="text-xs text-gray-600 overflow-auto max-h-60 mt-2">
+                      {JSON.stringify(debugInfo, null, 2)}
+                    </pre>
+                  </details>
+                </div>
+              )}
+            </TabsContent>
+            
+            <TabsContent value="debug" className="mt-0">
+              <AuthDiagnostics />
+            </TabsContent>
+          </CardContent>
+          
+          <CardFooter className="flex justify-center">
+            <Button variant="link" onClick={() => navigate("/login")}>
+              Back to Login
             </Button>
-            
-            {/* Test email functionality (in development) */}
-            {process.env.NODE_ENV === 'development' && (
-              <div className="mt-2">
-                <Button 
-                  type="button" 
-                  variant="outline" 
-                  size="sm"
-                  className="w-full text-xs"
-                  onClick={handleTestEmail}
-                  disabled={isLoading || !email}
-                >
-                  Test Email Delivery
-                </Button>
-              </div>
-            )}
-            
-            {process.env.NODE_ENV === 'development' && (
-              <div className="mt-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="w-full text-xs"
-                  onClick={testEdgeFunction}
-                  disabled={isLoading}
-                >
-                  Test Edge Function
-                </Button>
-              </div>
-            )}
-          </form>
-          
-          {/* Debug info for development */}
-          {process.env.NODE_ENV === 'development' && Object.keys(debugInfo).length > 0 && (
-            <div className="mt-4 p-3 bg-gray-50 border border-gray-200 rounded-md">
-              <details>
-                <summary className="text-xs font-medium text-gray-500 cursor-pointer">Debug Info:</summary>
-                <pre className="text-xs text-gray-600 overflow-auto max-h-60 mt-2">
-                  {JSON.stringify(debugInfo, null, 2)}
-                </pre>
-              </details>
-            </div>
-          )}
-        </CardContent>
-        <CardFooter className="flex justify-center">
-          <Button variant="link" onClick={() => navigate("/login")}>
-            Back to Login
-          </Button>
-        </CardFooter>
+          </CardFooter>
+        </Tabs>
       </Card>
     </div>
   );

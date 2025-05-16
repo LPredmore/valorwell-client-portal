@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { useAuth, AuthState } from '@/context/NewAuthContext';
-import { AlertCircle, Loader2 } from "lucide-react";
+import { AlertCircle, Loader2, Bug } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 const Login = () => {
@@ -18,6 +18,7 @@ const Login = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loginTimeout, setLoginTimeout] = useState<NodeJS.Timeout | null>(null);
+  const [showDebug, setShowDebug] = useState(false);
   
   // Reset form state when auth state changes
   useEffect(() => {
@@ -130,6 +131,17 @@ const Login = () => {
     }
   };
 
+  const handleDiagnosticMode = () => {
+    setShowDebug(!showDebug);
+  };
+
+  const handleDiagnosticsPageOpen = () => {
+    navigate("/debug/auth-public");
+  };
+  
+  // We're logging auth state so we can see it in console for debugging
+  const authStateString = authState ? AuthState[authState] : 'undefined';
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100">
       <Card className="w-full max-w-md">
@@ -188,6 +200,44 @@ const Login = () => {
               ) : "Sign in"}
             </Button>
           </form>
+          
+          {/* Debug section */}
+          <div className="mt-4">
+            <Button 
+              type="button" 
+              variant="ghost" 
+              size="sm"
+              className="w-full text-xs flex items-center justify-center"
+              onClick={handleDiagnosticMode}
+            >
+              <Bug className="h-3 w-3 mr-1" />
+              {showDebug ? "Hide Diagnostic Info" : "Show Diagnostic Info"}
+            </Button>
+          </div>
+          
+          {showDebug && (
+            <div className="mt-2 p-3 bg-gray-50 border border-gray-200 rounded-md">
+              <h4 className="text-xs font-semibold mb-1">Auth State Diagnostics:</h4>
+              <ul className="text-xs space-y-1">
+                <li>Auth State: <span className="font-mono">{authStateString}</span></li>
+                <li>Auth Initialized: <span className="font-mono">{authInitialized ? "Yes" : "No"}</span></li>
+                <li>Loading: <span className="font-mono">{isLoading ? "Yes" : "No"}</span></li>
+                <li>User Role: <span className="font-mono">{userRole || "None"}</span></li>
+                <li>Client Status: <span className="font-mono">{clientStatus || "None"}</span></li>
+                <li>Is Submitting: <span className="font-mono">{isSubmitting ? "Yes" : "No"}</span></li>
+              </ul>
+              
+              <Button 
+                type="button"
+                size="sm"
+                variant="outline"
+                className="mt-2 text-xs w-full"
+                onClick={handleDiagnosticsPageOpen}
+              >
+                Open Full Diagnostics Page
+              </Button>
+            </div>
+          )}
         </CardContent>
         <CardFooter className="flex flex-col space-y-2">
           <p className="text-center text-sm text-gray-500">
