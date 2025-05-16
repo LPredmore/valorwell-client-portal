@@ -21,7 +21,7 @@ export interface Therapist {
 
 interface UseTherapistSelectionOptions {
   clientState: string | null;
-  clientAge: number | null;
+  clientAge: number;
   enableFiltering?: boolean;
 }
 
@@ -54,6 +54,9 @@ export const useTherapistSelection = ({
   const [filteringApplied, setFilteringApplied] = useState<boolean>(false);
   const [selectingTherapistId, setSelectingTherapistId] = useState<string | null>(null);
   const [attemptCount, setAttemptCount] = useState<number>(0);
+  
+  // Log initial hook parameters for debugging
+  console.log(`[useTherapistSelection] Hook initialized with clientState: ${clientState}, clientAge: ${clientAge}, enableFiltering: ${enableFiltering}`);
   
   // Function to fetch therapists with multi-layered fallback strategies
   const fetchTherapists = useCallback(async () => {
@@ -148,11 +151,13 @@ export const useTherapistSelection = ({
         setAllTherapists(therapistData);
         
         // Apply filtering if enabled
-        if (enableFiltering && (clientState || clientAge !== null)) {
+        if (enableFiltering && (clientState || clientAge > 0)) {
           const filtered = filterTherapists(therapistData, clientState, clientAge);
+          console.log(`[useTherapistSelection] Filtering applied: ${filtered.length} therapists match criteria (from ${therapistData.length} total)`);
           setTherapists(filtered);
           setFilteringApplied(true);
         } else {
+          console.log('[useTherapistSelection] No filtering applied, showing all therapists');
           setTherapists(therapistData);
           setFilteringApplied(false);
         }
@@ -188,11 +193,12 @@ export const useTherapistSelection = ({
     } finally {
       setLoading(false);
       setAttemptCount(prev => prev + 1);
+      console.log('[useTherapistSelection] Fetch completed, loading set to false');
     }
   }, [clientState, clientAge, enableFiltering, attemptCount, toast]);
   
   // Filter therapists based on client state and age
-  const filterTherapists = (therapistList: Therapist[], state: string | null, age: number | null): Therapist[] => {
+  const filterTherapists = (therapistList: Therapist[], state: string | null, age: number): Therapist[] => {
     // Add defensive check for null therapist list
     if (!therapistList || therapistList.length === 0) {
       return [];
@@ -218,7 +224,7 @@ export const useTherapistSelection = ({
       }
       
       // Age Matching Logic
-      if (age !== null && therapist.clinician_min_client_age !== null) {
+      if (age > 0 && therapist.clinician_min_client_age !== null) {
         matchesAge = age >= therapist.clinician_min_client_age;
       }
       
@@ -228,6 +234,7 @@ export const useTherapistSelection = ({
   
   // Retry fetch function - increments attempt count to trigger the useEffect
   const retryFetch = useCallback(() => {
+    console.log('[useTherapistSelection] Manual retry triggered');
     setAttemptCount(prev => prev + 1);
   }, []);
   
@@ -235,9 +242,11 @@ export const useTherapistSelection = ({
   const selectTherapist = useCallback(async (therapistId: string): Promise<boolean> => {
     try {
       setSelectingTherapistId(therapistId);
+      console.log(`[useTherapistSelection] Selecting therapist with ID: ${therapistId}`);
       
       const userId = await getUserId();
       if (!userId) {
+        console.error('[useTherapistSelection] Cannot select therapist - no authenticated user ID found');
         toast({
           title: "Authentication Required",
           description: "Please log in to select a therapist.",
@@ -246,6 +255,7 @@ export const useTherapistSelection = ({
         return false;
       }
       
+      console.log(`[useTherapistSelection] Updating client record for user ID: ${userId}`);
       const { error } = await supabase
         .from('clients')
         .update({
@@ -255,7 +265,7 @@ export const useTherapistSelection = ({
         .eq('id', userId);
         
       if (error) {
-        console.error("Error selecting therapist:", error);
+        console.error("[useTherapistSelection] Error selecting therapist:", error);
         toast({
           title: "Error",
           description: "Failed to select therapist. Please try again.",
@@ -266,6 +276,7 @@ export const useTherapistSelection = ({
       
       // Find the therapist object safely
       const therapist = therapists.find(t => t && t.id === therapistId);
+      console.log(`[useTherapistSelection] Therapist selected:`, therapist);
       
       // Handle display name with null safety
       let displayName = 'the selected therapist';
@@ -285,6 +296,7 @@ export const useTherapistSelection = ({
         description: `You have selected ${displayName}.`,
       });
       
+      console.log(`[useTherapistSelection] Selection successful for ${displayName}`);
       return true;
     } catch (error: any) {
       console.error("Exception in selectTherapist:", error);
@@ -312,6 +324,7 @@ export const useTherapistSelection = ({
   
   // Fetch therapists when component mounts or when deps change
   useEffect(() => {
+    console.log('[useTherapistSelection] useEffect triggered - calling fetchTherapists()');
     fetchTherapists();
   }, [fetchTherapists]);
   

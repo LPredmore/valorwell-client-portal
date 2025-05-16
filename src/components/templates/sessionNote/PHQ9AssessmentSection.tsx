@@ -9,8 +9,29 @@ interface PHQ9AssessmentSectionProps {
 export const PHQ9AssessmentSection: React.FC<PHQ9AssessmentSectionProps> = ({
   phq9Data
 }) => {
+  // Enhanced safety check - guard against null/undefined props
   if (!phq9Data) {
+    console.log("[PHQ9AssessmentSection] No PHQ-9 data provided, component not rendered");
     return null; // Don't render anything if no PHQ-9 data is available
+  }
+  
+  // Parse score safely with error handling
+  let phq9Score: number | undefined = undefined;
+  if (phq9Data.phq9_score !== undefined) {
+    try {
+      phq9Score = typeof phq9Data.phq9_score === 'number' 
+        ? phq9Data.phq9_score 
+        : parseFloat(phq9Data.phq9_score);
+      
+      // Validate if score is a valid number
+      if (isNaN(phq9Score)) {
+        console.warn("[PHQ9AssessmentSection] Invalid PHQ-9 score:", phq9Data.phq9_score);
+        phq9Score = undefined;
+      }
+    } catch (e) {
+      console.error("[PHQ9AssessmentSection] Error parsing PHQ-9 score:", e);
+      phq9Score = undefined;
+    }
   }
   
   return (
@@ -29,16 +50,16 @@ export const PHQ9AssessmentSection: React.FC<PHQ9AssessmentSectionProps> = ({
         </div>
       )}
 
-      {phq9Data.phq9_score !== undefined && (
+      {phq9Score !== undefined && (
         <div className="mb-4">
           <label className="block text-sm font-medium text-gray-700 mb-1">PHQ-9 Score</label>
           <div className="bg-gray-100 border border-gray-300 rounded px-3 py-2 text-sm"
-               data-pdf-value={`${phq9Data.phq9_score} - ${getScoreInterpretation(phq9Data.phq9_score)}`}>
-            {phq9Data.phq9_score} - {getScoreInterpretation(phq9Data.phq9_score)}
+               data-pdf-value={`${phq9Score} - ${getScoreInterpretation(phq9Score)}`}>
+            {phq9Score} - {getScoreInterpretation(phq9Score)}
           </div>
           {/* Hidden div for PDF output */}
           <div className="hidden pdf-only">
-            {phq9Data.phq9_score} - {getScoreInterpretation(phq9Data.phq9_score)}
+            {phq9Score} - {getScoreInterpretation(phq9Score)}
           </div>
         </div>
       )}

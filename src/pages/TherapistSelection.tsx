@@ -14,16 +14,27 @@ import { useTherapistSelection, Therapist } from '@/hooks/useTherapistSelection'
 // Define interface for the client data structure
 interface Client {
   client_state: string | null;
-  client_age: number | null;
+  client_age: number;
 }
 
 const TherapistSelection = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
-  const { user, userId: authUserId, isLoading: isUserContextLoading, authInitialized, clientProfile: userClientProfile, refreshUserData } = useUser();
+  const { 
+    user, 
+    userId: authUserId, 
+    isLoading: isUserContextLoading, 
+    authInitialized, 
+    clientProfile: userClientProfile, 
+    refreshUserData 
+  } = useUser();
+  
   const [authError, setAuthError] = useState<string | null>(null);
   const [loadingTimeout, setLoadingTimeout] = useState(false);
   const [clientData, setClientData] = useState<Client | null>(null);
+  const [isDataReady, setIsDataReady] = useState(false);
+  
+  console.log('[TherapistSelection] Render with authUserId:', authUserId, 'authInitialized:', authInitialized, 'isUserContextLoading:', isUserContextLoading);
   
   // Add timeout mechanism to prevent indefinite loading
   useEffect(() => {
@@ -65,9 +76,28 @@ const TherapistSelection = () => {
 
   // Effect to set clientData from UserContext once available
   useEffect(() => {
-    if (!isUserContextLoading && authInitialized && authUserId) {
-      // Add the requested debug logging
-      console.log('[TherapistSelection DEBUG] userClientProfile from UserContext:', userClientProfile ? JSON.stringify(userClientProfile, null, 2) : 'null/undefined');
+    console.log("[TherapistSelection] useEffect for clientData triggered");
+    console.log("[TherapistSelection] Conditions: !isUserContextLoading=", !isUserContextLoading, 
+               "authInitialized=", authInitialized, 
+               "authUserId=", authUserId);
+    
+    if (!isUserContextLoading && authInitialized) {
+      if (!authUserId) {
+        console.log("[TherapistSelection] No authenticated user. Redirecting to login.");
+        toast({
+          title: "Authentication Required",
+          description: "Please log in to view therapists.",
+          variant: "destructive",
+        });
+        navigate('/login');
+        return;
+      }
+      
+      console.log('[TherapistSelection] User authenticated, checking profile data');
+      
+      // Log the client profile from context for debugging
+      console.log('[TherapistSelection DEBUG] userClientProfile from UserContext:', 
+                 userClientProfile ? JSON.stringify(userClientProfile, null, 2) : 'null/undefined');
       
       if (userClientProfile) {
         const clientAge = userClientProfile.client_age;
@@ -76,37 +106,49 @@ const TherapistSelection = () => {
         console.log(`[TherapistSelection DEBUG] userClientProfile.client_age: ${clientAge} (Type: ${typeof clientAge})`);
         console.log(`[TherapistSelection DEBUG] userClientProfile.client_state: ${clientState} (Type: ${typeof clientState})`);
         
-        setClientData({
-          client_state: clientState || null,
-          client_age: clientAge === undefined || clientAge === null ? null : Number(clientAge),
-        });
-        
-        console.log('[TherapistSelection] Using clientProfile from UserContext:', JSON.stringify({
-          client_state: clientState,
-          client_age: clientAge
-        }, null, 2));
+        // As per requirement, we're assuming client_age is always present and valid
+        if (clientAge !== undefined && clientAge !== null) {
+          setClientData({
+            client_state: clientState || null,
+            client_age: Number(clientAge),
+          });
+          
+          console.log('[TherapistSelection] Using clientProfile from UserContext:', JSON.stringify({
+            client_state: clientState,
+            client_age: clientAge
+          }, null, 2));
+          
+          // Set the data ready flag to true once we have valid client data
+          setIsDataReady(true);
+        } else {
+          console.warn('[TherapistSelection] Client profile found but age is missing');
+          toast({
+            title: "Profile Incomplete",
+            description: "Your profile is missing some information. Please update your profile.",
+            variant: "destructive",
+          });
+          // No navigate here as we want to allow viewing therapists even with incomplete profiles
+          // Just set up basic client data
+          setClientData({
+            client_state: clientState || null,
+            client_age: 0, // Default age as fallback
+          });
+          setIsDataReady(true);
+        }
       } else {
         console.warn('[TherapistSelection DEBUG] userClientProfile from UserContext is null/undefined.');
         toast({
-            title: "Profile Incomplete",
-            description: "Please complete your profile setup to select a therapist.",
-            variant: "destructive",
+          title: "Profile Incomplete",
+          description: "Please complete your profile setup to select a therapist.",
+          variant: "destructive",
         });
-        setClientData(null);
+        // Don't set clientData to maintain the loading state
+        // This prevents the useTherapistSelection hook from being called with bad data
       }
-    } else if (!isUserContextLoading && !authUserId) {
-        console.log("[TherapistSelection] No authenticated user. Redirecting to login.");
-        toast({
-            title: "Authentication Required",
-            description: "Please log in to view therapists.",
-            variant: "destructive",
-        });
-        navigate('/login');
     }
   }, [authUserId, isUserContextLoading, userClientProfile, navigate, toast, authInitialized]);
 
-  // Use our custom hook for therapist data with enhanced error handling
-  // Add defensive checks to prevent null values causing errors
+  // Only call useTherapistSelection when we have valid client data
   const {
     therapists,
     allTherapists,
@@ -117,11 +159,9 @@ const TherapistSelection = () => {
     selectTherapist,
     selectingTherapistId
   } = useTherapistSelection({
-    clientState: clientData?.client_state || null,
-    clientAge: clientData?.client_age !== undefined && clientData?.client_age !== null 
-              ? Number(clientData.client_age) 
-              : null,
-    enableFiltering: true
+    clientState: isDataReady ? clientData?.client_state || null : null,
+    clientAge: isDataReady ? (clientData?.client_age ?? 0) : 0,
+    enableFiltering: isDataReady
   });
 
   const handleSelectTherapist = async (therapist: Therapist) => {
@@ -153,10 +193,11 @@ const TherapistSelection = () => {
            "Unknown Therapist";
   };
 
+  // Loading state - waiting for user context to initialize
   if (isUserContextLoading || !authInitialized) {
     return (
       <Layout>
-        <div className="container max-w-6xl mx-auto py-6 flex justify-center items-center min-h-[calc(100vh-200px)]">
+        <div className="container max-w-6xl mx-auto py-6 flex flex-col justify-center items-center min-h-[calc(100vh-200px)]">
           <Loader2 className="h-12 w-12 animate-spin text-valorwell-600 mb-4" />
           <div className="text-center">
             <p className="text-lg text-valorwell-600 mb-2">
@@ -193,6 +234,18 @@ const TherapistSelection = () => {
               Refresh Page
             </button>
           </div>
+        </div>
+      </Layout>
+    );
+  }
+  
+  // Client data not ready yet
+  if (!isDataReady) {
+    return (
+      <Layout>
+        <div className="container max-w-6xl mx-auto py-6 flex flex-col justify-center items-center min-h-[calc(100vh-200px)]">
+          <Loader2 className="h-12 w-12 animate-spin text-valorwell-600 mb-4" />
+          <p className="text-lg text-valorwell-600">Loading profile information...</p>
         </div>
       </Layout>
     );
@@ -255,6 +308,7 @@ const TherapistSelection = () => {
     );
   }
 
+  // Main content - list of therapists
   return (
     <Layout>
       <div className="container max-w-6xl mx-auto py-6">
@@ -274,13 +328,13 @@ const TherapistSelection = () => {
               </div>
             ) : (
               <>
-                {filteringApplied && clientData && (clientData.client_state || clientData.client_age !== null) && (
+                {filteringApplied && clientData && (clientData.client_state || clientData.client_age > 0) && (
                   <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-md">
                     <Alert>
                       <Info className="h-5 w-5 text-blue-600" />
                       <AlertTitle className="font-semibold text-blue-700">Filtered Results</AlertTitle>
                       <AlertDescription className="text-blue-600">
-                        {clientData.client_state && clientData.client_age !== null ? (
+                        {clientData.client_state && clientData.client_age > 0 ? (
                           <>
                             Showing therapists licensed in <strong>{clientData.client_state}</strong> who work with clients aged <strong>{clientData.client_age}</strong> and older.
                           </>
@@ -288,7 +342,7 @@ const TherapistSelection = () => {
                           <>
                             Showing therapists licensed in <strong>{clientData.client_state}</strong>.
                           </>
-                        ) : clientData.client_age !== null ? (
+                        ) : clientData.client_age > 0 ? (
                           <>
                             Showing therapists who work with clients aged <strong>{clientData.client_age}</strong> and older.
                           </>
