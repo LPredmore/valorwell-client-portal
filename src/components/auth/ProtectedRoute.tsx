@@ -1,9 +1,8 @@
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Navigate, useParams } from 'react-router-dom';
 import { useUser } from '@/context/UserContext';
-import { supabase } from '@/integrations/supabase/client';
-import { useEffect, useState } from 'react';
+import { AuthState } from '@/context/UserContext';
 import { useToast } from '@/hooks/use-toast';
 
 interface ProtectedRouteProps {
@@ -17,127 +16,38 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   allowedRoles,
   blockNewClients = false
 }) => {
-  const { userRole, clientStatus, isLoading, authInitialized } = useUser();
+  const { 
+    userRole, 
+    clientStatus, 
+    isLoading, 
+    authInitialized, 
+    authState,
+    authError 
+  } = useUser();
   const { toast } = useToast();
   const { clientId } = useParams();
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  const [isCheckingUser, setIsCheckingUser] = useState(false);
-  const [loadingTimeout, setLoadingTimeout] = useState(false);
-  const [loadingError, setLoadingError] = useState<string | null>(null);
-  
-  // Add timeout mechanism to prevent indefinite loading
-  useEffect(() => {
-    let timeoutId: NodeJS.Timeout;
-    
-    if ((isLoading || !authInitialized || isCheckingUser) && !loadingError) {
-      console.log("[ProtectedRoute] Starting loading timeout check");
-      timeoutId = setTimeout(() => {
-        console.log("[ProtectedRoute] Loading timeout reached after 8 seconds");
-        setLoadingTimeout(true);
-        setLoadingError("Loading is taking longer than expected. Please refresh the page.");
-        toast({
-          title: "Authentication Status",
-          description: "Still checking your authentication. This might take a moment.",
-          variant: "default"
-        });
-        
-        // If auth is still not initialized after 10 seconds, attempt to proceed anyway
-        const emergencyTimeoutId = setTimeout(() => {
-          console.log("[ProtectedRoute] Emergency timeout - proceeding without waiting for auth");
-          // Force-proceed to login if we're truly stuck
-          if (!authInitialized) {
-            console.log("[ProtectedRoute] Auth still not initialized after emergency timeout");
-            window.location.href = '/login';
-          }
-        }, 5000); // 5 more seconds (13 total)
-        
-        return () => clearTimeout(emergencyTimeoutId);
-      }, 8000); // 8 seconds timeout
-    }
-    
-    return () => {
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-      }
-    };
-  }, [isLoading, authInitialized, isCheckingUser, loadingError, toast]);
-
-  useEffect(() => {
-    const getCurrentUserId = async () => {
-      if (clientId) {
-        console.log("[ProtectedRoute] Fetching current user ID for route validation");
-        setIsCheckingUser(true);
-        try {
-          const { data, error } = await supabase.auth.getUser();
-          
-          if (error) {
-            console.error("[ProtectedRoute] Error fetching user:", error);
-            setLoadingError("Failed to verify user access");
-            toast({
-              title: "Authentication Error",
-              description: "Failed to verify your access to this resource.",
-              variant: "destructive"
-            });
-            return;
-          }
-          
-          if (data?.user) {
-            console.log("[ProtectedRoute] User ID fetched successfully:", data.user.id);
-            setCurrentUserId(data.user.id);
-          } else {
-            console.warn("[ProtectedRoute] No user data returned");
-            setLoadingError("User data not available");
-          }
-        } catch (error) {
-          console.error("[ProtectedRoute] Exception in getCurrentUserId:", error);
-          setLoadingError("An unexpected error occurred");
-        } finally {
-          setIsCheckingUser(false);
-        }
-      }
-    };
-    
-    if (authInitialized) {
-      getCurrentUserId();
-    }
-  }, [clientId, authInitialized, toast]);
   
   // Log the current state for debugging
-  console.log(`[ProtectedRoute] Status: isLoading=${isLoading}, authInitialized=${authInitialized}, userRole=${userRole}, clientStatus=${clientStatus}, blockNewClients=${blockNewClients}`);
-  
-  // Wait for UserContext to be fully initialized before making routing decisions
-  // Handle loading states - distinguish between initial auth and data fetching
-  if (isLoading || !authInitialized || isCheckingUser) {
-    console.log("[ProtectedRoute] Waiting for initialization - authInitialized:", authInitialized, "isLoading:", isLoading, "isCheckingUser:", isCheckingUser);
+  useEffect(() => {
+    console.log(`[ProtectedRoute] Status: authState=${authState}, isLoading=${isLoading}, authInitialized=${authInitialized}, userRole=${userRole}, clientStatus=${clientStatus}, blockNewClients=${blockNewClients}`);
+  }, [authState, isLoading, authInitialized, userRole, clientStatus, blockNewClients]);
+
+  // Handle auth state transitions with appropriate UI
+  if (authState === AuthState.INITIALIZING || isLoading) {
     return (
       <div className="flex h-screen w-full items-center justify-center flex-col">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-valorwell-600 mb-4"></div>
         <p className="text-valorwell-600 mb-2">
-          {!authInitialized
-            ? "Initializing authentication..."
-            : isLoading
-              ? "Loading user data..."
-              : "Verifying access..."}
+          {authState === AuthState.INITIALIZING 
+            ? "Initializing authentication..." 
+            : "Loading user data..."}
         </p>
-        {loadingTimeout && (
-          <div className="flex flex-col items-center">
-            <p className="text-amber-600 text-sm text-center max-w-md px-4 mb-4">
-              {loadingError || "This is taking longer than expected. Please wait or refresh the page."}
-            </p>
-            <button
-              onClick={() => window.location.reload()}
-              className="px-4 py-2 bg-valorwell-600 text-white rounded-md hover:bg-valorwell-700 transition-colors"
-            >
-              Refresh Page
-            </button>
-          </div>
-        )}
       </div>
     );
   }
-  
+
   // Handle error state
-  if (loadingError) {
+  if (authState === AuthState.ERROR) {
     return (
       <div className="flex h-screen w-full items-center justify-center flex-col">
         <div className="text-red-500 mb-4">
@@ -148,7 +58,9 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
           </svg>
         </div>
         <p className="text-red-600 font-medium mb-2">Authentication Error</p>
-        <p className="text-center text-gray-600 mb-6 max-w-md px-4">{loadingError}</p>
+        <p className="text-center text-gray-600 mb-6 max-w-md px-4">
+          {authError?.message || "There was a problem verifying your access"}
+        </p>
         <button
           onClick={() => window.location.reload()}
           className="px-4 py-2 bg-valorwell-600 text-white rounded-md"
@@ -159,7 +71,13 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     );
   }
   
-  // First check role-based access
+  // If user is not authenticated, redirect to login
+  if (authState === AuthState.UNAUTHENTICATED) {
+    console.log("[ProtectedRoute] User is not authenticated, redirecting to login");
+    return <Navigate to="/login" replace />;
+  }
+  
+  // At this point we know the user is authenticated, so check role-based access
   if (!userRole || !allowedRoles.includes(userRole)) {
     console.log(`[ProtectedRoute] User role '${userRole}' not in allowed roles: [${allowedRoles.join(', ')}]`);
     

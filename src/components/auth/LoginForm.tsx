@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { z } from "zod";
@@ -59,12 +60,20 @@ const LoginForm = ({ onForgotPassword }: LoginFormProps) => {
       setIsLoading(true);
       console.log("[LoginForm] Calling supabase.auth.signInWithPassword");
       
-      const { data, error } = await debugAuthOperation("signInWithPassword", () => 
+      const loginPromise = debugAuthOperation("signInWithPassword", () => 
         supabase.auth.signInWithPassword({
           email: values.email,
           password: values.password,
         })
       );
+      
+      // Use Promise.race to handle potential timeouts
+      const { data, error } = await Promise.race([
+        loginPromise,
+        new Promise<{data: null, error: Error}>((_, reject) => 
+          setTimeout(() => reject(new Error("Login operation timed out")), 10000)
+        )
+      ]);
 
       // Clear the timeout since the operation completed
       clearTimeout(timeoutId);
@@ -84,15 +93,17 @@ const LoginForm = ({ onForgotPassword }: LoginFormProps) => {
         throw new Error(errorMessage);
       }
 
-      console.log("[LoginForm] Authentication successful, user:", data.user?.id);
+      console.log("[LoginForm] Authentication successful, user:", data?.user?.id);
       toast({
         title: "Login successful",
         description: "Welcome back!",
       });
       
       console.log("[LoginForm] Navigating to home page");
-      // Navigate immediately without delay
-      navigate("/");
+      // Add a small delay to allow the auth state to update
+      setTimeout(() => {
+        navigate("/");
+      }, 100);
     } catch (error: any) {
       console.error("[LoginForm] Login error:", error);
       // Clear the timeout if there's an error

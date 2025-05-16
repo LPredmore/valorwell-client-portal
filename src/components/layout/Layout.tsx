@@ -1,10 +1,10 @@
 
-import { ReactNode, useEffect, useState } from 'react';
+import { ReactNode, useEffect } from 'react';
 import Sidebar from './Sidebar';
 import Header from './Header';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
-import { useUser } from '@/context/UserContext';
+import { useUser, AuthState } from '@/context/UserContext';
 import AuthStateMonitor from '@/components/auth/AuthStateMonitor';
 
 interface LayoutProps {
@@ -14,64 +14,34 @@ interface LayoutProps {
 const Layout: React.FC<LayoutProps> = ({ children }) => {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { isLoading: userContextLoading, userId, authInitialized } = useUser();
-  const [loadingTimeout, setLoadingTimeout] = useState(false);
+  const { userId, authState, authInitialized, isLoading } = useUser();
 
   // Effect to handle redirects based on authentication status
   useEffect(() => {
-    console.log("[Layout] Initializing layout, userContextLoading:", userContextLoading, "authInitialized:", authInitialized);
+    console.log("[Layout] Initializing layout, authState:", authState, "authInitialized:", authInitialized);
     
     if (authInitialized) {
-      if (!userId) {
+      if (authState === AuthState.UNAUTHENTICATED) {
         console.log("[Layout] No authenticated user found, redirecting to login");
         navigate('/login');
+      } else if (authState === AuthState.ERROR) {
+        toast({
+          title: "Authentication Error",
+          description: "There was a problem with your authentication. Please try again.",
+          variant: "destructive",
+        });
       }
     }
-  }, [navigate, userContextLoading, userId, authInitialized]);
+  }, [navigate, authState, authInitialized, toast]);
 
-  // Add timeout mechanism to prevent indefinite loading
-  useEffect(() => {
-    let timeoutId: NodeJS.Timeout;
-    
-    if (userContextLoading && !authInitialized) {
-      console.log("[Layout] Starting loading timeout check");
-      timeoutId = setTimeout(() => {
-        console.log("[Layout] Loading timeout reached after 10 seconds");
-        setLoadingTimeout(true);
-        
-        // Add emergency redirect after 15 seconds if still loading
-        const emergencyTimeoutId = setTimeout(() => {
-          console.log("[Layout] Emergency timeout - forcing login redirect");
-          navigate('/login');
-        }, 5000); // additional 5 seconds after the first timeout
-        
-        return () => clearTimeout(emergencyTimeoutId);
-      }, 10000); // 10 seconds timeout
-    }
-    
-    return () => {
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-      }
-    };
-  }, [userContextLoading, authInitialized, navigate]);
-
-  // Show loading state while checking auth - updated to consider both states
-  if (userContextLoading && !authInitialized) {
+  // Show loading state while checking auth
+  if (authState === AuthState.INITIALIZING || isLoading) {
     return (
       <div className="flex h-screen w-full items-center justify-center flex-col">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-valorwell-600 mb-4"></div>
         <p className="text-valorwell-600">
-          {loadingTimeout ? "Taking longer than expected..." : "Loading user data..."}
+          {authState === AuthState.INITIALIZING ? "Initializing authentication..." : "Loading user data..."}
         </p>
-        {loadingTimeout && (
-          <button
-            onClick={() => window.location.reload()}
-            className="mt-4 px-4 py-2 bg-valorwell-600 text-white rounded-md hover:bg-valorwell-700 transition-colors"
-          >
-            Refresh Page
-          </button>
-        )}
       </div>
     );
   }

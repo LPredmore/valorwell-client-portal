@@ -1,7 +1,7 @@
 
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { useUser } from "@/context/UserContext";
+import { useUser, AuthState } from "@/context/UserContext";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import LoginForm from "@/components/auth/LoginForm";
 import ForgotPasswordDialog from "@/components/auth/ForgotPasswordDialog";
@@ -10,29 +10,29 @@ import { logSupabaseConfig, logAuthContext } from "@/utils/authDebugUtils";
 const Login = () => {
   const navigate = useNavigate();
   const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
-  const { userId, authInitialized, isLoading } = useUser();
+  const { userId, authState, authInitialized, isLoading, authError } = useUser();
   const [authCheckTimeout, setAuthCheckTimeout] = useState(false);
 
   // Check if user is already authenticated and auth is initialized
   useEffect(() => {
-    console.log("[Login] Checking auth state, userId:", userId, "authInitialized:", authInitialized, "isLoading:", isLoading);
+    console.log("[Login] Checking auth state, userId:", userId, "authState:", authState, "authInitialized:", authInitialized, "isLoading:", isLoading);
     
     // Log detailed auth debugging information
     logSupabaseConfig();
-    logAuthContext({ userId, authInitialized, isLoading });
+    logAuthContext({ userId, authState, authInitialized, isLoading, authError });
     
-    // Only redirect if auth is fully initialized, not loading, and we have a userId
-    if (authInitialized && !isLoading && userId) {
+    // Redirect if already authenticated
+    if (authInitialized && !isLoading && authState === AuthState.AUTHENTICATED && userId) {
       console.log("[Login] User is already authenticated, redirecting to home");
       navigate("/");
     }
-  }, [userId, authInitialized, isLoading, navigate]);
+  }, [userId, authState, authInitialized, isLoading, navigate, authError]);
 
   // Add timeout for auth check
   useEffect(() => {
     let timeoutId: NodeJS.Timeout;
     
-    if (!authInitialized || isLoading) {
+    if (authState === AuthState.INITIALIZING || isLoading) {
       timeoutId = setTimeout(() => {
         console.log("[Login] Auth check timeout reached after 10 seconds");
         setAuthCheckTimeout(true);
@@ -44,20 +44,22 @@ const Login = () => {
         clearTimeout(timeoutId);
       }
     };
-  }, [authInitialized, isLoading]);
+  }, [authState, isLoading]);
 
   const handleForgotPassword = () => {
     setIsResetDialogOpen(true);
   };
 
   // Show loading indicator if auth context is initializing
-  if (!authInitialized || isLoading) {
+  if (authState === AuthState.INITIALIZING || isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 mb-4"></div>
           <p className="text-gray-600 mb-2">
-            {!authInitialized ? "Initializing authentication..." : "Loading user data..."}
+            {authState === AuthState.INITIALIZING
+              ? "Initializing authentication..."
+              : "Loading user data..."}
           </p>
           {authCheckTimeout && (
             <div className="mt-4">
@@ -72,6 +74,24 @@ const Login = () => {
               </button>
             </div>
           )}
+        </div>
+      </div>
+    );
+  }
+
+  // Show error state if authentication failed
+  if (authState === AuthState.ERROR && authError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-100">
+        <div className="text-center bg-red-50 p-6 rounded-lg border border-red-200 max-w-md">
+          <h3 className="text-lg font-medium text-red-800 mb-2">Authentication Error</h3>
+          <p className="text-red-600 mb-4">{authError.message}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+          >
+            Refresh Page
+          </button>
         </div>
       </div>
     );
