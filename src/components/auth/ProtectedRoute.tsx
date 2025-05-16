@@ -32,15 +32,27 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     if ((isLoading || !authInitialized || isCheckingUser) && !loadingError) {
       console.log("[ProtectedRoute] Starting loading timeout check");
       timeoutId = setTimeout(() => {
-        console.log("[ProtectedRoute] Loading timeout reached after 15 seconds");
+        console.log("[ProtectedRoute] Loading timeout reached after 8 seconds");
         setLoadingTimeout(true);
         setLoadingError("Loading is taking longer than expected. Please refresh the page.");
         toast({
-          title: "Loading Timeout",
-          description: "Authentication is taking longer than expected. Please refresh the page.",
-          variant: "destructive"
+          title: "Authentication Status",
+          description: "Still checking your authentication. This might take a moment.",
+          variant: "default"
         });
-      }, 15000); // 15 seconds timeout
+        
+        // If auth is still not initialized after 10 seconds, attempt to proceed anyway
+        const emergencyTimeoutId = setTimeout(() => {
+          console.log("[ProtectedRoute] Emergency timeout - proceeding without waiting for auth");
+          // Force-proceed to login if we're truly stuck
+          if (!authInitialized) {
+            console.log("[ProtectedRoute] Auth still not initialized after emergency timeout");
+            window.location.href = '/login';
+          }
+        }, 5000); // 5 more seconds (13 total)
+        
+        return () => clearTimeout(emergencyTimeoutId);
+      }, 8000); // 8 seconds timeout
     }
     
     return () => {
@@ -108,9 +120,17 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
               : "Verifying access..."}
         </p>
         {loadingTimeout && (
-          <p className="text-amber-600 text-sm text-center max-w-md px-4">
-            {loadingError || "This is taking longer than expected. Please wait or refresh the page."}
-          </p>
+          <div className="flex flex-col items-center">
+            <p className="text-amber-600 text-sm text-center max-w-md px-4 mb-4">
+              {loadingError || "This is taking longer than expected. Please wait or refresh the page."}
+            </p>
+            <button
+              onClick={() => window.location.reload()}
+              className="px-4 py-2 bg-valorwell-600 text-white rounded-md hover:bg-valorwell-700 transition-colors"
+            >
+              Refresh Page
+            </button>
+          </div>
         )}
       </div>
     );

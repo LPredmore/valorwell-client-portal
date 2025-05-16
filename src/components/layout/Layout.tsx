@@ -38,6 +38,14 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       timeoutId = setTimeout(() => {
         console.log("[Layout] Loading timeout reached after 10 seconds");
         setLoadingTimeout(true);
+        
+        // Add emergency redirect after 15 seconds if still loading
+        const emergencyTimeoutId = setTimeout(() => {
+          console.log("[Layout] Emergency timeout - forcing login redirect");
+          navigate('/login');
+        }, 5000); // additional 5 seconds after the first timeout
+        
+        return () => clearTimeout(emergencyTimeoutId);
       }, 10000); // 10 seconds timeout
     }
     
@@ -46,7 +54,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         clearTimeout(timeoutId);
       }
     };
-  }, [userContextLoading, authInitialized]);
+  }, [userContextLoading, authInitialized, navigate]);
 
   // Show loading state while checking auth - updated to consider both states
   if (userContextLoading && !authInitialized) {
@@ -56,6 +64,14 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         <p className="text-valorwell-600">
           {loadingTimeout ? "Taking longer than expected..." : "Loading user data..."}
         </p>
+        {loadingTimeout && (
+          <button
+            onClick={() => window.location.reload()}
+            className="mt-4 px-4 py-2 bg-valorwell-600 text-white rounded-md hover:bg-valorwell-700 transition-colors"
+          >
+            Refresh Page
+          </button>
+        )}
       </div>
     );
   }

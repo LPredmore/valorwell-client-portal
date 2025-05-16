@@ -1,3 +1,4 @@
+
 import React, { createContext, useState, useEffect, useContext, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client'; // Adjust path as needed
 import { AuthChangeEvent, Session, User as SupabaseUser } from '@supabase/supabase-js';
@@ -103,6 +104,20 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     let isMounted = true;
     setIsLoading(true);
     setAuthInitialized(false);
+    
+    // Set a safety timeout to ensure authInitialized gets set 
+    // even if Supabase auth calls fail or hang
+    const authInitTimeoutId = setTimeout(() => {
+      if (isMounted && !authInitialized) {
+        logInfo("[UserContext] Safety timeout reached: Force setting authInitialized=true");
+        setAuthInitialized(true);
+        // Only reset loading if auth is taking too long and we're still loading
+        if (isLoading) {
+          logInfo("[UserContext] Safety timeout also resetting isLoading=false since still loading");
+          setIsLoading(false);
+        }
+      }
+    }, 5000); // 5 second safety timeout
 
     // 1. Initial Session Check
     supabase.auth.getSession().then(async ({ data: { session } }) => {
@@ -140,12 +155,39 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     );
 
+    // Add an additional check after a small delay if authInitialized is still false
+    // This helps when neither getSession nor onAuthStateChange callbacks fire
+    const shortCheckTimeout = setTimeout(() => {
+      if (isMounted && !authInitialized) {
+        logInfo("[UserContext] Short timeout check - auth still not initialized");
+        // Perform a direct check to Supabase to see if we have a session
+        supabase.auth.getUser().then(({ data }) => {
+          if (!isMounted) return;
+          logInfo("[UserContext] Short timeout getUser check:", data.user?.id || "no user");
+          if (data.user) {
+            processSessionData(data.user);
+          } else {
+            processSessionData(null);
+          }
+          setAuthInitialized(true);
+        }).catch(() => {
+          if (isMounted) {
+            logInfo("[UserContext] Short timeout getUser failed, setting initialized anyway");
+            setAuthInitialized(true);
+            setIsLoading(false);
+          }
+        });
+      }
+    }, 1500); // 1.5 seconds short timeout
+
     return () => {
       isMounted = false;
+      clearTimeout(authInitTimeoutId);
+      clearTimeout(shortCheckTimeout);
       logInfo("[UserContext] Cleaning up auth subscription (unmount).");
       authListener?.subscription?.unsubscribe();
     };
-  }, [processSessionData]); // processSessionData is stable due to useCallback
+  }, [processSessionData, authInitialized, isLoading]); // processSessionData is stable due to useCallback
 
   const refreshUserData = useCallback(async () => {
     logInfo("[UserContext] refreshUserData explicitly called.");

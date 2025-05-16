@@ -11,6 +11,7 @@ const Login = () => {
   const navigate = useNavigate();
   const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
   const { userId, authInitialized, isLoading } = useUser();
+  const [authCheckTimeout, setAuthCheckTimeout] = useState(false);
 
   // Check if user is already authenticated and auth is initialized
   useEffect(() => {
@@ -27,6 +28,24 @@ const Login = () => {
     }
   }, [userId, authInitialized, isLoading, navigate]);
 
+  // Add timeout for auth check
+  useEffect(() => {
+    let timeoutId: NodeJS.Timeout;
+    
+    if (!authInitialized || isLoading) {
+      timeoutId = setTimeout(() => {
+        console.log("[Login] Auth check timeout reached after 10 seconds");
+        setAuthCheckTimeout(true);
+      }, 10000);
+    }
+    
+    return () => {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+    };
+  }, [authInitialized, isLoading]);
+
   const handleForgotPassword = () => {
     setIsResetDialogOpen(true);
   };
@@ -40,6 +59,19 @@ const Login = () => {
           <p className="text-gray-600 mb-2">
             {!authInitialized ? "Initializing authentication..." : "Loading user data..."}
           </p>
+          {authCheckTimeout && (
+            <div className="mt-4">
+              <p className="text-amber-600 text-sm mb-4">
+                This is taking longer than expected.
+              </p>
+              <button
+                onClick={() => window.location.reload()}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+              >
+                Refresh Page
+              </button>
+            </div>
+          )}
         </div>
       </div>
     );
