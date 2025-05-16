@@ -10,25 +10,40 @@ import { logSupabaseConfig, logAuthContext } from "@/utils/authDebugUtils";
 const Login = () => {
   const navigate = useNavigate();
   const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
-  const { userId, authInitialized } = useUser();
+  const { userId, authInitialized, isLoading } = useUser();
 
-  // Check if user is already authenticated
+  // Check if user is already authenticated and auth is initialized
   useEffect(() => {
-    console.log("[Login] Checking auth state, userId:", userId, "authInitialized:", authInitialized);
+    console.log("[Login] Checking auth state, userId:", userId, "authInitialized:", authInitialized, "isLoading:", isLoading);
     
     // Log detailed auth debugging information
     logSupabaseConfig();
-    logAuthContext({ userId, authInitialized });
+    logAuthContext({ userId, authInitialized, isLoading });
     
-    if (authInitialized && userId) {
+    // Only redirect if auth is fully initialized, not loading, and we have a userId
+    if (authInitialized && !isLoading && userId) {
       console.log("[Login] User is already authenticated, redirecting to home");
       navigate("/");
     }
-  }, [userId, authInitialized, navigate]);
+  }, [userId, authInitialized, isLoading, navigate]);
 
   const handleForgotPassword = () => {
     setIsResetDialogOpen(true);
   };
+
+  // Show loading indicator if auth context is initializing
+  if (!authInitialized || isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-100">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 mb-4"></div>
+          <p className="text-gray-600 mb-2">
+            {!authInitialized ? "Initializing authentication..." : "Loading user data..."}
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100">
