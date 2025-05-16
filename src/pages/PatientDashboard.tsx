@@ -1,146 +1,137 @@
 
+import React, { useState } from 'react';
 import NewLayout from '@/components/layout/NewLayout';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { 
+  Card, 
+  CardContent, 
+  CardDescription, 
+  CardHeader, 
+  CardTitle 
+} from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Calendar } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 const PatientDashboard = () => {
   const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState('dashboard');
   
-  // Mock data
-  const nextAppointment = {
-    date: '2025-05-20',
-    time: '2:00 PM',
-    provider: 'Dr. Emma Johnson'
-  };
-  
-  const unreadMessages = 3;
-  const documentsToComplete = 2;
-
   return (
     <NewLayout>
       <div className="container mx-auto max-w-6xl">
-        <h1 className="text-3xl font-bold mb-8">Patient Dashboard</h1>
-        
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          {/* Upcoming Appointment */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Next Appointment</CardTitle>
-              <CardDescription>Your upcoming therapy session</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {nextAppointment ? (
-                <div>
-                  <p className="font-semibold">{new Date(nextAppointment.date).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</p>
-                  <p className="text-gray-600">{nextAppointment.time} with {nextAppointment.provider}</p>
-                  <div className="mt-4">
-                    <Button className="w-full">Join Session</Button>
-                  </div>
-                </div>
-              ) : (
-                <div>
-                  <p className="text-gray-600">No upcoming appointments</p>
-                  <div className="mt-4">
-                    <Button className="w-full">Schedule Session</Button>
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-          
-          {/* Messages */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Messages</CardTitle>
-              <CardDescription>Communication with your provider</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {unreadMessages > 0 ? (
-                <div>
-                  <p>You have <span className="font-semibold text-blue-600">{unreadMessages} unread messages</span></p>
-                  <div className="mt-4">
-                    <Button className="w-full" onClick={() => navigate('/messages')}>View Messages</Button>
-                  </div>
-                </div>
-              ) : (
-                <div>
-                  <p className="text-gray-600">No new messages</p>
-                  <div className="mt-4">
-                    <Button className="w-full" onClick={() => navigate('/messages')}>Send Message</Button>
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-          
-          {/* Documents */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Documents</CardTitle>
-              <CardDescription>Forms and documents to review</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {documentsToComplete > 0 ? (
-                <div>
-                  <p>You have <span className="font-semibold text-amber-600">{documentsToComplete} documents</span> to complete</p>
-                  <div className="mt-4">
-                    <Button className="w-full" onClick={() => navigate('/patient-documents')}>View Documents</Button>
-                  </div>
-                </div>
-              ) : (
-                <div>
-                  <p className="text-gray-600">No pending documents</p>
-                  <div className="mt-4">
-                    <Button className="w-full" onClick={() => navigate('/patient-documents')}>View Documents</Button>
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-2xl font-semibold">Patient Portal</h1>
+          <div className="flex items-center space-x-2">
+            {/* This would normally contain user info/avatar */}
+          </div>
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Your Care Plan</CardTitle>
-              <CardDescription>Treatment plan and progress</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <p>Your personalized treatment plan is designed to help you manage anxiety and improve mood regulation.</p>
-                <ul className="list-disc pl-5 space-y-2">
-                  <li>Practice daily mindfulness meditation (10 minutes)</li>
-                  <li>Complete weekly anxiety tracking journal</li>
-                  <li>Implement CBT techniques for negative thoughts</li>
-                </ul>
-                <Button variant="outline" className="w-full mt-2">View Full Plan</Button>
-              </div>
-            </CardContent>
-          </Card>
+        <Tabs 
+          value={activeTab} 
+          onValueChange={setActiveTab}
+          className="w-full"
+        >
+          <TabsList className="border-b w-full justify-start mb-6 bg-transparent p-0">
+            <TabsTrigger 
+              value="dashboard" 
+              className="data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:text-blue-600 rounded-none px-4 py-2"
+              onClick={() => navigate('/patient-dashboard')}
+            >
+              Dashboard
+            </TabsTrigger>
+            <TabsTrigger 
+              value="profile" 
+              className="data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:text-blue-600 rounded-none px-4 py-2"
+              onClick={() => navigate('/patient-profile')}
+            >
+              Profile
+            </TabsTrigger>
+            <TabsTrigger 
+              value="past-appointments" 
+              className="data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:text-blue-600 rounded-none px-4 py-2"
+              onClick={() => {}} // This would navigate to past appointments
+            >
+              Past Appointments
+            </TabsTrigger>
+            <TabsTrigger 
+              value="documents" 
+              className="data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:text-blue-600 rounded-none px-4 py-2"
+              onClick={() => navigate('/patient-documents')}
+            >
+              Documents
+            </TabsTrigger>
+            <TabsTrigger 
+              value="insurance" 
+              className="data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:text-blue-600 rounded-none px-4 py-2"
+              onClick={() => {}} // This would navigate to insurance
+            >
+              Insurance
+            </TabsTrigger>
+          </TabsList>
           
-          <Card>
-            <CardHeader>
-              <CardTitle>Resources</CardTitle>
-              <CardDescription>Helpful materials and exercises</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="p-3 bg-blue-50 rounded-lg">
-                  <h3 className="font-medium">Anxiety Management Worksheet</h3>
-                  <p className="text-sm text-gray-600">Tools for managing daily anxiety triggers</p>
-                  <Button variant="link" className="p-0 h-auto text-blue-600">Download</Button>
-                </div>
-                <div className="p-3 bg-green-50 rounded-lg">
-                  <h3 className="font-medium">Sleep Hygiene Guide</h3>
-                  <p className="text-sm text-gray-600">Improve your sleep quality and habits</p>
-                  <Button variant="link" className="p-0 h-auto text-blue-600">Download</Button>
-                </div>
-                <Button variant="outline" className="w-full">View All Resources</Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+          <TabsContent value="dashboard">
+            <div className="space-y-6">
+              {/* Today's Appointments */}
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-lg">Today's Appointments</CardTitle>
+                  <CardDescription>Sessions scheduled for today</CardDescription>
+                </CardHeader>
+                <CardContent className="pt-2">
+                  <div className="flex flex-col items-center justify-center py-8 text-center">
+                    <Calendar className="h-16 w-16 text-gray-300 mb-4" />
+                    <h3 className="text-lg font-medium">No appointments today</h3>
+                    <p className="text-sm text-gray-500 mt-1">Check your upcoming appointments below</p>
+                  </div>
+                </CardContent>
+              </Card>
+              
+              {/* Therapist Information */}
+              <Card>
+                <CardHeader className="pb-2 flex flex-row items-center justify-between">
+                  <div>
+                    <CardTitle className="text-lg">Your Therapist</CardTitle>
+                  </div>
+                  <Button variant="outline" size="sm">
+                    Book New Appointment
+                  </Button>
+                </CardHeader>
+                <CardContent className="pt-2">
+                  <div className="flex items-start gap-4">
+                    <img 
+                      src="/lovable-uploads/d25ee8dc-45f2-4bb9-aaa0-8115fc74374e.png" 
+                      alt="Therapist" 
+                      className="w-32 h-32 object-cover rounded-md"
+                    />
+                    <div>
+                      <h3 className="font-semibold mb-2">About NotReal Therapist, LPC</h3>
+                      <p className="text-gray-700">I'm here to help people be awesome and cool</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              
+              {/* Upcoming Appointments */}
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-lg">Upcoming Appointments</CardTitle>
+                  <CardDescription>Your scheduled sessions</CardDescription>
+                </CardHeader>
+                <CardContent className="pt-2">
+                  <div className="flex flex-col items-center justify-center py-8 text-center">
+                    <Calendar className="h-16 w-16 text-gray-300 mb-4" />
+                    <h3 className="text-lg font-medium">No upcoming appointments</h3>
+                    <p className="text-sm text-gray-500 mt-1">Schedule a session with your therapist</p>
+                    <Button className="mt-4">
+                      Book Appointment
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+        </Tabs>
       </div>
     </NewLayout>
   );

@@ -27,8 +27,8 @@ const Sidebar = () => {
   const location = useLocation();
   const currentPath = location.pathname;
   
-  // Determine user type: for now just using a hardcoded value for demonstration
-  const userType = 'clinician'; // or 'admin', 'patient'
+  // Determine user type based on current path for demo purposes
+  const userType = currentPath.includes('patient') ? 'patient' : 'clinician';
   
   // Navigation items shared between different user types
   const commonNavItems = [
@@ -44,10 +44,9 @@ const Sidebar = () => {
   
   // Navigation items specific to patients
   const patientNavItems = [
-    { name: 'My Dashboard', path: '/patient-dashboard', icon: Home },
-    { name: 'Appointments', path: '/patient-appointments', icon: Calendar },
-    { name: 'Documents', path: '/patient-documents', icon: FileText },
-    { name: 'Profile', path: '/patient-profile', icon: User }
+    { name: 'Dashboard', path: '/patient-dashboard', icon: Home },
+    { name: 'My Profile', path: '/patient-profile', icon: User },
+    { name: 'Documents', path: '/patient-documents', icon: FileText }
   ];
   
   // Determine which navigation items to show based on user type
