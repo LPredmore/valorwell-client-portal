@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,11 +12,50 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 
 const Login = () => {
   const navigate = useNavigate();
-  const { login, authState, userRole, clientStatus } = useAuth();
+  const { login, authState, userRole, clientStatus, authInitialized } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  // Reset form state when auth state changes
+  useEffect(() => {
+    console.log("Auth state changed in Login component:", authState, "userRole:", userRole, "clientStatus:", clientStatus);
+    
+    // If we're authenticated and form was submitting, handle redirection
+    if (authState === AuthState.AUTHENTICATED && isSubmitting) {
+      setIsSubmitting(false);
+      handleSuccessfulLogin();
+    }
+    
+    // If there's an auth error while submitting, reset the form
+    if (authState === AuthState.ERROR && isSubmitting) {
+      setIsSubmitting(false);
+      setError("Authentication error. Please try again.");
+    }
+  }, [authState, userRole, clientStatus]);
+
+  const handleSuccessfulLogin = () => {
+    console.log("Handling successful login. userRole:", userRole, "clientStatus:", clientStatus);
+    toast.success("Login successful", { description: "Welcome back!" });
+    
+    // Handle redirection based on role and client status
+    if (userRole === 'client') {
+      if (clientStatus === 'New') {
+        console.log("Redirecting client with New status to profile setup");
+        navigate("/profile-setup");
+      } else {
+        console.log("Redirecting client to dashboard");
+        navigate("/patient-dashboard");
+      }
+    } else if (userRole === 'clinician') {
+      navigate("/clients");
+    } else if (userRole === 'admin') {
+      navigate("/settings");
+    } else {
+      navigate("/");
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -35,31 +74,28 @@ const Login = () => {
       console.log("Login result:", success, error);
       
       if (success) {
-        toast.success("Login successful", { description: "Welcome back!" });
-        console.log("Login successful, userRole:", userRole, "clientStatus:", clientStatus);
+        // Don't navigate here - let the useEffect handle it
+        // The loading state will be reset by the useEffect
+        console.log("Login successful, waiting for auth state update");
         
-        // Wait briefly to allow auth state to update
+        // Set a safety timeout to reset loading state if auth state doesn't change
         setTimeout(() => {
-          // Handle redirection based on role and client status
-          if (userRole === 'client') {
-            if (clientStatus === 'New') {
-              navigate("/profile-setup");
-            } else {
-              navigate("/patient-dashboard");
+          if (isSubmitting) {
+            console.log("Safety timeout reached, forcing loading state reset");
+            setIsSubmitting(false);
+            
+            // If we're already authenticated but stuck, try redirecting
+            if (authState === AuthState.AUTHENTICATED) {
+              handleSuccessfulLogin();
             }
-          } else if (userRole === 'clinician') {
-            navigate("/clients");
-          } else if (userRole === 'admin') {
-            navigate("/settings");
-          } else {
-            navigate("/");
           }
-        }, 500);
+        }, 3000);
       } else {
         setError(error?.message || "Invalid login credentials. Please try again.");
         setIsSubmitting(false);
       }
     } catch (err: any) {
+      console.error("Login error:", err);
       setError(err.message || "An unexpected error occurred. Please try again.");
       setIsSubmitting(false);
     }
