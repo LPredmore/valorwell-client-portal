@@ -35,8 +35,8 @@ const MyDocuments: React.FC<MyDocumentsProps> = ({ clientId, excludedTypes = [] 
         let userId = clientId;
         
         if (!userId) {
-          const user = await getCurrentUser();
-          if (!user) {
+          const { user, error } = await getCurrentUser();
+          if (error || !user) {
             setIsLoading(false);
             return;
           }

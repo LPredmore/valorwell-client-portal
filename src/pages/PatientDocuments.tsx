@@ -22,8 +22,8 @@ const PatientDocuments: React.FC = () => {
     const loadUserAndAssignments = async () => {
       setLoading(true);
       try {
-        const user = await getCurrentUser();
-        if (!user) {
+        const { user, error } = await getCurrentUser();
+        if (error || !user) {
           toast({
             title: "Authentication required",
             description: "Please log in to view your documents",
@@ -35,8 +35,19 @@ const PatientDocuments: React.FC = () => {
         setClientId(user.id);
         
         // Fetch the document assignments for this user
-        const docAssignments = await fetchDocumentAssignments(user.id);
-        setAssignments(docAssignments);
+        const { data, error: assignmentsError } = await fetchDocumentAssignments(user.id);
+        if (assignmentsError) {
+          toast({
+            title: "Error",
+            description: "Failed to load document assignments",
+            variant: "destructive"
+          });
+          return;
+        }
+        
+        if (data) {
+          setAssignments(data);
+        }
       } catch (error) {
         console.error('Error loading user or assignments:', error);
         toast({
@@ -78,8 +89,10 @@ const PatientDocuments: React.FC = () => {
   const handleSaveForm = () => {
     // Refresh the assignments list after saving
     if (clientId) {
-      fetchDocumentAssignments(clientId).then(docAssignments => {
-        setAssignments(docAssignments);
+      fetchDocumentAssignments(clientId).then(({ data }) => {
+        if (data) {
+          setAssignments(data);
+        }
       });
     }
     
@@ -90,8 +103,10 @@ const PatientDocuments: React.FC = () => {
   const handleCompleteForm = () => {
     // Refresh the assignments list after completing
     if (clientId) {
-      fetchDocumentAssignments(clientId).then(docAssignments => {
-        setAssignments(docAssignments);
+      fetchDocumentAssignments(clientId).then(({ data }) => {
+        if (data) {
+          setAssignments(data);
+        }
       });
     }
     
@@ -106,8 +121,10 @@ const PatientDocuments: React.FC = () => {
 
   const handleRefreshAssignments = () => {
     if (clientId) {
-      fetchDocumentAssignments(clientId).then(docAssignments => {
-        setAssignments(docAssignments);
+      fetchDocumentAssignments(clientId).then(({ data }) => {
+        if (data) {
+          setAssignments(data);
+        }
       });
     }
   };
