@@ -1,0 +1,406 @@
+[
+  {
+    "enum_type": "app_role",
+    "enum_value": "admin"
+  },
+  {
+    "enum_type": "app_role",
+    "enum_value": "client"
+  },
+  {
+    "enum_type": "app_role",
+    "enum_value": "clinician"
+  },
+  {
+    "enum_type": "client_gender_identity_type",
+    "enum_value": "Male"
+  },
+  {
+    "enum_type": "client_gender_identity_type",
+    "enum_value": "Female"
+  },
+  {
+    "enum_type": "client_gender_identity_type",
+    "enum_value": "Other"
+  },
+  {
+    "enum_type": "client_gender_type",
+    "enum_value": "Male"
+  },
+  {
+    "enum_type": "client_gender_type",
+    "enum_value": "Female"
+  },
+  {
+    "enum_type": "client_relationship_type",
+    "enum_value": "Self"
+  },
+  {
+    "enum_type": "client_relationship_type",
+    "enum_value": "Parent/Guardian"
+  },
+  {
+    "enum_type": "client_relationship_type",
+    "enum_value": "Spouse"
+  },
+  {
+    "enum_type": "client_relationship_type",
+    "enum_value": "Child"
+  },
+  {
+    "enum_type": "client_status_type",
+    "enum_value": "New"
+  },
+  {
+    "enum_type": "client_status_type",
+    "enum_value": "Profile Complete"
+  },
+  {
+    "enum_type": "client_status_type",
+    "enum_value": "Signed"
+  },
+  {
+    "enum_type": "client_status_type",
+    "enum_value": "No Clinician Availabile"
+  },
+  {
+    "enum_type": "client_status_type",
+    "enum_value": "First Sessions"
+  },
+  {
+    "enum_type": "client_status_type",
+    "enum_value": "Established"
+  },
+  {
+    "enum_type": "client_status_type",
+    "enum_value": "At Risk"
+  },
+  {
+    "enum_type": "client_status_type",
+    "enum_value": "Went Cold"
+  },
+  {
+    "enum_type": "client_status_type",
+    "enum_value": "Re-Engaged"
+  },
+  {
+    "enum_type": "client_status_type",
+    "enum_value": "Success"
+  },
+  {
+    "enum_type": "client_status_type",
+    "enum_value": "Discharged"
+  },
+  {
+    "enum_type": "client_status_type",
+    "enum_value": "Blacklist"
+  },
+  {
+    "enum_type": "client_status_type",
+    "enum_value": "Do Not Contact"
+  },
+  {
+    "enum_type": "client_va_coverage_type",
+    "enum_value": "CHAMPVA"
+  },
+  {
+    "enum_type": "client_va_coverage_type",
+    "enum_value": "VA Community Care"
+  },
+  {
+    "enum_type": "client_va_coverage_type",
+    "enum_value": "TRICARE"
+  },
+  {
+    "enum_type": "client_va_coverage_type",
+    "enum_value": "No Coverage - Veteran"
+  },
+  {
+    "enum_type": "client_va_coverage_type",
+    "enum_value": "No Coverage - Not a Veteran"
+  },
+  {
+    "enum_type": "clinician_status_enum",
+    "enum_value": "New"
+  },
+  {
+    "enum_type": "clinician_status_enum",
+    "enum_value": "Active"
+  },
+  {
+    "enum_type": "clinician_status_enum",
+    "enum_value": "Available"
+  },
+  {
+    "enum_type": "clinician_status_enum",
+    "enum_value": "Unavailable"
+  },
+  {
+    "enum_type": "clinician_status_enum",
+    "enum_value": "Inactive"
+  },
+  {
+    "enum_type": "clinician_status_enum",
+    "enum_value": "Pending"
+  },
+  {
+    "enum_type": "document_category",
+    "enum_value": "medical_record"
+  },
+  {
+    "enum_type": "document_category",
+    "enum_value": "consent_form"
+  },
+  {
+    "enum_type": "document_category",
+    "enum_value": "therapy_note"
+  },
+  {
+    "enum_type": "document_category",
+    "enum_value": "questionnaire"
+  },
+  {
+    "enum_type": "event_type",
+    "enum_value": "appointment"
+  },
+  {
+    "enum_type": "event_type",
+    "enum_value": "time_off"
+  },
+  {
+    "enum_type": "event_type",
+    "enum_value": "availability"
+  },
+  {
+    "enum_type": "states",
+    "enum_value": "Alabama"
+  },
+  {
+    "enum_type": "states",
+    "enum_value": "Alaska"
+  },
+  {
+    "enum_type": "states",
+    "enum_value": "American Samoa"
+  },
+  {
+    "enum_type": "states",
+    "enum_value": "Arizona"
+  },
+  {
+    "enum_type": "states",
+    "enum_value": "Arkansas"
+  },
+  {
+    "enum_type": "states",
+    "enum_value": "California"
+  },
+  {
+    "enum_type": "states",
+    "enum_value": "Colorado"
+  },
+  {
+    "enum_type": "states",
+    "enum_value": "Connecticut"
+  },
+  {
+    "enum_type": "states",
+    "enum_value": "Delaware"
+  },
+  {
+    "enum_type": "states",
+    "enum_value": "District of Columbia"
+  },
+  {
+    "enum_type": "states",
+    "enum_value": "Florida"
+  },
+  {
+    "enum_type": "states",
+    "enum_value": "Georgia"
+  },
+  {
+    "enum_type": "states",
+    "enum_value": "Guam"
+  },
+  {
+    "enum_type": "states",
+    "enum_value": "Hawaii"
+  },
+  {
+    "enum_type": "states",
+    "enum_value": "Idaho"
+  },
+  {
+    "enum_type": "states",
+    "enum_value": "Illinois"
+  },
+  {
+    "enum_type": "states",
+    "enum_value": "Indiana"
+  },
+  {
+    "enum_type": "states",
+    "enum_value": "Iowa"
+  },
+  {
+    "enum_type": "states",
+    "enum_value": "Kansas"
+  },
+  {
+    "enum_type": "states",
+    "enum_value": "Kentucky"
+  },
+  {
+    "enum_type": "states",
+    "enum_value": "Louisiana"
+  },
+  {
+    "enum_type": "states",
+    "enum_value": "Maine"
+  },
+  {
+    "enum_type": "states",
+    "enum_value": "Maryland"
+  },
+  {
+    "enum_type": "states",
+    "enum_value": "Massachusetts"
+  },
+  {
+    "enum_type": "states",
+    "enum_value": "Michigan"
+  },
+  {
+    "enum_type": "states",
+    "enum_value": "Minnesota"
+  },
+  {
+    "enum_type": "states",
+    "enum_value": "Mississippi"
+  },
+  {
+    "enum_type": "states",
+    "enum_value": "Missouri"
+  },
+  {
+    "enum_type": "states",
+    "enum_value": "Montana"
+  },
+  {
+    "enum_type": "states",
+    "enum_value": "Nebraska"
+  },
+  {
+    "enum_type": "states",
+    "enum_value": "Nevada"
+  },
+  {
+    "enum_type": "states",
+    "enum_value": "New Hampshire"
+  },
+  {
+    "enum_type": "states",
+    "enum_value": "New Jersey"
+  },
+  {
+    "enum_type": "states",
+    "enum_value": "New Mexico"
+  },
+  {
+    "enum_type": "states",
+    "enum_value": "New York"
+  },
+  {
+    "enum_type": "states",
+    "enum_value": "North Carolina"
+  },
+  {
+    "enum_type": "states",
+    "enum_value": "North Dakota"
+  },
+  {
+    "enum_type": "states",
+    "enum_value": "Northern Mariana Islands"
+  },
+  {
+    "enum_type": "states",
+    "enum_value": "Ohio"
+  },
+  {
+    "enum_type": "states",
+    "enum_value": "Oklahoma"
+  },
+  {
+    "enum_type": "states",
+    "enum_value": "Oregon"
+  },
+  {
+    "enum_type": "states",
+    "enum_value": "Pennsylvania"
+  },
+  {
+    "enum_type": "states",
+    "enum_value": "Puerto Rico"
+  },
+  {
+    "enum_type": "states",
+    "enum_value": "Rhode Island"
+  },
+  {
+    "enum_type": "states",
+    "enum_value": "South Carolina"
+  },
+  {
+    "enum_type": "states",
+    "enum_value": "South Dakota"
+  },
+  {
+    "enum_type": "states",
+    "enum_value": "Tennessee"
+  },
+  {
+    "enum_type": "states",
+    "enum_value": "Texas"
+  },
+  {
+    "enum_type": "states",
+    "enum_value": "Utah"
+  },
+  {
+    "enum_type": "states",
+    "enum_value": "Vermont"
+  },
+  {
+    "enum_type": "states",
+    "enum_value": "Virgin Islands"
+  },
+  {
+    "enum_type": "states",
+    "enum_value": "Virginia"
+  },
+  {
+    "enum_type": "states",
+    "enum_value": "Washington"
+  },
+  {
+    "enum_type": "states",
+    "enum_value": "West Virginia"
+  },
+  {
+    "enum_type": "states",
+    "enum_value": "Wisconsin"
+  },
+  {
+    "enum_type": "states",
+    "enum_value": "Wyoming"
+  },
+  {
+    "enum_type": "user_role",
+    "enum_value": "user"
+  },
+  {
+    "enum_type": "user_role",
+    "enum_value": "admin"
+  }
+]
