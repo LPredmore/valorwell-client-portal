@@ -23,7 +23,7 @@ const PatientDashboard = () => {
   useEffect(() => {
     console.log("[PatientDashboard] Current state: clientStatus=", clientStatus, "isLoading=", isLoading);
     
-    // Redirect to profile setup if client status is "New"
+    // Redirect to profile setup if client status is "New" and loading is complete
     if (!isLoading && clientStatus === 'New') {
       console.log("[PatientDashboard] User has New status, redirecting to profile setup");
       toast.info("Please complete your profile setup first");
@@ -31,12 +31,43 @@ const PatientDashboard = () => {
     }
   }, [clientStatus, navigate, isLoading]);
   
-  // If still loading, show loading indicator
+  // If still loading, show loading indicator with timeout handling
+  const [showLoadingTimeout, setShowLoadingTimeout] = useState(false);
+  
+  useEffect(() => {
+    let timeoutId: NodeJS.Timeout | null = null;
+    
+    if (isLoading) {
+      timeoutId = setTimeout(() => {
+        setShowLoadingTimeout(true);
+      }, 5000); // Show timeout message after 5 seconds
+    }
+    
+    return () => {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+    };
+  }, [isLoading]);
+  
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-screen flex-col">
         <Loader2 className="h-12 w-12 animate-spin text-blue-500 mb-4" />
         <p className="text-gray-600">Loading your dashboard...</p>
+        
+        {showLoadingTimeout && (
+          <div className="mt-6 text-center max-w-md px-4">
+            <p className="text-amber-600 mb-2">This is taking longer than expected.</p>
+            <p className="text-gray-600 mb-4">There might be an issue with your connection.</p>
+            <Button
+              onClick={() => window.location.reload()}
+              variant="outline"
+            >
+              Refresh Page
+            </Button>
+          </div>
+        )}
       </div>
     );
   }
