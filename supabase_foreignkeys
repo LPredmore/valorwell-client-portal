@@ -1,0 +1,104 @@
+[
+  {
+    "table_name": "api_logs",
+    "column_name": "client_id",
+    "foreign_table_name": "clients",
+    "foreign_column_name": "id"
+  },
+  {
+    "table_name": "appointments",
+    "column_name": "client_id",
+    "foreign_table_name": "clients",
+    "foreign_column_name": "id"
+  },
+  {
+    "table_name": "appointments",
+    "column_name": "clinician_id",
+    "foreign_table_name": "clinicians",
+    "foreign_column_name": "id"
+  },
+  {
+    "table_name": "availability_blocks",
+    "column_name": "clinician_id",
+    "foreign_table_name": "clinicians",
+    "foreign_column_name": "id"
+  },
+  {
+    "table_name": "client_history",
+    "column_name": "client_id",
+    "foreign_table_name": "clients",
+    "foreign_column_name": "id"
+  },
+  {
+    "table_name": "client_history_current_spouse",
+    "column_name": "history_id",
+    "foreign_table_name": "client_history",
+    "foreign_column_name": "id"
+  },
+  {
+    "table_name": "client_history_family",
+    "column_name": "history_id",
+    "foreign_table_name": "client_history",
+    "foreign_column_name": "id"
+  },
+  {
+    "table_name": "client_history_household",
+    "column_name": "history_id",
+    "foreign_table_name": "client_history",
+    "foreign_column_name": "id"
+  },
+  {
+    "table_name": "client_history_medications",
+    "column_name": "history_id",
+    "foreign_table_name": "client_history",
+    "foreign_column_name": "id"
+  },
+  {
+    "table_name": "client_history_spouses",
+    "column_name": "history_id",
+    "foreign_table_name": "client_history",
+    "foreign_column_name": "id"
+  },
+  {
+    "table_name": "client_history_treatments",
+    "column_name": "history_id",
+    "foreign_table_name": "client_history",
+    "foreign_column_name": "id"
+  },
+  {
+    "table_name": "clinical_documents",
+    "column_name": "client_id",
+    "foreign_table_name": "clients",
+    "foreign_column_name": "id"
+  },
+  {
+    "table_name": "clinician_licenses",
+    "column_name": "clinician_id",
+    "foreign_table_name": "clinicians",
+    "foreign_column_name": "id"
+  },
+  {
+    "table_name": "phq9_assessments",
+    "column_name": "client_id",
+    "foreign_table_name": "clients",
+    "foreign_column_name": "id"
+  },
+  {
+    "table_name": "session_notes",
+    "column_name": "client_id",
+    "foreign_table_name": "clients",
+    "foreign_column_name": "id"
+  },
+  {
+    "table_name": "session_notes_history",
+    "column_name": "client_id",
+    "foreign_table_name": "clients",
+    "foreign_column_name": "id"
+  },
+  {
+    "table_name": "treatment_plans",
+    "column_name": "client_id",
+    "foreign_table_name": "clients",
+    "foreign_column_name": "id"
+  }
+]
