@@ -16,7 +16,7 @@ export interface DocumentAssignment {
   id: string;
   document_name: string;
   client_id: string;
-  status: 'not_started' | 'pending' | 'in_progress' | 'completed';
+  status: string; // Changed from union type to string to match database schema
   assigned_by?: string;
   created_at: string;
   updated_at: string;
@@ -32,7 +32,7 @@ export interface DocumentAssignment {
  */
 export async function updateDocumentStatus(
   assignmentId: string,
-  status: 'not_started' | 'in_progress' | 'completed'
+  status: string // Changed from union type to string to match interface
 ) {
   try {
     const { data, error } = await supabase
@@ -93,5 +93,199 @@ export async function getCurrentUser() {
   } catch (error) {
     console.error('Error getting current user:', error);
     return null;
+  }
+}
+
+/**
+ * Fetches clinical documents for a client
+ * @param clientId - The ID of the client
+ * @returns Array of clinical documents
+ */
+export async function fetchClinicalDocuments(clientId: string) {
+  try {
+    const { data, error } = await supabase
+      .from('clinical_documents')
+      .select('*')
+      .eq('client_id', clientId)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching clinical documents:', error);
+      return [];
+    }
+
+    return data || [];
+  } catch (error) {
+    console.error('Exception fetching clinical documents:', error);
+    return [];
+  }
+}
+
+/**
+ * Gets a download URL for a document
+ * @param filePath - The storage path of the document
+ * @returns The download URL or null if there was an error
+ */
+export async function getDocumentDownloadURL(filePath: string) {
+  try {
+    const { data, error } = await supabase.storage
+      .from('clinical-documents')
+      .createSignedUrl(filePath, 60 * 5); // 5 minutes expiry
+
+    if (error) {
+      console.error('Error getting document URL:', error);
+      return null;
+    }
+
+    return data?.signedUrl || null;
+  } catch (error) {
+    console.error('Exception getting document URL:', error);
+    return null;
+  }
+}
+
+/**
+ * Interface for PHQ-9 assessment data
+ */
+interface PHQ9AssessmentData {
+  client_id: string;
+  assessment_date: string;
+  question_1: number;
+  question_2: number;
+  question_3: number;
+  question_4: number;
+  question_5: number;
+  question_6: number;
+  question_7: number;
+  question_8: number;
+  question_9: number;
+  total_score: number;
+  additional_notes?: string;
+}
+
+/**
+ * Saves a PHQ-9 assessment to the database
+ * @param assessmentData - The PHQ-9 assessment data to save
+ * @returns Object with success status and data or error
+ */
+export async function savePHQ9Assessment(assessmentData: PHQ9AssessmentData) {
+  try {
+    const { data, error } = await supabase
+      .from('phq9_assessments')
+      .insert(assessmentData)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error saving PHQ-9 assessment:', error);
+      return { success: false, error };
+    }
+
+    return { success: true, data };
+  } catch (error) {
+    console.error('Exception saving PHQ-9 assessment:', error);
+    return { success: false, error };
+  }
+}
+
+/**
+ * Parses a date string from the database into a Date object
+ * @param dateString - The date string to parse
+ * @returns A Date object representing the date string
+ */
+export function parseDateString(dateString: string): Date {
+  // Handle different date formats that might come from the database
+  if (!dateString) return new Date();
+  
+  try {
+    // Try to parse the date string
+    const date = new Date(dateString);
+    
+    // Check if the date is valid
+    if (isNaN(date.getTime())) {
+      console.warn('Invalid date string:', dateString);
+      return new Date();
+    }
+    
+    return date;
+  } catch (error) {
+    console.error('Error parsing date string:', error);
+    return new Date();
+  }
+}
+
+/**
+ * Formats a Date object for storage in the database
+ * @param date - The Date object to format
+ * @returns A string representation of the date in ISO format (YYYY-MM-DD)
+ */
+export function formatDateForDB(date: Date): string {
+  if (!date || isNaN(date.getTime())) {
+    console.warn('Invalid date object:', date);
+    return '';
+  }
+  
+  try {
+    // Format the date as YYYY-MM-DD
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    
+    return `${year}-${month}-${day}`;
+  } catch (error) {
+    console.error('Error formatting date for DB:', error);
+    return '';
+  }
+}
+
+/**
+ * Fetches a client record by user ID
+ * @param userId - The ID of the user
+ * @returns The client record or null if not found
+ */
+export async function getClientByUserId(userId: string) {
+  try {
+    const { data, error } = await supabase
+      .from('clients')
+      .select('*')
+      .eq('id', userId)
+      .single();
+
+    if (error) {
+      console.error('Error fetching client by user ID:', error);
+      return null;
+    }
+
+    return data;
+  } catch (error) {
+    console.error('Exception fetching client by user ID:', error);
+    return null;
+  }
+}
+
+/**
+ * Updates a client's profile information
+ * @param clientId - The ID of the client to update
+ * @param updates - The profile updates to apply
+ * @returns Object with success status and data or error
+ */
+export async function updateClientProfile(clientId: string, updates: any) {
+  try {
+    const { data, error } = await supabase
+      .from('clients')
+      .update(updates)
+      .eq('id', clientId)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error updating client profile:', error);
+      return { success: false, error };
+    }
+
+    return { success: true, data };
+  } catch (error) {
+    console.error('Exception updating client profile:', error);
+    return { success: false, error };
   }
 }

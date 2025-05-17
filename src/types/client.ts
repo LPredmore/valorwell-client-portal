@@ -1,4 +1,8 @@
 
+/**
+ * Represents a client in the system.
+ * This interface matches the schema of the clients table.
+ */
 export interface ClientDetails {
   id: string;
   client_first_name: string | null;
@@ -7,17 +11,17 @@ export interface ClientDetails {
   client_email: string | null;
   client_phone: string | null;
   client_date_of_birth: string | null;
-  client_age: number | null;
+  client_age: number | null; // Application-calculated field, not in database
   client_gender: string | null;
   client_gender_identity: string | null;
   client_state: string | null;
   client_time_zone: string | null;
-  client_minor: string | null;
+  client_minor: boolean | null; // Changed from string to boolean to match schema
   client_status: string | null;
-  client_assigned_therapist: string | null;
+  client_assigned_therapist: string | null; // UUID stored as string
   client_referral_source: string | null;
   client_self_goal: string | null;
-  client_diagnosis: string[] | null;
+  client_diagnosis: string[] | null; // Array of diagnosis codes
   client_insurance_company_primary: string | null;
   client_policy_number_primary: string | null;
   client_group_number_primary: string | null;
@@ -103,6 +107,10 @@ export interface ClientDetails {
   client_has_even_more_insurance?: string | null;
 }
 
+/**
+ * Represents a clinician in the system.
+ * This interface matches the schema of the clinicians table.
+ */
 export interface Clinician {
   id: string;
   clinician_professional_name: string | null;
@@ -110,6 +118,10 @@ export interface Clinician {
   clinician_last_name: string | null;
   clinician_timezone: string | null;
   clinician_nameinsurance: string | null;
+  clinician_type: string | null;  // Correct field name (not clinician_title)
+  clinician_email: string | null; // Added missing field
+  clinician_bio: string | null;   // Added missing field
+  clinician_status: string | null; // Added missing field
 }
 
 export interface TabProps {
