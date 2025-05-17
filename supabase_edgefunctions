@@ -1,0 +1,92 @@
+[
+  {
+    "routine_name": "assign_default_documents_to_new_client",
+    "routine_type": "FUNCTION",
+    "data_type": "trigger"
+  },
+  {
+    "routine_name": "check_table_exists",
+    "routine_type": "FUNCTION",
+    "data_type": "boolean"
+  },
+  {
+    "routine_name": "convert_appointment_times_to_utc",
+    "routine_type": "FUNCTION",
+    "data_type": "void"
+  },
+  {
+    "routine_name": "create_or_replace_check_table_exists_function",
+    "routine_type": "FUNCTION",
+    "data_type": "void"
+  },
+  {
+    "routine_name": "debug_client_therapist_matching",
+    "routine_type": "FUNCTION",
+    "data_type": "record"
+  },
+  {
+    "routine_name": "debug_rls_check",
+    "routine_type": "FUNCTION",
+    "data_type": "boolean"
+  },
+  {
+    "routine_name": "handle_new_client",
+    "routine_type": "FUNCTION",
+    "data_type": "trigger"
+  },
+  {
+    "routine_name": "handle_new_user",
+    "routine_type": "FUNCTION",
+    "data_type": "trigger"
+  },
+  {
+    "routine_name": "is_admin",
+    "routine_type": "FUNCTION",
+    "data_type": "boolean"
+  },
+  {
+    "routine_name": "is_client",
+    "routine_type": "FUNCTION",
+    "data_type": "boolean"
+  },
+  {
+    "routine_name": "is_clinician",
+    "routine_type": "FUNCTION",
+    "data_type": "boolean"
+  },
+  {
+    "routine_name": "prevent_overlapping_availability_new",
+    "routine_type": "FUNCTION",
+    "data_type": "trigger"
+  },
+  {
+    "routine_name": "standardize_uuid",
+    "routine_type": "FUNCTION",
+    "data_type": "uuid"
+  },
+  {
+    "routine_name": "update_system_settings_updated_at",
+    "routine_type": "FUNCTION",
+    "data_type": "trigger"
+  },
+  {
+    "routine_name": "update_timestamp",
+    "routine_type": "FUNCTION",
+    "data_type": "trigger"
+  },
+  {
+    "routine_name": "update_timestamp_new",
+    "routine_type": "FUNCTION",
+    "data_type": "trigger"
+  },
+  {
+    "routine_name": "update_updated_at_column",
+    "routine_type": "FUNCTION",
+    "data_type": "trigger"
+  },
+  {
+    "routine_name": "user_has_admin_role",
+    "routine_type": "FUNCTION",
+    "data_type": "boolean"
+  }
+]
