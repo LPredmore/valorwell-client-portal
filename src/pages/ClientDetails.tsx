@@ -209,7 +209,7 @@ const ClientDetails = () => {
         client_gender_identity: clientData.client_gender_identity || "",
         client_state: clientData.client_state || "",
         client_time_zone: clientData.client_time_zone || "",
-        client_minor: clientData.client_minor || "",
+        client_minor: clientData.client_minor?.toString() || "", // Convert to string
         client_status: clientData.client_status || "",
         client_assigned_therapist: clientData.client_assigned_therapist || "",
         client_referral_source: clientData.client_referral_source || "",
@@ -260,6 +260,7 @@ const ClientDetails = () => {
         client_subscriber_dob_secondary: values.client_subscriber_dob_secondary ? formatDateForDB(values.client_subscriber_dob_secondary) : null,
         client_subscriber_dob_tertiary: values.client_subscriber_dob_tertiary ? formatDateForDB(values.client_subscriber_dob_tertiary) : null,
         client_age: values.client_age ? parseInt(values.client_age) : null,
+        client_minor: values.client_minor || null, // Ensure it's a string or null
       };
 
       const { error } = await supabase

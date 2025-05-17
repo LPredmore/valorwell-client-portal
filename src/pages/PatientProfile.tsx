@@ -54,9 +54,9 @@ const PatientProfile: React.FC = () => {
     setLoading(true);
 
     try {
-      const user = await getCurrentUser();
+      const { user, error: userError } = await getCurrentUser();
 
-      if (!user) {
+      if (userError || !user) {
         toast({
           title: "Authentication required",
           description: "Please sign in to view your profile",
@@ -67,49 +67,50 @@ const PatientProfile: React.FC = () => {
       }
 
       console.log("Current user:", user);
-      const client = await getClientByUserId(user.id);
+      const { client, error: clientError } = await getClientByUserId(user.id);
       console.log("Retrieved client data:", client);
 
-      if (client) {
-        setClientData(client);
-
-        let age = '';
-        if (client.client_date_of_birth) {
-          const dob = new Date(client.client_date_of_birth);
-          const today = new Date();
-          age = String(today.getFullYear() - dob.getFullYear());
-        }
-
-        let formattedDob = '';
-        if (client.client_date_of_birth) {
-          const dob = new Date(client.client_date_of_birth);
-          formattedDob = dob.toLocaleDateString('en-US', {
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric'
-          });
-        }
-
-        form.reset({
-          firstName: client.client_first_name || '',
-          lastName: client.client_last_name || '',
-          preferredName: client.client_preferred_name || '',
-          email: client.client_email || '',
-          phone: client.client_phone || '',
-          dateOfBirth: formattedDob,
-          age: age,
-          gender: client.client_gender || '',
-          genderIdentity: client.client_gender_identity || '',
-          state: client.client_state || '',
-          timeZone: client.client_time_zone || ''
-        });
-      } else {
+      if (clientError || !client) {
         toast({
           title: "Profile not found",
           description: "We couldn't find your client profile",
           variant: "destructive"
         });
+        return;
       }
+
+      setClientData(client);
+
+      let age = '';
+      if (client.client_date_of_birth) {
+        const dob = new Date(client.client_date_of_birth);
+        const today = new Date();
+        age = String(today.getFullYear() - dob.getFullYear());
+      }
+
+      let formattedDob = '';
+      if (client.client_date_of_birth) {
+        const dob = new Date(client.client_date_of_birth);
+        formattedDob = dob.toLocaleDateString('en-US', {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric'
+        });
+      }
+
+      form.reset({
+        firstName: client.client_first_name || '',
+        lastName: client.client_last_name || '',
+        preferredName: client.client_preferred_name || '',
+        email: client.client_email || '',
+        phone: client.client_phone || '',
+        dateOfBirth: formattedDob,
+        age: age,
+        gender: client.client_gender || '',
+        genderIdentity: client.client_gender_identity || '',
+        state: client.client_state || '',
+        timeZone: client.client_time_zone || ''
+      });
     } catch (error) {
       console.error("Error fetching client data:", error);
       toast({

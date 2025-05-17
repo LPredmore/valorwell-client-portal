@@ -28,7 +28,10 @@ const PracticeTab = () => {
 
   const fetchPracticeData = async () => {
     try {
-      const data = await fetchPracticeInfo();
+      const { data, error } = await fetchPracticeInfo();
+      if (error) {
+        throw error;
+      }
       if (data) {
         setPracticeInfo(data);
       }

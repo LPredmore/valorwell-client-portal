@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
@@ -70,6 +69,7 @@ export function AddUserDialog({ open, onOpenChange, onUserAdded }: AddUserDialog
     try {
       // User metadata to be saved
       const userData = {
+        email: data.email,
         first_name: data.firstName,
         last_name: data.lastName,
         phone: data.phone || "",
@@ -80,7 +80,7 @@ export function AddUserDialog({ open, onOpenChange, onUserAdded }: AddUserDialog
       console.log("User metadata to be saved:", userData);
       
       // Create user using our helper function that now uses the edge function
-      const { data: createUserResponse, error: createUserError } = await createUser(data.email, userData);
+      const { success, data: createUserResponse, error: createUserError } = await createUser(userData);
 
       if (createUserError) {
         console.error("Error creating user:", createUserError);

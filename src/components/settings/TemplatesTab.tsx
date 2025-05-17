@@ -46,7 +46,7 @@ const TemplatesTab = () => {
   return (
     <div className="p-6 animate-fade-in">
       {showTreatmentPlanTemplate ? (
-        <TreatmentPlanTemplate onClose={() => setShowTreatmentPlanTemplate(false)} />
+        <TreatmentPlanTemplate onClose={() => setShowTreatmentPlanTemplate(false)} clinicianName="" />
       ) : showSessionNoteTemplate ? (
         <SessionNoteTemplate onClose={() => setShowSessionNoteTemplate(false)} />
       ) : showPHQ9Template ? (
