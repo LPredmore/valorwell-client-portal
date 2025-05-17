@@ -1,0 +1,51 @@
+[
+  {
+    "table_name": "admins",
+    "trigger_name": "update_admins_updated_at",
+    "action_timing": "BEFORE",
+    "event": "UPDATE",
+    "action_statement": "EXECUTE FUNCTION update_timestamp()"
+  },
+  {
+    "table_name": "appointments",
+    "trigger_name": "set_timestamp",
+    "action_timing": "BEFORE",
+    "event": "UPDATE",
+    "action_statement": "EXECUTE FUNCTION update_timestamp()"
+  },
+  {
+    "table_name": "appointments",
+    "trigger_name": "set_updated_at",
+    "action_timing": "BEFORE",
+    "event": "UPDATE",
+    "action_statement": "EXECUTE FUNCTION update_timestamp()"
+  },
+  {
+    "table_name": "availability_blocks",
+    "trigger_name": "set_timestamp",
+    "action_timing": "BEFORE",
+    "event": "UPDATE",
+    "action_statement": "EXECUTE FUNCTION update_timestamp()"
+  },
+  {
+    "table_name": "availability_exceptions",
+    "trigger_name": "set_updated_at",
+    "action_timing": "BEFORE",
+    "event": "UPDATE",
+    "action_statement": "EXECUTE FUNCTION update_timestamp()"
+  },
+  {
+    "table_name": "clients",
+    "trigger_name": "auto_assign_documents_trigger",
+    "action_timing": "AFTER",
+    "event": "INSERT",
+    "action_statement": "EXECUTE FUNCTION assign_default_documents_to_new_client()"
+  },
+  {
+    "table_name": "system_settings",
+    "trigger_name": "update_system_settings_timestamp",
+    "action_timing": "BEFORE",
+    "event": "UPDATE",
+    "action_statement": "EXECUTE FUNCTION update_system_settings_updated_at()"
+  }
+]
