@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "@/hooks/use-toast";
@@ -6,7 +5,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { debugAuthOperation } from "@/debug/authDebugUtils";
 
 const UpdatePassword = () => {
   const navigate = useNavigate();
@@ -16,117 +14,60 @@ const UpdatePassword = () => {
   const [hashPresent, setHashPresent] = useState(false);
   const [sessionVerified, setSessionVerified] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [debugInfo, setDebugInfo] = useState<any>({});
   const [currentUser, setCurrentUser] = useState<any>(null);
 
+  // 1. Parse and set session from hash tokens on mount
   useEffect(() => {
-    const checkSession = async () => {
-      try {
-        // Check if we have a hash parameter in the URL which indicates we're coming from a password reset email
-        const hash = window.location.hash;
-        console.log("[UpdatePassword] Checking URL hash:", hash);
-        
-        // Check specifically for the recovery token pattern
-        const hasResetToken = hash.includes('type=recovery') && hash.includes('access_token=');
-        setHashPresent(hasResetToken);
-        
-        // Log detailed hash information for debugging
-        setDebugInfo(prev => ({
-          ...prev,
-          hashCheck: {
-            status: hasResetToken ? 'success' : 'warning',
-            message: hasResetToken ? 'Valid reset token found' : 'No valid reset token found',
-            hash: hash,
-            hasType: hash.includes('type=recovery'),
-            hasToken: hash.includes('access_token='),
-            timestamp: new Date().toISOString()
-          }
-        }));
+    const setSessionFromHash = async () => {
+      const hash = window.location.hash;
+      const params = new URLSearchParams(hash.replace(/^#/, ""));
+      const access_token = params.get("access_token");
+      const refresh_token = params.get("refresh_token");
+      const isRecovery = params.get("type") === "recovery";
+      const hasTokens = !!access_token && !!refresh_token && isRecovery;
 
-        // If there's no valid hash, this might not be a valid password reset flow
-        if (!hasResetToken) {
-          console.log("[UpdatePassword] No valid reset token found in URL, might not be a valid reset flow");
-          return;
-        }
+      setHashPresent(hasTokens);
 
-        // Check if there's an existing user session that might conflict with the reset
-        const existingSession = await supabase.auth.getSession();
-        if (existingSession.data.session) {
-          setCurrentUser(existingSession.data.session.user);
-          console.log("[UpdatePassword] Found existing session for user:", existingSession.data.session.user.email);
-          
-          setDebugInfo(prev => ({
-            ...prev,
-            existingSession: {
-              email: existingSession.data.session.user.email,
-              id: existingSession.data.session.user.id,
-              timestamp: new Date().toISOString()
-            }
-          }));
-
-          // Auto sign-out if we detect a recovery token but user is already logged in
-          if (hasResetToken) {
-            console.log("[UpdatePassword] Reset token found but user is already logged in - signing out automatically");
-            await signOutBeforeReset();
-          }
-        }
-
-        // Verify the session is active for password reset
-        console.log("[UpdatePassword] Verifying session from hash...");
-        const { data, error } = await debugAuthOperation("getSession", () => 
-          supabase.auth.getSession()
-        );
-
+      if (hasTokens) {
+        // Set Supabase session so updateUser works
+        const { error } = await supabase.auth.setSession({ access_token, refresh_token });
         if (error) {
-          console.error("[UpdatePassword] Session verification error:", error);
-          setError(`Session verification failed: ${error.message}`);
-          setSessionVerified(false);
-          return;
-        }
-
-        const session = data?.session;
-        console.log("[UpdatePassword] Session data:", session ? "Session exists" : "No session");
-        
-        if (session) {
-          console.log("[UpdatePassword] Found active session, user can reset password");
-          setSessionVerified(true);
+          setError("Session could not be restored from recovery link. Try requesting a new password reset.");
         } else {
-          console.log("[UpdatePassword] No active session found, password reset may fail");
-          setError("No active session found. The reset link may have expired.");
-          setSessionVerified(false);
+          // Confirm session is valid
+          const { data } = await supabase.auth.getSession();
+          if (data?.session?.user) {
+            setCurrentUser(null); // Means not currently logged in as someone else
+            setSessionVerified(true);
+          } else {
+            setError("Session is not valid. Try requesting a new password reset.");
+          }
         }
-      } catch (error: any) {
-        console.error("[UpdatePassword] Error in checkSession:", error);
-        setError(`Error checking session: ${error.message}`);
+      } else {
+        setHashPresent(false);
+        setError("Missing or invalid password reset token. Make sure to use the full link from your email.");
       }
     };
-
-    checkSession();
+    setSessionFromHash();
+    // eslint-disable-next-line
   }, []);
 
+  // Optional: Sign out if currently logged in as someone else (safety check)
   const signOutBeforeReset = async () => {
     try {
-      console.log("[UpdatePassword] Signing out current user before password reset");
-      
-      // Use global sign out to ensure complete token removal
-      await supabase.auth.signOut({ scope: 'global' });
-      
-      // Wait a moment for the auth system to sync
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      window.location.reload(); // Reload to process the recovery token
-      return true;
+      await supabase.auth.signOut({ scope: "global" });
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      window.location.reload();
     } catch (error) {
-      console.error("[UpdatePassword] Error signing out:", error);
-      return false;
+      // ignore
     }
   };
 
+  // 2. Password update logic
   const handleUpdatePassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    
-    // Validate passwords
+
     if (password !== confirmPassword) {
       setError("Passwords don't match");
       toast({
@@ -157,12 +98,8 @@ const UpdatePassword = () => {
       return;
     }
 
-    console.log("[UpdatePassword] Starting password update process");
     setIsLoading(true);
-
-    // Set a timeout to clear the loading state in case the operation hangs
     const timeoutId = setTimeout(() => {
-      console.warn("[UpdatePassword] Update password operation timed out after 45 seconds");
       setIsLoading(false);
       setError("The request timed out. Please try again or request a new reset link.");
       toast({
@@ -170,50 +107,39 @@ const UpdatePassword = () => {
         description: "The password update took too long. Please try again.",
         variant: "destructive",
       });
-    }, 45000); // Increased to 45 seconds for more reliable operation
+    }, 45000);
 
     try {
-      // Update the user's password
-      const { data, error } = await debugAuthOperation("updatePassword", () =>
-        supabase.auth.updateUser({
-          password: password
-        })
-      );
-
-      // Clear the timeout since the operation completed
+      // Now update the user's password
+      const { error } = await supabase.auth.updateUser({ password });
       clearTimeout(timeoutId);
 
       if (error) {
-        console.error("[UpdatePassword] Error updating password:", error.message);
         setError(`Failed to update password: ${error.message}`);
-        throw error;
+        toast({
+          title: "Failed to update password",
+          description: error.message || "There was a problem updating your password. Please try again.",
+          variant: "destructive",
+        });
+        return;
       }
 
-      console.log("[UpdatePassword] Password updated successfully");
-      
       toast({
         title: "Password updated",
         description: "Your password has been updated successfully.",
       });
 
-      // After password is updated successfully, clear the session to prevent session conflicts
+      // Sign out after password update
       try {
-        await supabase.auth.signOut({ scope: 'global' });
-        console.log("[UpdatePassword] Signed out after successful password update");
-      } catch (signOutError) {
-        console.error("[UpdatePassword] Error signing out after password update:", signOutError);
-      }
+        await supabase.auth.signOut({ scope: "global" });
+      } catch (signOutError) {}
 
-      // Redirect to login page after successful password update
-      // Added delay to ensure signout completes and toast is visible
       setTimeout(() => {
         navigate("/login");
       }, 2000);
     } catch (error: any) {
-      console.error("[UpdatePassword] Error details:", error);
-      // Clear the timeout if there's an error
       clearTimeout(timeoutId);
-      
+      setError("There was a problem updating your password. Please try again.");
       toast({
         title: "Failed to update password",
         description: error.message || "There was a problem updating your password. Please try again.",
@@ -230,9 +156,9 @@ const UpdatePassword = () => {
         <CardHeader className="space-y-1">
           <CardTitle className="text-2xl font-bold text-center">Update Password</CardTitle>
           <CardDescription className="text-center">
-            {hashPresent ? 
-              "Enter your new password below" : 
-              "This page is for resetting your password after clicking the link in the reset email"}
+            {hashPresent
+              ? "Enter your new password below"
+              : "This page is for resetting your password after clicking the link in the reset email"}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -241,26 +167,7 @@ const UpdatePassword = () => {
               <p className="text-sm font-medium">{error}</p>
             </div>
           )}
-          
-          {currentUser && (
-            <div className="mb-4 p-3 bg-blue-50 border border-blue-200 text-blue-800 rounded-md">
-              <p className="text-sm font-medium">
-                You're currently logged in as {currentUser.email}
-              </p>
-              <p className="text-xs mt-1">
-                To reset a different account's password, you need to sign out first.
-              </p>
-              <Button
-                variant="outline"
-                size="sm"
-                className="mt-2 w-full"
-                onClick={signOutBeforeReset}
-              >
-                Sign out and continue with password reset
-              </Button>
-            </div>
-          )}
-          
+
           {!hashPresent && (
             <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 text-yellow-800 rounded-md">
               <p className="text-sm font-medium">
@@ -278,7 +185,7 @@ const UpdatePassword = () => {
               </Button>
             </div>
           )}
-          
+
           <form onSubmit={handleUpdatePassword} className="space-y-4">
             <div className="space-y-2">
               <label htmlFor="password" className="text-sm font-medium">New Password</label>
@@ -289,8 +196,8 @@ const UpdatePassword = () => {
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Enter your new password"
                 required
-                disabled={isLoading || !hashPresent || currentUser !== null}
-                className={!hashPresent || currentUser !== null ? "bg-gray-100" : ""}
+                disabled={isLoading || !hashPresent}
+                className={!hashPresent ? "bg-gray-100" : ""}
               />
             </div>
             <div className="space-y-2">
@@ -302,28 +209,18 @@ const UpdatePassword = () => {
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 placeholder="Confirm your new password"
                 required
-                disabled={isLoading || !hashPresent || currentUser !== null}
-                className={!hashPresent || currentUser !== null ? "bg-gray-100" : ""}
+                disabled={isLoading || !hashPresent}
+                className={!hashPresent ? "bg-gray-100" : ""}
               />
             </div>
-            <Button 
-              type="submit" 
-              className="w-full" 
-              disabled={isLoading || !hashPresent || currentUser !== null}
+            <Button
+              type="submit"
+              className="w-full"
+              disabled={isLoading || !hashPresent}
             >
               {isLoading ? "Updating..." : "Update Password"}
             </Button>
           </form>
-          
-          {/* Debug info for development */}
-          {process.env.NODE_ENV === 'development' && Object.keys(debugInfo).length > 0 && (
-            <div className="mt-4 p-3 bg-gray-50 border border-gray-200 rounded-md">
-              <p className="text-xs font-medium text-gray-500 mb-1">Debug Info:</p>
-              <pre className="text-xs text-gray-600 overflow-auto max-h-32">
-                {JSON.stringify(debugInfo, null, 2)}
-              </pre>
-            </div>
-          )}
         </CardContent>
         <CardFooter className="flex justify-center">
           <Button variant="link" onClick={() => navigate("/login")}>
