@@ -1,4 +1,3 @@
-
 import { useState, useRef, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
@@ -21,43 +20,36 @@ const ResetPassword = () => {
 
   // Clean up timeout on unmount
   useEffect(() => {
-    console.log("[ResetPassword] Page loaded, email param:", emailParam);
-    
     return () => {
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
       }
     };
-  }, [emailParam]);
+  }, []);
 
+  // THIS IS THE ONLY handleResetPassword YOU NEED:
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
     setSuccessMessage(null);
-    
-    console.log("[ResetPassword] Starting password reset for email:", email);
-    
-    // Basic email validation
+
     if (!email || !email.includes('@')) {
       setErrorMessage("Please enter a valid email address");
       return;
     }
-    
+
     try {
       setIsLoading(true);
-      
-      // Use the origin for redirect
-      const redirectTo = `${window.location.origin}/update-password`;
-      
-      console.log("[ResetPassword] Using redirect URL:", redirectTo);
-      
-      // Set a safety timeout to detect if the operation is taking too long
+
+      // 👇 Use your preview client portal for the reset redirect
+      const redirectTo = "https://preview--valorwell-client-portal.lovable.app/update-password";
+      // (Change this to your production domain when you launch!)
+
+      // Optional: timeout for slow network
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
       }
-      
       timeoutRef.current = window.setTimeout(() => {
-        console.log("[ResetPassword] Operation taking longer than expected.");
         if (isLoading) {
           setIsLoading(false);
           setErrorMessage("The request is taking longer than expected. Please try again later.");
@@ -66,32 +58,26 @@ const ResetPassword = () => {
           });
         }
       }, 15000) as unknown as number;
-      
-      // Make the Supabase auth call directly
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo
-      });
-      
+
+      // 🔥 The magic call
+      const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
+
       // Clear timeout since we got a response
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
         timeoutRef.current = null;
       }
-      
+
       if (error) {
-        console.error("[ResetPassword] Error:", error.message);
         setErrorMessage(error.message);
         throw error;
       }
-      
+
       setSuccessMessage("Password reset email sent successfully!");
-      console.log("[ResetPassword] Password reset email sent successfully");
-      
       toast("Password reset email sent", {
         description: "Please check your email for the password reset link."
       });
     } catch (error: any) {
-      console.error("[ResetPassword] Error details:", error);
       toast("Failed to send reset email", {
         description: error.message || "There was a problem sending the reset email. Please try again."
       });
@@ -109,7 +95,6 @@ const ResetPassword = () => {
             Enter your email address and we'll send you a link to reset your password
           </CardDescription>
         </CardHeader>
-        
         <CardContent>
           {errorMessage && (
             <Alert variant="destructive" className="mb-4">
@@ -117,14 +102,12 @@ const ResetPassword = () => {
               <AlertDescription>{errorMessage}</AlertDescription>
             </Alert>
           )}
-          
           {successMessage && (
             <div className="mb-4 p-3 bg-green-50 border border-green-200 text-green-800 rounded-md">
               <p className="text-sm font-medium">{successMessage}</p>
               <p className="text-xs mt-1">Please check your email for further instructions.</p>
             </div>
           )}
-          
           <form onSubmit={handleResetPassword} className="space-y-4">
             <div className="space-y-2">
               <label htmlFor="email" className="text-sm font-medium">Email</label>
@@ -148,7 +131,6 @@ const ResetPassword = () => {
             </Button>
           </form>
         </CardContent>
-        
         <CardFooter className="flex justify-center">
           <Button variant="link" onClick={() => navigate("/login")}>
             Back to Login
