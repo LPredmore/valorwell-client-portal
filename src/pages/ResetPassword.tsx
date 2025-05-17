@@ -17,9 +17,11 @@ const ResetPassword = () => {
   const emailParam = searchParams.get("email");
   const [email, setEmail] = useState(emailParam || "");
   const [isLoading, setIsLoading] = useState(false);
+  const [isTestSending, setIsTestSending] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<string>("reset");
+  const [debugInfo, setDebugInfo] = useState<any>({});
   const timeoutRef = useRef<number | null>(null);
 
   // Clean up timeout on unmount
@@ -37,6 +39,7 @@ const ResetPassword = () => {
     e.preventDefault();
     setErrorMessage(null);
     setSuccessMessage(null);
+    setDebugInfo({});
     
     console.log("[ResetPassword] Starting password reset for email:", email);
     
@@ -60,10 +63,39 @@ const ResetPassword = () => {
       
       console.log("[ResetPassword] Using redirect URL:", redirectTo);
       
-      // SIMPLIFIED APPROACH: Make a direct call with minimal options
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      // Set a safety timeout to detect if the operation is taking too long
+      timeoutRef.current = window.setTimeout(() => {
+        console.log("[ResetPassword] Operation taking longer than expected.");
+        setDebugInfo(prev => ({
+          ...prev,
+          timeout: true,
+          timeoutTime: new Date().toISOString()
+        }));
+      }, 5000) as unknown as number;
+      
+      // Make the Supabase auth call
+      const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo
       });
+      
+      // Capture response data for debugging
+      setDebugInfo(prev => ({
+        ...prev,
+        supabaseResponse: {
+          data,
+          error: error ? {
+            message: error.message,
+            name: error.name,
+            status: error.status
+          } : null
+        }
+      }));
+      
+      // Clear timeout since we got a response
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
       
       if (error) {
         console.error("[ResetPassword] Error:", error.message);
@@ -84,6 +116,57 @@ const ResetPassword = () => {
       });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  // Function to test email delivery using the test-resend Edge Function
+  const handleTestEmail = async () => {
+    if (!email || !email.includes('@')) {
+      setErrorMessage("Please enter a valid email address");
+      return;
+    }
+    
+    try {
+      setIsTestSending(true);
+      console.log("[ResetPassword] Testing email delivery to:", email);
+      
+      // Call the test-resend function directly
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/test-resend`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
+        },
+        body: JSON.stringify({ email })
+      });
+      
+      const result = await response.json();
+      
+      setDebugInfo(prev => ({
+        ...prev,
+        testEmailResponse: result
+      }));
+      
+      console.log("[ResetPassword] Test email response:", result);
+      
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || "Failed to send test email");
+      }
+      
+      toast("Test email sent", {
+        description: "A test email was sent to verify the email delivery system."
+      });
+    } catch (error: any) {
+      console.error("[ResetPassword] Test email error:", error);
+      toast("Failed to send test email", {
+        description: error.message || "There was a problem with the email service."
+      });
+      setDebugInfo(prev => ({
+        ...prev,
+        testEmailError: error.message
+      }));
+    } finally {
+      setIsTestSending(false);
     }
   };
 
@@ -145,6 +228,38 @@ const ResetPassword = () => {
                     </>
                   ) : "Send Reset Link"}
                 </Button>
+                
+                <div className="pt-2 border-t mt-4">
+                  <p className="text-xs text-gray-500 mb-2">
+                    Troubleshooting options:
+                  </p>
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    size="sm"
+                    className="w-full"
+                    onClick={handleTestEmail}
+                    disabled={isTestSending}
+                  >
+                    {isTestSending ? (
+                      <>
+                        <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                        Testing...
+                      </>
+                    ) : "Test Email Delivery"}
+                  </Button>
+                </div>
+                
+                {Object.keys(debugInfo).length > 0 && (
+                  <div className="mt-4 p-3 bg-gray-50 border border-gray-200 text-xs rounded-md">
+                    <details>
+                      <summary className="cursor-pointer font-medium">Debug Information</summary>
+                      <pre className="mt-2 whitespace-pre-wrap overflow-auto max-h-60">
+                        {JSON.stringify(debugInfo, null, 2)}
+                      </pre>
+                    </details>
+                  </div>
+                )}
               </form>
             </TabsContent>
             
