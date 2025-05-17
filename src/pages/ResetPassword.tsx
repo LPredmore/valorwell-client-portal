@@ -2,16 +2,14 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
-import { supabase, testResendEmailService } from "@/integrations/supabase/client";
+import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle, Loader2, Bug } from "lucide-react";
-import { runAuthDiagnostics, testPasswordResetFlow } from "@/utils/authTroubleshooter";
+import { AlertCircle, Loader2 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import AuthDiagnostics from "@/components/auth/AuthDiagnostics";
-import { debugAuthOperation } from "@/utils/authDebugUtils";
 
 const ResetPassword = () => {
   const navigate = useNavigate();
@@ -21,21 +19,12 @@ const ResetPassword = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  const [debugInfo, setDebugInfo] = useState<any>({});
-  const [showAdvanced, setShowAdvanced] = useState(false);
   const [activeTab, setActiveTab] = useState<string>("reset");
   const timeoutRef = useRef<number | null>(null);
 
-  // Add console logs to trace page load and state changes
+  // Clean up timeout on unmount
   useEffect(() => {
     console.log("[ResetPassword] Page loaded, email param:", emailParam);
-    
-    // Check for Supabase URL to verify config
-    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-    console.log("[ResetPassword] Supabase URL configured:", supabaseUrl ? "Yes" : "No");
-    
-    // Log the current origin for redirect URL validation
-    console.log("[ResetPassword] Current origin:", window.location.origin);
     
     return () => {
       if (timeoutRef.current) {
@@ -48,7 +37,6 @@ const ResetPassword = () => {
     e.preventDefault();
     setErrorMessage(null);
     setSuccessMessage(null);
-    setDebugInfo({});
     
     console.log("[ResetPassword] Starting password reset for email:", email);
     
@@ -64,96 +52,18 @@ const ResetPassword = () => {
       timeoutRef.current = null;
     }
     
-    // Set a timeout to clear the loading state in case the operation hangs
-    timeoutRef.current = window.setTimeout(() => {
-      console.warn("[ResetPassword] Reset password operation timed out after 45 seconds");
-      setIsLoading(false);
-      setErrorMessage("The request timed out. Please try again.");
-      setDebugInfo(prev => ({
-        ...prev,
-        timeout: {
-          timestamp: new Date().toISOString(),
-          message: "Operation timed out after 45 seconds"
-        }
-      }));
-      toast("Request timed out", {
-        description: "The password reset request took too long. Please try again."
-      });
-    }, 45000) as unknown as number;  // Increased to 45 seconds
-    
     try {
       setIsLoading(true);
       
-      // Check for existing session first and sign out if needed
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        console.log("[ResetPassword] Found existing session, signing out first");
-        setDebugInfo(prev => ({
-          ...prev,
-          existingSession: {
-            email: session.user.email,
-            id: session.user.id,
-            timestamp: new Date().toISOString()
-          }
-        }));
-        
-        await supabase.auth.signOut();
-        console.log("[ResetPassword] Successfully signed out existing user");
-      }
-      
-      // Use the origin to build the proper redirect URL
-      const siteUrl = window.location.origin;
-      const redirectTo = `${siteUrl}/update-password`;
+      // Simple direct approach - use the origin for redirect
+      const redirectTo = `${window.location.origin}/update-password`;
       
       console.log("[ResetPassword] Using redirect URL:", redirectTo);
       
-      // Verify the URL is properly formatted
-      if (!siteUrl || !siteUrl.startsWith('http')) {
-        throw new Error(`Invalid site URL: ${siteUrl}. Password reset may not work correctly.`);
-      }
-      
-      // Save URL details for debugging
-      setDebugInfo(prev => ({
-        ...prev,
-        urlDetails: {
-          siteUrl,
-          redirectTo,
-          timestamp: new Date().toISOString()
-        }
-      }));
-      
-      // Call Supabase Auth API directly with explicit redirect URL
-      console.log("[ResetPassword] Calling supabase.auth.resetPasswordForEmail with:", {
-        email: email,
-        redirectTo: redirectTo
+      // SIMPLIFIED APPROACH: Make a direct call with minimal options
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo
       });
-      
-      const { data, error } = await debugAuthOperation("resetPasswordForEmail", () =>
-        supabase.auth.resetPasswordForEmail(email, {
-          redirectTo: redirectTo,
-          captchaToken: undefined // Explicitly set to undefined to avoid issues
-        })
-      );
-      
-      console.log("[ResetPassword] Reset password response:", { data, error });
-      
-      setDebugInfo(prev => ({
-        ...prev,
-        supabaseResponse: {
-          data,
-          error: error ? {
-            message: error.message,
-            status: error.status
-          } : null,
-          timestamp: new Date().toISOString()
-        }
-      }));
-      
-      // Clear the timeout since the operation completed
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-        timeoutRef.current = null;
-      }
       
       if (error) {
         console.error("[ResetPassword] Error:", error.message);
@@ -164,129 +74,13 @@ const ResetPassword = () => {
       setSuccessMessage("Password reset email sent successfully!");
       console.log("[ResetPassword] Password reset email sent successfully");
       
-      // Add more detailed success information
-      setDebugInfo(prev => ({
-        ...prev,
-        resetSuccess: {
-          timestamp: new Date().toISOString(),
-          redirectUrl: redirectTo
-        }
-      }));
-      
       toast("Password reset email sent", {
-        description: "Please check your email for the password reset link. Be sure to click the complete link in the email."
+        description: "Please check your email for the password reset link."
       });
     } catch (error: any) {
       console.error("[ResetPassword] Error details:", error);
-      // Clear the timeout if there's an error
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-        timeoutRef.current = null;
-      }
-      
       toast("Failed to send reset email", {
         description: error.message || "There was a problem sending the reset email. Please try again."
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleTestEmail = async () => {
-    if (!email || !email.includes('@')) {
-      setErrorMessage("Please enter a valid email address");
-      return;
-    }
-    
-    setIsLoading(true);
-    setDebugInfo(prev => ({ ...prev, testingEmail: true }));
-    
-    try {
-      const result = await testResendEmailService(email);
-      setDebugInfo(prev => ({
-        ...prev,
-        directTestResult: result,
-        timestamp: new Date().toISOString()
-      }));
-      
-      if (result.success) {
-        toast("Test email sent", {
-          description: "A test email was sent successfully. Please check your inbox."
-        });
-      } else {
-        toast("Test email failed", {
-          description: result.error || "Failed to send test email"
-        });
-      }
-    } catch (error: any) {
-      console.error("[ResetPassword] Test email error:", error);
-      toast("Test email failed", {
-        description: error.message || "There was a problem sending the test email"
-      });
-    } finally {
-      setIsLoading(false);
-      setDebugInfo(prev => ({ ...prev, testingEmail: false }));
-    }
-  };
-  
-  const testEdgeFunction = async () => {
-    try {
-      setIsLoading(true);
-      setDebugInfo(prev => ({ ...prev, edgeFunctionTest: { status: 'testing' } }));
-      
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const response = await fetch(`${supabaseUrl}/functions/v1/test-resend`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      });
-      
-      const result = await response.json();
-      setDebugInfo(prev => ({
-        ...prev,
-        edgeFunctionTest: {
-          status: 'completed',
-          result: result,
-          timestamp: new Date().toISOString()
-        }
-      }));
-      
-      toast("Edge Function Test", {
-        description: result.status === 'ok' ? "Edge function is operational" : "Edge function test failed"
-      });
-    } catch (error) {
-      setDebugInfo(prev => ({
-        ...prev,
-        edgeFunctionTest: {
-          status: 'error',
-          error: error,
-          timestamp: new Date().toISOString()
-        }
-      }));
-      toast("Edge Function Test Failed", {
-        description: "Could not connect to the edge function"
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const runDiagnostic = async () => {
-    setIsLoading(true);
-    try {
-      const diagnosticResults = await runAuthDiagnostics();
-      setDebugInfo(prev => ({
-        ...prev,
-        diagnosticResults
-      }));
-      toast("Diagnostics Complete", {
-        description: "Authentication system diagnostics have been run."
-      });
-    } catch (error) {
-      console.error("[ResetPassword] Diagnostic error:", error);
-      toast("Diagnostic Failed", {
-        description: "There was a problem running the diagnostics"
       });
     } finally {
       setIsLoading(false);
@@ -351,60 +145,7 @@ const ResetPassword = () => {
                     </>
                   ) : "Send Reset Link"}
                 </Button>
-                
-                <div className="pt-2">
-                  <Button
-                    type="button"
-                    variant="outline" 
-                    size="sm"
-                    className="w-full text-xs"
-                    onClick={() => setShowAdvanced(!showAdvanced)}
-                  >
-                    {showAdvanced ? "Hide Advanced Options" : "Show Advanced Options"}
-                  </Button>
-                </div>
-                
-                {showAdvanced && (
-                  <div className="space-y-2 pt-2 border-t border-gray-100">
-                    <p className="text-xs text-gray-500">Advanced diagnostic tools:</p>
-                    <div className="grid grid-cols-2 gap-2">
-                      <Button 
-                        type="button" 
-                        variant="outline" 
-                        size="sm"
-                        className="text-xs"
-                        onClick={handleTestEmail}
-                        disabled={isLoading || !email}
-                      >
-                        Test Email Delivery
-                      </Button>
-                      
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="text-xs"
-                        onClick={testEdgeFunction}
-                        disabled={isLoading}
-                      >
-                        Test Edge Function
-                      </Button>
-                    </div>
-                  </div>
-                )}
               </form>
-              
-              {/* Debug info */}
-              {showAdvanced && Object.keys(debugInfo).length > 0 && (
-                <div className="mt-4 p-3 bg-gray-50 border border-gray-200 rounded-md">
-                  <details>
-                    <summary className="text-xs font-medium text-gray-500 cursor-pointer">Debug Info:</summary>
-                    <pre className="text-xs text-gray-600 overflow-auto max-h-60 mt-2">
-                      {JSON.stringify(debugInfo, null, 2)}
-                    </pre>
-                  </details>
-                </div>
-              )}
             </TabsContent>
             
             <TabsContent value="debug" className="mt-0">
