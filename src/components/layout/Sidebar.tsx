@@ -12,8 +12,7 @@ import {
   PlusCircle,
   Home,
   Users,
-  LogOut,
-  UserRound
+  LogOut
 } from 'lucide-react';
 
 // Function to determine if a route is active
@@ -47,8 +46,7 @@ const Sidebar = () => {
   const patientNavItems = [
     { name: 'Dashboard', path: '/patient-dashboard', icon: Home },
     { name: 'My Profile', path: '/patient-profile', icon: User },
-    { name: 'Documents', path: '/patient-documents', icon: FileText },
-    { name: 'Therapist Selection', path: '/therapist-selection', icon: UserRound }
+    { name: 'Documents', path: '/patient-documents', icon: FileText }
   ];
   
   // Determine which navigation items to show based on user type
