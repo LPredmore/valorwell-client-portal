@@ -6,14 +6,14 @@ import { toast } from 'sonner';
 
 interface AuthProtectedRouteProps {
   children: React.ReactNode;
-  allowedRoles: string[];
+  allowedRoles?: string[];
   blockNewClients?: boolean;
   redirectPath?: string;
 }
 
 const AuthProtectedRoute: React.FC<AuthProtectedRouteProps> = ({
   children,
-  allowedRoles,
+  allowedRoles = ["client"],
   blockNewClients = false,
   redirectPath = '/login'
 }) => {
@@ -35,7 +35,7 @@ const AuthProtectedRoute: React.FC<AuthProtectedRouteProps> = ({
     }
   }, [authState, isLoading, authInitialized, userRole, clientStatus, blockNewClients]);
 
-  // Handle loading timeout - FIXED: Always initialize the state, never conditionally
+  // Handle loading timeout - Always initialize the state
   const [showLoadingTimeout, setShowLoadingTimeout] = React.useState(false);
   
   useEffect(() => {
@@ -58,7 +58,6 @@ const AuthProtectedRoute: React.FC<AuthProtectedRouteProps> = ({
     };
   }, [authInitialized, isLoading, showLoadingTimeout]);
 
-  // FIXED: Move all useMemo hooks outside of conditionals and always initialize them
   // Create loading component
   const loadingComponent = React.useMemo(() => {
     if (!authInitialized || isLoading) {
@@ -68,7 +67,7 @@ const AuthProtectedRoute: React.FC<AuthProtectedRouteProps> = ({
           <p className="text-valorwell-600 mb-2">
             {!authInitialized
               ? "Initializing authentication..."
-              : "Loading user data..."}
+              : "Loading your profile..."}
           </p>
           
           {showLoadingTimeout && (
@@ -125,8 +124,6 @@ const AuthProtectedRoute: React.FC<AuthProtectedRouteProps> = ({
     return null;
   }, [authState, authError]);
   
-  // FIXED: Properly handle component rendering to avoid conditional hook calls
-  
   // Check if loading component should be shown
   if (loadingComponent) {
     return loadingComponent;
@@ -143,32 +140,22 @@ const AuthProtectedRoute: React.FC<AuthProtectedRouteProps> = ({
     return <Navigate to={redirectPath} state={{ from: location }} replace />;
   }
 
-  // User is authenticated, check role
-  if (!userRole || !allowedRoles.includes(userRole)) {
-    console.log(`[AuthProtectedRoute] User role '${userRole}' not in allowed roles: [${allowedRoles.join(', ')}]`);
-    
-    // Redirect clients to patient dashboard
-    if (userRole === 'client') {
-      toast.warning("You don't have permission to access this page");
-      console.log("[AuthProtectedRoute] Redirecting client to patient dashboard");
-      return <Navigate to="/patient-dashboard" replace />;
-    }
-    
-    // Redirect others to login
-    toast.warning("You don't have the required permissions");
-    console.log("[AuthProtectedRoute] No valid role, redirecting to login");
+  // User is authenticated, check role - we only accept client role in this application
+  if (userRole !== 'client') {
+    toast.warning("This application is for patients only");
+    console.log("[AuthProtectedRoute] User is not a client, redirecting to login");
     return <Navigate to="/login" replace />;
   }
 
   // For clients, block new clients if specified
-  if (userRole === 'client' && blockNewClients && clientStatus === 'New') {
+  if (blockNewClients && clientStatus === 'New') {
     console.log("[AuthProtectedRoute] Blocking new client, redirecting to profile setup");
     toast.info("Please complete your profile first");
     return <Navigate to="/profile-setup" replace />;
   }
 
   // Access granted
-  console.log(`[AuthProtectedRoute] Access granted with role: ${userRole}`);
+  console.log(`[AuthProtectedRoute] Access granted to protected route for client`);
   return <>{children}</>;
 };
 

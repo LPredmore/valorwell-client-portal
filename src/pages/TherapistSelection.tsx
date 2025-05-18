@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
@@ -95,7 +96,7 @@ const TherapistSelection = () => {
         navigate('/patient-dashboard');
       }
     } catch (error) {
-      DebugUtils.log(sessionId, '[TherapistSelection] Error selecting therapist', error, true);
+      DebugUtils.error(sessionId, '[TherapistSelection] Error selecting therapist', error);
       toast.error("Failed to select therapist, please try again");
     }
   };
@@ -116,8 +117,7 @@ const TherapistSelection = () => {
   const isProfileComplete = (): boolean => {
     if (clientProfile?.client_is_profile_complete === true) return true;
     if (clientProfile?.client_is_profile_complete === false) return false;
-    if (clientProfile?.client_is_profile_complete === "true") return true;
-    return false;
+    return false; // Default to false if it's a string or undefined
   };
 
   return (

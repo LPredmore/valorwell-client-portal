@@ -7,11 +7,8 @@ import { Separator } from '@/components/ui/separator';
 import {
   User,
   FileText,
-  Calendar,
   Settings,
-  PlusCircle,
   Home,
-  Users,
   LogOut,
   UserCheck
 } from 'lucide-react';
@@ -28,52 +25,21 @@ const Sidebar = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const currentPath = location.pathname;
-  const { userRole } = useAuth();
-  
-  // Determine user type based on role from auth context or fallback to path detection
-  const isPatientView = userRole === 'client' || 
-    currentPath.includes('patient') || 
-    currentPath.includes('therapist-selection');
-  
-  const userType = isPatientView ? 'patient' : 'clinician';
-  
-  // Navigation items shared between different user types
-  const commonNavItems = [
-    { name: 'Home', path: '/', icon: Home }
-  ];
-  
-  // Navigation items specific to clinicians
-  const clinicianNavItems = [
-    { name: 'Clients', path: '/clients', icon: Users },
-    { name: 'Calendar', path: '/calendar', icon: Calendar },
-    { name: 'Documents', path: '/documents', icon: FileText }
-  ];
+  const { logout } = useAuth();
   
   // Navigation items specific to patients
-  const patientNavItems = [
+  const navItems = [
     { name: 'Dashboard', path: '/patient-dashboard', icon: Home },
     { name: 'My Profile', path: '/patient-profile', icon: User },
     { name: 'Documents', path: '/patient-documents', icon: FileText },
     { name: 'Therapist Selection', path: '/therapist-selection', icon: UserCheck }
   ];
-  
-  // Determine which navigation items to show based on user type
-  let navItems = [...commonNavItems];
-  if (userType === 'clinician') {
-    navItems = [...navItems, ...clinicianNavItems];
-  } else if (userType === 'patient') {
-    navItems = [...patientNavItems];
-  }
 
-  // Define action buttons based on user type
-  const actionButtons = userType === 'clinician' ? [
-    {
-      name: 'New Client',
-      action: () => navigate('/clients/new'),
-      icon: PlusCircle,
-      primary: true
-    }
-  ] : [];
+  // Handle logout
+  const handleLogout = async () => {
+    await logout();
+    navigate('/login');
+  };
 
   return (
     <div className="flex flex-col h-screen w-64 bg-white border-r shadow-sm">
@@ -110,33 +76,13 @@ const Sidebar = () => {
             );
           })}
         </nav>
-        
-        {actionButtons.length > 0 && (
-          <div className="px-4 mt-6">
-            <Separator className="mb-4" />
-            {actionButtons.map((button) => {
-              const Icon = button.icon;
-              return (
-                <Button
-                  key={button.name}
-                  onClick={button.action}
-                  variant={button.primary ? "default" : "outline"}
-                  className="w-full mb-2 flex items-center"
-                >
-                  <Icon className="h-4 w-4 mr-2" />
-                  {button.name}
-                </Button>
-              );
-            })}
-          </div>
-        )}
       </div>
       
       <div className="p-4 border-t">
         <Button
           variant="ghost"
           className="w-full justify-start text-gray-700 hover:bg-gray-100"
-          onClick={() => navigate('/login')}
+          onClick={handleLogout}
         >
           <LogOut className="h-5 w-5 mr-2" />
           Logout

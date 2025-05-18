@@ -3,6 +3,9 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Clinician } from "@/types/client";
 
+/**
+ * Get a clinician by ID - used for therapist selection
+ */
 export const getClinicianById = async (clinicianId: string) => {
   try {
     const { data, error } = await supabase
@@ -19,6 +22,9 @@ export const getClinicianById = async (clinicianId: string) => {
   }
 };
 
+/**
+ * Get a clinician's timezone - needed for appointment scheduling
+ */
 export const getClinicianTimeZone = async (clinicianId: string): Promise<string> => {
   try {
     const { data, error } = await supabase
@@ -40,7 +46,9 @@ export const getClinicianTimeZone = async (clinicianId: string): Promise<string>
   }
 };
 
-// Create and export the useClinicianData hook
+/**
+ * Hook to fetch clinician data - used for patient to view assigned therapist info
+ */
 export const useClinicianData = (clinicianId?: string) => {
   const [clinicianData, setClinicianData] = useState<Clinician | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);

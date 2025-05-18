@@ -1,5 +1,6 @@
+
 import { useState, useEffect, useRef } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,7 +13,7 @@ import { DebugUtils } from "@/utils/debugUtils";
 
 const Login = () => {
   const navigate = useNavigate();
-  const { login, authState, userRole, clientStatus, authInitialized, isLoading } = useAuth();
+  const { login, authState, clientStatus, authInitialized, isLoading } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -25,7 +26,6 @@ const Login = () => {
   useEffect(() => {
     DebugUtils.log(sessionId, "Auth state changed in Login component", {
       authState, 
-      userRole, 
       clientStatus, 
       isLoading,
       isSubmitting
@@ -62,7 +62,7 @@ const Login = () => {
       DebugUtils.log(sessionId, "Auth initialized but not authenticated. Resetting submitting state.");
       setIsSubmitting(false);
     }
-  }, [authState, userRole, clientStatus, isLoading, authInitialized, loginTimeout, sessionId]);
+  }, [authState, clientStatus, isLoading, authInitialized, loginTimeout, sessionId]);
 
   // Clean up timeout on unmount
   useEffect(() => {
@@ -74,24 +74,16 @@ const Login = () => {
   }, [loginTimeout]);
 
   const handleSuccessfulLogin = () => {
-    DebugUtils.log(sessionId, "Handling successful login", { userRole, clientStatus });
+    DebugUtils.log(sessionId, "Handling successful login", { clientStatus });
     toast.success("Login successful", { description: "Welcome back!" });
     
-    // Handle redirection based on role and client status
-    if (userRole === 'client') {
-      if (clientStatus === 'New') {
-        DebugUtils.log(sessionId, "Redirecting client with New status to profile setup");
-        navigate("/profile-setup");
-      } else {
-        DebugUtils.log(sessionId, "Redirecting client to dashboard");
-        navigate("/patient-dashboard");
-      }
-    } else if (userRole === 'clinician') {
-      navigate("/clients");
-    } else if (userRole === 'admin') {
-      navigate("/settings");
+    // Handle redirection based on client status - simplified for patient-only app
+    if (clientStatus === 'New') {
+      DebugUtils.log(sessionId, "Redirecting client with New status to profile setup");
+      navigate("/profile-setup");
     } else {
-      navigate("/");
+      DebugUtils.log(sessionId, "Redirecting client to dashboard");
+      navigate("/patient-dashboard");
     }
   };
 
@@ -234,7 +226,6 @@ const Login = () => {
                 <li>Auth State: <span className="font-mono">{authStateString}</span></li>
                 <li>Auth Initialized: <span className="font-mono">{authInitialized ? "Yes" : "No"}</span></li>
                 <li>Loading: <span className="font-mono">{isLoading ? "Yes" : "No"}</span></li>
-                <li>User Role: <span className="font-mono">{userRole || "None"}</span></li>
                 <li>Client Status: <span className="font-mono">{clientStatus || "None"}</span></li>
                 <li>Is Submitting: <span className="font-mono">{isSubmitting ? "Yes" : "No"}</span></li>
               </ul>
@@ -266,7 +257,7 @@ const Login = () => {
               onClick={() => navigate("/reset-password")} 
               className="text-blue-500 hover:text-blue-700 font-medium"
             >
-              Admin password reset
+              Reset password
             </button>
           </p>
         </CardFooter>
