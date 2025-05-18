@@ -16,7 +16,7 @@ export interface ClientDetails {
   client_gender_identity: string | null;
   client_state: string | null;
   client_time_zone: string | null;
-  client_minor: boolean | null; // Changed from string to boolean to match schema
+  client_minor: string | null; // Changed from boolean to string to match schema and usage
   client_status: string | null;
   client_assigned_therapist: string | null; // UUID stored as string
   client_referral_source: string | null;

@@ -100,7 +100,7 @@ const ClientDetails = () => {
     client_gender_identity: z.string().optional().nullable(),
     client_state: z.string().optional().nullable(),
     client_time_zone: z.string().optional().nullable(),
-    client_minor: z.string().optional().nullable(),
+    client_minor: z.string().optional().nullable(), // Keep as string to match database storage
     client_status: z.string().optional().nullable(),
     client_assigned_therapist: z.string().optional().nullable(),
     client_referral_source: z.string().optional().nullable(),
@@ -154,7 +154,7 @@ const ClientDetails = () => {
       client_gender_identity: clientData?.client_gender_identity || "",
       client_state: clientData?.client_state || "",
       client_time_zone: clientData?.client_time_zone || "",
-      client_minor: clientData?.client_minor || "",
+      client_minor: clientData?.client_minor?.toString() || "", // Convert to string
       client_status: clientData?.client_status || "",
       client_assigned_therapist: clientData?.client_assigned_therapist || "",
       client_referral_source: clientData?.client_referral_source || "",
