@@ -94,6 +94,7 @@ const AdditionalInsurance: React.FC<AdditionalInsuranceProps> = ({ form }) => {
           type="select"
           options={["Yes", "No"]}
           required={true}
+          defaultValue="No"
         />
       </div>
     </div>
