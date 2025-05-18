@@ -89,15 +89,36 @@ class AuthService {
     supabase.auth.onAuthStateChange((event, session) => {
       console.log(`[AuthService] Auth state changed: ${event}`);
       
-      if (event === 'SIGNED_IN' && session) {
-        this.handleSuccessfulAuth(session);
-      } else if (event === 'SIGNED_OUT') {
-        this.handleSignOut();
-      } else if (event === 'USER_UPDATED' && session) {
-        this.handleUserUpdated(session);
-      } else if (event === 'TOKEN_REFRESHED' && session) {
-        console.log('[AuthService] Token refreshed successfully');
-        this.handleSuccessfulAuth(session);
+      switch (event) {
+        case 'SIGNED_IN':
+        case 'TOKEN_REFRESHED':
+        case 'USER_UPDATED':
+          if (session) {
+            this.handleSuccessfulAuth(session);
+            
+            // Schedule next refresh before token expires
+            if (session.expires_at) {
+              const expiresIn = (session.expires_at * 1000) - Date.now();
+              const refreshTime = expiresIn - SESSION_EXPIRY_BUFFER;
+              
+              if (refreshTime > 0) {
+                console.log(`[AuthService] Scheduling refresh in ${refreshTime}ms`);
+                setTimeout(() => this.refreshSession(), refreshTime);
+              }
+            }
+          }
+          break;
+          
+        case 'SIGNED_OUT':
+          this.handleSignOut();
+          break;
+          
+        case 'PASSWORD_RECOVERY':
+          // Handle password recovery if needed
+          break;
+          
+        default:
+          console.log(`[AuthService] Unhandled auth event: ${event}`);
       }
     });
   }
@@ -410,19 +431,19 @@ class AuthService {
     return role.includes(currentRole);
   }
   
-  // Force refresh session
-  public async refreshSession(): Promise<boolean> {
+  // Force refresh session with retry logic
+  public async refreshSession(attempt = 1): Promise<boolean> {
+    const MAX_RETRIES = 3;
+    const BASE_DELAY = 1000; // 1 second
+    
     try {
-      console.log('[AuthService] Manually refreshing session');
+      console.log(`[AuthService] Refreshing session (attempt ${attempt})`);
+      
+      // First try to get current session
       const { data, error } = await supabase.auth.getSession();
       
       if (error) {
-        this._error = {
-          code: error.status?.toString(),
-          message: error.message || 'Failed to refresh session',
-          originalError: error
-        };
-        return false;
+        throw error;
       }
       
       const session = data?.session;
@@ -430,34 +451,47 @@ class AuthService {
       if (session) {
         this.handleSuccessfulAuth(session);
         return true;
-      } else {
-        // Try to refresh the session explicitly
-        const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
-        
-        if (refreshError) {
-          this._error = {
-            code: refreshError.status?.toString(),
-            message: refreshError.message || 'Failed to refresh session',
-            originalError: refreshError
-          };
-          return false;
-        }
-        
-        if (refreshData?.session) {
-          this.handleSuccessfulAuth(refreshData.session);
-          return true;
-        }
-        
-        this._currentState = AuthState.UNAUTHENTICATED;
-        this.saveSessionToStorage(null, null);
-        this.notifyListeners();
-        return false;
       }
+      
+      // If no session, try explicit refresh
+      const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+      
+      if (refreshError) {
+        throw refreshError;
+      }
+      
+      if (refreshData?.session) {
+        this.handleSuccessfulAuth(refreshData.session);
+        return true;
+      }
+      
+      // No session found after refresh
+      this._currentState = AuthState.UNAUTHENTICATED;
+      this.saveSessionToStorage(null, null);
+      this.notifyListeners();
+      return false;
+      
     } catch (error: any) {
+      if (attempt < MAX_RETRIES) {
+        // Exponential backoff
+        const delay = BASE_DELAY * Math.pow(2, attempt - 1);
+        console.log(`[AuthService] Refresh failed, retrying in ${delay}ms`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        return this.refreshSession(attempt + 1);
+      }
+      
+      // Max retries reached
       this._error = {
-        message: error.message || 'An error occurred during session refresh',
+        code: error.status?.toString(),
+        message: error.message || 'Failed to refresh session after multiple attempts',
         originalError: error
       };
+      
+      // If we can't refresh, assume session is invalid
+      this._currentState = AuthState.UNAUTHENTICATED;
+      this.saveSessionToStorage(null, null);
+      this.notifyListeners();
+      
       return false;
     }
   }
