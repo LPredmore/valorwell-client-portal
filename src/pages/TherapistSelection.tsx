@@ -33,6 +33,8 @@ const TherapistSelection = () => {
       setNetworkOnline(true);
       // Trigger a refresh when connection is restored
       setManualRefreshCount(prev => prev + 1);
+      // Reset circuit breaker in debugger
+      TherapistSelectionDebugger.resetCircuitBreaker();
     };
     
     const handleOffline = () => {
@@ -42,6 +44,14 @@ const TherapistSelection = () => {
     
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
+    
+    // Reset any circuit breaker state at component mount
+    try {
+      sessionStorage.removeItem('therapist_selection_circuit_breaker');
+      TherapistSelectionDebugger.resetCircuitBreaker();
+    } catch (err) {
+      // Ignore storage errors
+    }
     
     return () => {
       window.removeEventListener('online', handleOnline);
@@ -115,6 +125,16 @@ const TherapistSelection = () => {
     if (!networkOnline && !navigator.onLine) {
       toast.error("You appear to be offline. Please check your internet connection.");
       return;
+    }
+    
+    // Reset circuit breaker in debugger
+    TherapistSelectionDebugger.resetCircuitBreaker();
+    
+    // Reset circuit breaker state in session storage
+    try {
+      sessionStorage.removeItem('therapist_selection_circuit_breaker');
+    } catch (err) {
+      // Ignore storage errors
     }
     
     // Trigger retry fetch from the hook

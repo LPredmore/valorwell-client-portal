@@ -34,7 +34,7 @@ const queryClient = new QueryClient({
       retry: 2,                // Limit to 2 retries
       retryDelay: attempt => Math.min(1000 * 2 ** attempt, 30000), // Exponential backoff with max of 30 seconds
       staleTime: 60 * 1000,    // 1 minute
-      gcTime: 5 * 60 * 1000,   // 5 minutes (updated from cacheTime to gcTime)
+      gcTime: 5 * 60 * 1000,   // 5 minutes (updated from cacheTime)
       refetchOnWindowFocus: false, // Don't refetch on window focus to prevent unnecessary requests
       refetchOnReconnect: true, // Refetch when reconnecting to network
     },

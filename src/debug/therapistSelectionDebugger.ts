@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 
 /**
@@ -10,6 +9,7 @@ export class TherapistSelectionDebugger {
   private static debugId = `debug-${Math.random().toString(36).substring(2, 9)}`;
   private static debugStartTime = Date.now();
   private static lastNetworkStatus: boolean = navigator.onLine;
+  private static circuitBreakerState: 'open' | 'closed' = 'closed';
 
   /**
    * Verify client state is being correctly retrieved from the database
@@ -54,17 +54,23 @@ export class TherapistSelectionDebugger {
         
         if (error) {
           console.error('[TherapistSelectionDebugger] Error fetching client state:', error);
+          this.circuitBreakerState = 'open';
+          console.warn('[TherapistSelectionDebugger] Circuit breaker opened due to database error');
         } else if (data) {
           console.log('[TherapistSelectionDebugger] Client state from database:', data.client_state);
           console.log('[TherapistSelectionDebugger] Client age from database:', data.client_age);
+          this.circuitBreakerState = 'closed';
         } else {
           console.warn('[TherapistSelectionDebugger] No client data found');
         }
       } catch (error) {
         console.error('[TherapistSelectionDebugger] Query timed out or was aborted:', error);
+        this.circuitBreakerState = 'open';
+        console.warn('[TherapistSelectionDebugger] Circuit breaker opened due to timeout');
       }
     } catch (error) {
       console.error('[TherapistSelectionDebugger] Exception verifying client state:', error);
+      this.circuitBreakerState = 'open';
     }
   }
 
@@ -112,6 +118,7 @@ export class TherapistSelectionDebugger {
         
         if (allError) {
           console.error('[TherapistSelectionDebugger] Error fetching therapists:', allError);
+          this.circuitBreakerState = 'open';
           return;
         }
         
@@ -135,13 +142,31 @@ export class TherapistSelectionDebugger {
           matchingTherapists.forEach(therapist => {
             console.log(`[TherapistSelectionDebugger] Therapist ${therapist.clinician_professional_name} (${therapist.id}) is licensed in ${clientState}`);
           });
+          this.circuitBreakerState = 'closed';
         }
       } catch (error) {
         console.error('[TherapistSelectionDebugger] Query timed out or was aborted:', error);
+        this.circuitBreakerState = 'open';
       }
     } catch (error) {
       console.error('[TherapistSelectionDebugger] Exception verifying therapist filtering:', error);
+      this.circuitBreakerState = 'open';
     }
+  }
+
+  /**
+   * Reset the circuit breaker state
+   */
+  public static resetCircuitBreaker(): void {
+    console.log('[TherapistSelectionDebugger] Manually resetting circuit breaker state to closed');
+    this.circuitBreakerState = 'closed';
+  }
+
+  /**
+   * Get the current circuit breaker state
+   */
+  public static getCircuitBreakerState(): 'open' | 'closed' {
+    return this.circuitBreakerState;
   }
 
   /**
@@ -232,6 +257,11 @@ export class TherapistSelectionDebugger {
     if (currentStatus !== this.lastNetworkStatus) {
       console.log(`[TherapistSelectionDebugger] Network status changed: ${currentStatus ? 'Online' : 'Offline'}`);
       this.lastNetworkStatus = currentStatus;
+      
+      // Reset circuit breaker when network comes back online
+      if (currentStatus) {
+        this.resetCircuitBreaker();
+      }
     }
     
     // Setup listeners if not already set
@@ -239,6 +269,7 @@ export class TherapistSelectionDebugger {
       window.addEventListener('online', () => {
         console.log('[TherapistSelectionDebugger] Network came online');
         this.lastNetworkStatus = true;
+        this.resetCircuitBreaker(); // Reset circuit breaker when network comes online
       });
       
       window.addEventListener('offline', () => {
@@ -264,6 +295,9 @@ export class TherapistSelectionDebugger {
     console.log('[TherapistSelectionDebugger] Running all verification checks');
     console.log(`[TherapistSelectionDebugger] Debug session ID: ${this.debugId}`);
     
+    // Reset circuit breaker at the start of checks
+    this.resetCircuitBreaker();
+    
     // Monitor network status
     this.monitorNetworkStatus();
     
@@ -271,14 +305,22 @@ export class TherapistSelectionDebugger {
     const isConnected = await this.checkDatabaseConnectivity();
     if (!isConnected) {
       console.error('[TherapistSelectionDebugger] Database connectivity check failed, skipping further checks');
+      this.circuitBreakerState = 'open';
       return;
     }
     
     await this.verifyClientState(userId);
     await this.verifyTherapistFiltering(clientState);
-    this.verifyTherapistFields(therapists);
-    this.logRenderTime('TherapistSelection with data');
+    
+    if (therapists && therapists.length > 0) {
+      this.verifyTherapistFields(therapists);
+      this.logRenderTime('TherapistSelection with data');
+      this.circuitBreakerState = 'closed'; // Successful data load indicates system is working
+    } else {
+      console.warn('[TherapistSelectionDebugger] No therapists data provided for field verification');
+    }
     
     console.log('[TherapistSelectionDebugger] All verification checks completed');
+    console.log('[TherapistSelectionDebugger] Circuit breaker state:', this.circuitBreakerState);
   }
 }
