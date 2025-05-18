@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { UseFormReturn } from 'react-hook-form';
 import FormFieldWrapper from '@/components/ui/FormFieldWrapper';
 import { Separator } from '@/components/ui/separator';
@@ -8,9 +8,20 @@ import { Card, CardContent } from '@/components/ui/card';
 
 interface AdditionalInsuranceProps {
   form: UseFormReturn<any>;
+  onOtherInsuranceChange?: (value: string) => void;
 }
 
-const AdditionalInsurance: React.FC<AdditionalInsuranceProps> = ({ form }) => {
+const AdditionalInsurance: React.FC<AdditionalInsuranceProps> = ({ form, onOtherInsuranceChange }) => {
+  // Watch for changes to the hasMoreInsurance field
+  const hasMoreInsurance = form.watch('hasMoreInsurance');
+  
+  // Call the callback when the value changes
+  useEffect(() => {
+    if (onOtherInsuranceChange && hasMoreInsurance) {
+      onOtherInsuranceChange(hasMoreInsurance);
+    }
+  }, [hasMoreInsurance, onOtherInsuranceChange]);
+  
   return (
     <div className="space-y-6">
       <h3 className="text-lg font-medium">Additional Insurance Information</h3>
@@ -94,7 +105,6 @@ const AdditionalInsurance: React.FC<AdditionalInsuranceProps> = ({ form }) => {
           type="select"
           options={["Yes", "No"]}
           required={true}
-          defaultValue="No"
         />
       </div>
     </div>
