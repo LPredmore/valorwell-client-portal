@@ -3,27 +3,27 @@ import React, { useState, useEffect } from 'react';
 import Layout from '@/components/layout/Layout';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { FileText, ClipboardCheck } from 'lucide-react';
-import { getCurrentUser, fetchDocumentAssignments, DocumentAssignment } from '@/integrations/supabase/client';
+import { fetchDocumentAssignments, DocumentAssignment } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import DocumentAssignmentsList from '@/components/patient/DocumentAssignmentsList';
 import DocumentFormRenderer from '@/components/patient/DocumentFormRenderer';
 import MyDocuments from '@/components/patient/MyDocuments';
+import { useAuth } from '@/context/NewAuthContext';
 
 const PatientDocuments: React.FC = () => {
   const [loading, setLoading] = useState(true);
-  const [clientId, setClientId] = useState<string | null>(null);
   const [assignments, setAssignments] = useState<DocumentAssignment[]>([]);
   const [selectedAssignment, setSelectedAssignment] = useState<DocumentAssignment | null>(null);
   const [isFormMode, setIsFormMode] = useState(false);
   const [activeTab, setActiveTab] = useState('assignments');
   const { toast } = useToast();
+  const { userId } = useAuth(); // Changed from getCurrentUser to useAuth
 
   useEffect(() => {
-    const loadUserAndAssignments = async () => {
+    const loadAssignments = async () => {
       setLoading(true);
       try {
-        const { user, error } = await getCurrentUser();
-        if (error || !user) {
+        if (!userId) {
           toast({
             title: "Authentication required",
             description: "Please log in to view your documents",
@@ -32,10 +32,8 @@ const PatientDocuments: React.FC = () => {
           return;
         }
         
-        setClientId(user.id);
-        
         // Fetch the document assignments for this user
-        const { data, error: assignmentsError } = await fetchDocumentAssignments(user.id);
+        const { data, error: assignmentsError } = await fetchDocumentAssignments(userId);
         if (assignmentsError) {
           toast({
             title: "Error",
@@ -49,7 +47,7 @@ const PatientDocuments: React.FC = () => {
           setAssignments(data);
         }
       } catch (error) {
-        console.error('Error loading user or assignments:', error);
+        console.error('Error loading assignments:', error);
         toast({
           title: "Error",
           description: "Failed to load document assignments",
@@ -60,8 +58,8 @@ const PatientDocuments: React.FC = () => {
       }
     };
 
-    loadUserAndAssignments();
-  }, [toast]);
+    loadAssignments();
+  }, [toast, userId]);
 
   const handleStartForm = (assignment: DocumentAssignment) => {
     setSelectedAssignment(assignment);
@@ -88,8 +86,8 @@ const PatientDocuments: React.FC = () => {
 
   const handleSaveForm = () => {
     // Refresh the assignments list after saving
-    if (clientId) {
-      fetchDocumentAssignments(clientId).then(({ data }) => {
+    if (userId) {
+      fetchDocumentAssignments(userId).then(({ data }) => {
         if (data) {
           setAssignments(data);
         }
@@ -102,8 +100,8 @@ const PatientDocuments: React.FC = () => {
 
   const handleCompleteForm = () => {
     // Refresh the assignments list after completing
-    if (clientId) {
-      fetchDocumentAssignments(clientId).then(({ data }) => {
+    if (userId) {
+      fetchDocumentAssignments(userId).then(({ data }) => {
         if (data) {
           setAssignments(data);
         }
@@ -120,8 +118,8 @@ const PatientDocuments: React.FC = () => {
   };
 
   const handleRefreshAssignments = () => {
-    if (clientId) {
-      fetchDocumentAssignments(clientId).then(({ data }) => {
+    if (userId) {
+      fetchDocumentAssignments(userId).then(({ data }) => {
         if (data) {
           setAssignments(data);
         }
@@ -140,10 +138,10 @@ const PatientDocuments: React.FC = () => {
           </div>
         </div>
         
-        {isFormMode && selectedAssignment && clientId ? (
+        {isFormMode && selectedAssignment && userId ? (
           <DocumentFormRenderer
             assignment={selectedAssignment}
-            clientId={clientId}
+            clientId={userId}
             onSave={handleSaveForm}
             onCancel={handleCancelForm}
             onComplete={handleCompleteForm}
@@ -173,7 +171,7 @@ const PatientDocuments: React.FC = () => {
             </TabsContent>
             
             <TabsContent value="documents" className="mt-0">
-              <MyDocuments clientId={clientId || undefined} excludedTypes={['session_note', 'treatment_plan']} />
+              <MyDocuments clientId={userId || undefined} excludedTypes={['session_note', 'treatment_plan']} />
             </TabsContent>
           </Tabs>
         )}

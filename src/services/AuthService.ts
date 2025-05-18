@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { Session, User } from '@supabase/supabase-js';
 
@@ -24,7 +23,7 @@ interface AuthSession {
 }
 
 const AUTH_STORAGE_KEY = 'auth_session_cache';
-const AUTH_TIMEOUT = 5000; // 5 seconds timeout for auth operations
+const AUTH_TIMEOUT = 15000; // Increased from 5000 to 15000 (15 seconds)
 
 class AuthService {
   private static instance: AuthService;
@@ -43,6 +42,7 @@ class AuthService {
   }
   
   private constructor() {
+    console.log('[AuthService] Initializing AuthService');
     // Try to restore session from storage immediately
     this.restoreSessionFromStorage();
     
@@ -89,6 +89,9 @@ class AuthService {
         this.handleSignOut();
       } else if (event === 'USER_UPDATED' && session) {
         this.handleUserUpdated(session);
+      } else if (event === 'TOKEN_REFRESHED' && session) {
+        console.log('[AuthService] Token refreshed successfully');
+        this.handleSuccessfulAuth(session);
       }
     });
   }
@@ -98,6 +101,7 @@ class AuthService {
     if (this._initialCheckComplete) return;
     
     try {
+      console.log('[AuthService] Starting initial session check');
       // Use Promise.race to implement timeout
       const sessionResult = await Promise.race([
         supabase.auth.getSession(),
@@ -119,14 +123,39 @@ class AuthService {
       }
     } catch (error) {
       console.error('[AuthService] Error during initial session check:', error);
-      // Even if there's an error, still mark initialization as complete
-      this._currentState = AuthState.ERROR;
-      this._error = {
-        message: 'Failed to check authentication status',
-        originalError: error
-      };
+      // Fallback to direct user check if getSession times out
+      try {
+        console.log('[AuthService] Attempting fallback to getUser');
+        const { data: userData } = await supabase.auth.getUser();
+        
+        if (userData?.user) {
+          console.log('[AuthService] Found user via getUser fallback');
+          // We found a user, but no session. Try to get a session via refresh
+          const { data: refreshData } = await supabase.auth.refreshSession();
+          
+          if (refreshData?.session) {
+            console.log('[AuthService] Successfully refreshed session');
+            this.handleSuccessfulAuth(refreshData.session);
+          } else {
+            console.log('[AuthService] User found but could not refresh session');
+            this._currentState = AuthState.UNAUTHENTICATED;
+          }
+        } else {
+          console.log('[AuthService] No user found via getUser fallback');
+          this._currentState = AuthState.UNAUTHENTICATED;
+        }
+      } catch (fallbackError) {
+        console.error('[AuthService] Fallback check failed:', fallbackError);
+        // Even if there's an error, still mark initialization as complete
+        this._currentState = AuthState.ERROR;
+        this._error = {
+          message: 'Failed to check authentication status. Please try refreshing the page.',
+          originalError: error
+        };
+      }
     } finally {
       this._initialCheckComplete = true;
+      console.log('[AuthService] Initial check complete, state:', this._currentState);
       this.notifyListeners();
     }
   }
@@ -368,6 +397,7 @@ class AuthService {
   // Force refresh session
   public async refreshSession(): Promise<boolean> {
     try {
+      console.log('[AuthService] Manually refreshing session');
       const { data, error } = await supabase.auth.getSession();
       
       if (error) {
@@ -385,6 +415,23 @@ class AuthService {
         this.handleSuccessfulAuth(session);
         return true;
       } else {
+        // Try to refresh the session explicitly
+        const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+        
+        if (refreshError) {
+          this._error = {
+            code: refreshError.status?.toString(),
+            message: refreshError.message || 'Failed to refresh session',
+            originalError: refreshError
+          };
+          return false;
+        }
+        
+        if (refreshData?.session) {
+          this.handleSuccessfulAuth(refreshData.session);
+          return true;
+        }
+        
         this._currentState = AuthState.UNAUTHENTICATED;
         this.saveSessionToStorage(null, null);
         this.notifyListeners();

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import Layout from '@/components/layout/Layout';
 import { useForm } from 'react-hook-form';
@@ -6,7 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { getCurrentUser, getClientByUserId, updateClientProfile } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
 import MyProfile from '@/components/patient/MyProfile';
-import { useUser } from '@/context/UserContext';
+import { useAuth } from '@/context/NewAuthContext';
 
 const PatientProfile: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
@@ -15,7 +14,7 @@ const PatientProfile: React.FC = () => {
   const [isEditing, setIsEditing] = useState<boolean>(false);
   const { toast } = useToast();
   const navigate = useNavigate();
-  const { userId } = useUser();
+  const { userId } = useAuth();
 
   const genderOptions = ['Male', 'Female', 'Non-Binary', 'Other', 'Prefer not to say'];
   const genderIdentityOptions = ['Male', 'Female', 'Trans Man', 'Trans Woman', 'Non-Binary', 'Other', 'Prefer not to say'];
@@ -54,9 +53,8 @@ const PatientProfile: React.FC = () => {
     setLoading(true);
 
     try {
-      const { user, error: userError } = await getCurrentUser();
-
-      if (userError || !user) {
+      // Use userId from useAuth hook
+      if (!userId) {
         toast({
           title: "Authentication required",
           description: "Please sign in to view your profile",
@@ -66,8 +64,8 @@ const PatientProfile: React.FC = () => {
         return;
       }
 
-      console.log("Current user:", user);
-      const { client, error: clientError } = await getClientByUserId(user.id);
+      console.log("Current user ID:", userId);
+      const { client, error: clientError } = await getClientByUserId(userId);
       console.log("Retrieved client data:", client);
 
       if (clientError || !client) {
@@ -186,7 +184,7 @@ const PatientProfile: React.FC = () => {
   useEffect(() => {
     console.log("PatientProfile component mounted");
     fetchClientData();
-  }, []);
+  }, [userId]);
 
   return (
     <Layout>

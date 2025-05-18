@@ -21,7 +21,7 @@ const PatientDashboard = () => {
   const { clientStatus, authState, isLoading } = useAuth();
   
   useEffect(() => {
-    console.log("[PatientDashboard] Current state: clientStatus=", clientStatus, "isLoading=", isLoading);
+    console.log("[PatientDashboard] Current state: clientStatus=", clientStatus, "isLoading=", isLoading, "authState=", authState);
     
     // Redirect to profile setup if client status is "New" and loading is complete
     if (!isLoading && clientStatus === 'New') {
@@ -29,7 +29,7 @@ const PatientDashboard = () => {
       toast.info("Please complete your profile setup first");
       navigate('/profile-setup', { replace: true });
     }
-  }, [clientStatus, navigate, isLoading]);
+  }, [clientStatus, navigate, isLoading, authState]);
   
   // If still loading, show loading indicator with timeout handling
   const [showLoadingTimeout, setShowLoadingTimeout] = useState(false);
