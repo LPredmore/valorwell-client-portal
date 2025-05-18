@@ -255,28 +255,24 @@ export const useTherapistSelection = ({
     });
     
     try {
-      // Strategy 1: Use the debug wrapper with the normal query
-      console.log('[useTherapistSelection] Strategy 1: Using debug wrapper with normal query');
+      // Strategy 1: Use case-insensitive comparison for clinician_status
+      console.log('[useTherapistSelection] Strategy 1: Using case-insensitive query for clinician_status');
       
       // Race between the actual query and the timeout
       const result = await Promise.race([
         supabase
           .from('clinicians')
           .select('id, clinician_first_name, clinician_last_name, clinician_professional_name, clinician_type, clinician_bio, clinician_licensed_states, clinician_min_client_age, clinician_image_url')
-          .eq('clinician_status', 'Active'),
+          .or('clinician_status.eq.Active,clinician_status.eq.active,clinician_status.ilike.active'),
         timeoutPromise
       ]);
       
       therapistData = result.data || [];
       fetchError = result.error;
       
-      // If Strategy 1 fails with a specific error about clinician_status, try Strategy 2
-      if (fetchError && fetchError.message && (
-        fetchError.message.includes('clinician_status') || 
-        fetchError.message.includes('does not exist') ||
-        fetchError.message.includes('invalid input')
-      )) {
-        console.log('[useTherapistSelection] Strategy 1 failed. Trying Strategy 2...');
+      // If Strategy 1 fails, try Strategy 2
+      if (fetchError || therapistData.length === 0) {
+        console.log('[useTherapistSelection] Strategy 1 failed or returned no results. Trying Strategy 2...');
         
         // Strategy 2: Try without status filter (in case the enum is causing issues)
         const noStatusResult = await Promise.race([
@@ -286,18 +282,28 @@ export const useTherapistSelection = ({
           timeoutPromise
         ]);
         
-        if (!noStatusResult.error) {
+        if (!noStatusResult.error && noStatusResult.data && noStatusResult.data.length > 0) {
           console.log('[useTherapistSelection] Strategy 2 succeeded (no status filter)');
-          // Filter active status in-memory since we couldn't do it in the query
-          therapistData = (noStatusResult.data || [])
-            .filter(t => t && (
-              (t as any).clinician_status === 'Active' || 
-              (t as any).clinician_status === 'active'
-            ));
-          fetchError = null;
+          
+          // Filter active status in-memory with case-insensitive comparison
+          therapistData = noStatusResult.data.filter(t => {
+            if (!t) return false;
+            
+            // Case-insensitive check for 'Active' or 'active'
+            const status = ((t as any).clinician_status || '').toLowerCase();
+            return status === 'active';
+          });
+          
+          if (therapistData.length > 0) {
+            console.log(`[useTherapistSelection] Found ${therapistData.length} active therapists after in-memory filtering`);
+            fetchError = null;
+          } else {
+            console.log('[useTherapistSelection] No active therapists found after in-memory filtering');
+            fetchError = { message: 'No active therapists found' };
+          }
         } else {
           console.log('[useTherapistSelection] Strategy 2 also failed. Error:', noStatusResult.error);
-          fetchError = noStatusResult.error;
+          fetchError = noStatusResult.error || { message: 'No therapists found' };
         }
       }
       
