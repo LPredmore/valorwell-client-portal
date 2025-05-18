@@ -45,7 +45,6 @@ function App() {
                 <Route path="/reset-password" element={<ResetPassword />} />
                 <Route path="/update-password" element={<UpdatePassword />} />
                 <Route path="/profile-setup" element={<ProfileSetup />} />
-                <Route path="/therapist-selection" element={<TherapistSelection />} />
                 
                 {/* Protected routes - Only authenticated clients can access */}
                 <Route path="/patient-dashboard" element={
@@ -61,6 +60,11 @@ function App() {
                 <Route path="/patient-profile" element={
                   <AuthProtectedRoute allowedRoles={["client"]} blockNewClients={true}>
                     <PatientProfile />
+                  </AuthProtectedRoute>
+                } />
+                <Route path="/therapist-selection" element={
+                  <AuthProtectedRoute allowedRoles={["client"]}>
+                    <TherapistSelection />
                   </AuthProtectedRoute>
                 } />
                 
