@@ -169,7 +169,8 @@ const TherapistSelection = () => {
           {therapists.map((therapist) => {
             const title = getTherapistTitle(therapist);
             const fullName = `${title} ${therapist.clinician_first_name || ''} ${therapist.clinician_last_name || ''}`.trim();
-            const imageUrl = therapist.clinician_image_url || therapist.clinician_profile_image || 'https://randomuser.me/api/portraits/lego/1.jpg';
+            // Use clinician_image_url as the primary image source
+            const imageUrl = therapist.clinician_image_url || 'https://randomuser.me/api/portraits/lego/1.jpg';
             
             return (
               <Card 

@@ -1,4 +1,3 @@
-
 import { DebugUtils } from './debugUtils';
 import { supabase } from '@/integrations/supabase/client';
 import { PostgrestSingleResponse } from '@supabase/supabase-js';
@@ -201,7 +200,7 @@ export class ClinicianQueryDebugger {
 ║ 4. A database view or function that references this column                 ║
 ║ 5. A cached query plan in the database                                     ║
 ║ 6. An issue with the USER-DEFINED clinician_status_enum type               ║
-╚════════════════════════════════════════════════════════════════════════════╝
+╚═════════════════════════════════��══════════════════════════════════════════╝
       `);
     }
     
@@ -288,7 +287,7 @@ export class ClinicianQueryDebugger {
     return this.debugQuery<T>(
       'clinicians',
       (query) => query
-        .select('id, clinician_first_name, clinician_last_name, clinician_professional_name, clinician_type, clinician_bio, clinician_licensed_states, clinician_min_client_age, clinician_profile_image, clinician_image_url')
+        .select('id, clinician_first_name, clinician_last_name, clinician_professional_name, clinician_type, clinician_bio, clinician_licensed_states, clinician_min_client_age, clinician_image_url')
         .eq('clinician_status', 'Active')
     );
   }
@@ -301,7 +300,7 @@ export class ClinicianQueryDebugger {
     return this.debugQuery<T>(
       'clinicians_compatibility_view',
       (query) => query
-        .select('id, clinician_first_name, clinician_last_name, clinician_professional_name, clinician_type, clinician_bio, clinician_licensed_states, clinician_min_client_age, clinician_profile_image, clinician_image_url')
+        .select('id, clinician_first_name, clinician_last_name, clinician_professional_name, clinician_type, clinician_bio, clinician_licensed_states, clinician_min_client_age, clinician_image_url')
         .eq('clinician_status', 'Active')
     );
   }
@@ -314,7 +313,7 @@ export class ClinicianQueryDebugger {
     return this.debugQuery<T>(
       'clinicians',
       (query) => query
-        .select('id, clinician_first_name, clinician_last_name, clinician_professional_name, clinician_type, clinician_bio, clinician_licensed_states, clinician_min_client_age, clinician_profile_image, clinician_image_url')
+        .select('id, clinician_first_name, clinician_last_name, clinician_professional_name, clinician_type, clinician_bio, clinician_licensed_states, clinician_min_client_age, clinician_image_url')
     );
   }
   
@@ -341,7 +340,7 @@ export class ClinicianQueryDebugger {
           console.log('[ClinicianQueryDebugger] All attempts failed, trying direct query');
           const directResult = await supabase
             .from('clinicians')
-            .select('id, clinician_first_name, clinician_last_name, clinician_professional_name, clinician_type, clinician_bio, clinician_licensed_states, clinician_min_client_age, clinician_profile_image, clinician_image_url');
+            .select('id, clinician_first_name, clinician_last_name, clinician_professional_name, clinician_type, clinician_bio, clinician_licensed_states, clinician_min_client_age, clinician_image_url');
             
           return { 
             data: directResult.data as T[] | null, 

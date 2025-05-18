@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { ClinicianQueryDebugger } from '@/debug/clinicianQueryDebugger';
@@ -15,8 +14,9 @@ export interface Therapist {
   clinician_bio_short?: string | null;
   clinician_licensed_states: string[] | null;
   clinician_min_client_age: number | null;
-  clinician_profile_image: string | null;
   clinician_image_url: string | null;
+  // Keep this for backward compatibility
+  clinician_profile_image?: string | null;
 }
 
 interface UseTherapistSelectionOptions {
@@ -69,12 +69,12 @@ export const useTherapistSelection = ({
     let fetchError: any = null;
     
     try {
-      // Strategy 1: Use the debug wrapper with the normal query
+      // Strategy 1: Use the debug wrapper with the normal query - FIXED: removed clinician_profile_image
       console.log('[useTherapistSelection] Strategy 1: Using debug wrapper with normal query');
       const result = await ClinicianQueryDebugger.debugQuery<Therapist>(
         'clinicians',
         (query) => query
-          .select('id, clinician_first_name, clinician_last_name, clinician_professional_name, clinician_type, clinician_bio, clinician_licensed_states, clinician_min_client_age, clinician_profile_image, clinician_image_url')
+          .select('id, clinician_first_name, clinician_last_name, clinician_professional_name, clinician_type, clinician_bio, clinician_licensed_states, clinician_min_client_age, clinician_image_url')
           .eq('clinician_status', 'Active')
       );
       
@@ -85,11 +85,11 @@ export const useTherapistSelection = ({
       if (fetchError && fetchError.message && fetchError.message.includes('clinician_title')) {
         console.log('[useTherapistSelection] Strategy 1 failed with clinician_title error. Trying Strategy 2...');
         
-        // Strategy 2: Use the compatibility view
+        // Strategy 2: Use the compatibility view - FIXED: removed clinician_profile_image
         const compatResult = await ClinicianQueryDebugger.debugQuery<Therapist>(
           'clinicians_compatibility_view',
           (query) => query
-            .select('id, clinician_first_name, clinician_last_name, clinician_professional_name, clinician_type, clinician_bio, clinician_licensed_states, clinician_min_client_age, clinician_profile_image, clinician_image_url')
+            .select('id, clinician_first_name, clinician_last_name, clinician_professional_name, clinician_type, clinician_bio, clinician_licensed_states, clinician_min_client_age, clinician_image_url')
             .eq('clinician_status', 'Active')
         );
         
@@ -100,11 +100,11 @@ export const useTherapistSelection = ({
         } else {
           console.log('[useTherapistSelection] Strategy 2 also failed. Trying Strategy 3...');
           
-          // Strategy 3: Try without status filter (in case the enum is causing issues)
+          // Strategy 3: Try without status filter (in case the enum is causing issues) - FIXED: removed clinician_profile_image
           const noStatusResult = await ClinicianQueryDebugger.debugQuery<Therapist>(
             'clinicians',
             (query) => query
-              .select('id, clinician_first_name, clinician_last_name, clinician_professional_name, clinician_type, clinician_bio, clinician_licensed_states, clinician_min_client_age, clinician_profile_image, clinician_image_url')
+              .select('id, clinician_first_name, clinician_last_name, clinician_professional_name, clinician_type, clinician_bio, clinician_licensed_states, clinician_min_client_age, clinician_image_url')
           );
           
           if (!noStatusResult.error) {
@@ -116,10 +116,10 @@ export const useTherapistSelection = ({
           } else {
             console.log('[useTherapistSelection] Strategy 3 also failed. Trying Strategy 4 (direct query)...');
             
-            // Strategy 4: Direct query as a last resort
+            // Strategy 4: Direct query as a last resort - FIXED: removed clinician_profile_image
             const directResult = await supabase
               .from('clinicians')
-              .select('id, clinician_first_name, clinician_last_name, clinician_professional_name, clinician_type, clinician_bio, clinician_licensed_states, clinician_min_client_age, clinician_profile_image, clinician_image_url');
+              .select('id, clinician_first_name, clinician_last_name, clinician_professional_name, clinician_type, clinician_bio, clinician_licensed_states, clinician_min_client_age, clinician_image_url');
             
             if (!directResult.error) {
               console.log('[useTherapistSelection] Strategy 4 succeeded (direct query)');
@@ -145,6 +145,13 @@ export const useTherapistSelection = ({
             return therapist;
           });
         }
+        
+        // NEW: Map clinician_image_url to clinician_profile_image for backward compatibility
+        therapistData = therapistData.map(t => {
+          const therapist = { ...t };
+          therapist.clinician_profile_image = t.clinician_image_url;
+          return therapist;
+        });
         
         console.log('[useTherapistSelection] Loaded', therapistData.length, 'therapists');
         // Store all therapists for reference
