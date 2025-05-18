@@ -1,5 +1,5 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import { useAuth } from '@/context/NewAuthContext';
 import { useTherapistSelection } from '@/hooks/useTherapistSelection';
 import { Loader } from 'lucide-react';
+import { TherapistSelectionDebugger } from '@/debug/therapistSelectionDebugger';
 
 const TherapistSelection = () => {
   const navigate = useNavigate();
@@ -17,6 +18,11 @@ const TherapistSelection = () => {
   const { clientProfile } = useAuth();
   const clientState = clientProfile?.client_state || null;
   const clientAge = clientProfile?.client_age || 18;
+  
+  // Add console logs to verify client data
+  console.log('[TherapistSelection] Client profile:', clientProfile);
+  console.log('[TherapistSelection] Client state:', clientState);
+  console.log('[TherapistSelection] Client age:', clientAge);
 
   // Use the therapist selection hook to get real therapist data
   const { 
@@ -32,6 +38,18 @@ const TherapistSelection = () => {
     clientAge,
     enableFiltering: true
   });
+
+  // Run verification checks when therapists are loaded
+  useEffect(() => {
+    if (!loading && !error && therapists.length > 0) {
+      console.log('[TherapistSelection] Running verification checks');
+      TherapistSelectionDebugger.runAllChecks(
+        clientProfile?.id || null,
+        clientState,
+        therapists
+      );
+    }
+  }, [loading, error, therapists, clientProfile, clientState]);
 
   // Track if any submission is in progress (either our local state or from the hook)
   const isSubmitting = !!selectingTherapistId;
@@ -167,6 +185,15 @@ const TherapistSelection = () => {
         
         <div className="space-y-6">
           {therapists.map((therapist) => {
+            // Log therapist data to verify correct fields are being used
+            console.log('[TherapistSelection] Therapist data:', {
+              id: therapist.id,
+              name: therapist.clinician_professional_name,
+              type: therapist.clinician_type,
+              states: therapist.clinician_licensed_states,
+              imageUrl: therapist.clinician_image_url
+            });
+            
             const title = getTherapistTitle(therapist);
             const fullName = `${title} ${therapist.clinician_first_name || ''} ${therapist.clinician_last_name || ''}`.trim();
             // Use clinician_image_url as the primary image source

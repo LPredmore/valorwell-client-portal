@@ -74,36 +74,63 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
     cleanupOldAuthKeys();
   }, []);
 
-  // Safety timeout for initialization
+  // Improved safety timeout for initialization with progressive approach
   useEffect(() => {
-    // If initialization takes too long, consider it done anyway
-    const timeoutId = setTimeout(() => {
-      if (!authInitialized) {
-        console.log('[AuthContext] Initialization timeout reached, forcing initialized state');
-        setAuthInitialized(true);
-        if (authState === AuthState.INITIALIZING) {
-          // Default to unauthenticated if we can't determine state
-          setAuthState(AuthState.UNAUTHENTICATED);
-        }
-      }
-    }, 8000); // 8 seconds timeout
+    // Use a progressive timeout approach to avoid premature timeouts
+    // but still ensure the app doesn't hang indefinitely
     
-    return () => clearTimeout(timeoutId);
+    // Initial timeout is longer (15 seconds instead of 8)
+    const initialTimeoutId = setTimeout(() => {
+      if (!authInitialized) {
+        console.log('[AuthContext] Initial initialization timeout reached (15s), checking network...');
+        
+        // Check if network is the issue
+        if (!navigator.onLine) {
+          console.warn('[AuthContext] Network appears to be offline during initialization');
+          setAuthError({
+            message: 'Network connectivity issue detected. Please check your internet connection.'
+          });
+        }
+        
+        // Set a final timeout that will force initialization after 30 seconds total
+        const finalTimeoutId = setTimeout(() => {
+          if (!authInitialized) {
+            console.warn('[AuthContext] Final initialization timeout reached (30s), forcing initialized state');
+            setAuthInitialized(true);
+            
+            if (authState === AuthState.INITIALIZING) {
+              // Default to unauthenticated if we can't determine state
+              setAuthState(AuthState.UNAUTHENTICATED);
+              setAuthError({
+                message: 'Authentication initialization timed out. Some features may be unavailable.'
+              });
+            }
+          }
+        }, 15000); // Additional 15 seconds (30s total)
+        
+        return () => clearTimeout(finalTimeoutId);
+      }
+    }, 15000); // 15 seconds for initial timeout (increased from 8s)
+    
+    return () => clearTimeout(initialTimeoutId);
   }, [authInitialized, authState]);
   
-  // Sync with AuthService initialization state
+  // Improved sync with AuthService initialization state
   useEffect(() => {
-    setAuthInitialized(AuthService.isInitialized);
-    console.log(`[AuthContext] AuthService.isInitialized: ${AuthService.isInitialized}`);
+    // Only update if the value is actually different to prevent unnecessary renders
+    if (AuthService.isInitialized !== authInitialized) {
+      console.log(`[AuthContext] Setting authInitialized to: ${AuthService.isInitialized}`);
+      setAuthInitialized(AuthService.isInitialized);
+    }
     
-    // Monitor changes to initialization state - using a more efficient approach
-    // Only check every second instead of every 500ms to reduce overhead
+    // Use a more efficient approach with a single check on mount and then
+    // rely on the AuthService state listener for updates
     const checkInitInterval = setInterval(() => {
       if (AuthService.isInitialized !== authInitialized) {
         console.log(`[AuthContext] AuthService initialization changed: ${AuthService.isInitialized}`);
         setAuthInitialized(AuthService.isInitialized);
       }
-    }, 1000); // Check every 1000ms (1 second) instead of 500ms
+    }, 3000); // Check every 3 seconds instead of every 1 second to reduce overhead
     
     return () => clearInterval(checkInitInterval);
   }, [authInitialized]);
@@ -177,7 +204,7 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
     }
   };
 
-  // Effect to update isLoading state based on initialization and client data loading
+  // Improved effect to update isLoading state with debounce to prevent flicker
   useEffect(() => {
     const isStillInitializing = !authInitialized || authState === AuthState.INITIALIZING;
     const isClientDataLoading = authState === AuthState.AUTHENTICATED && loadingClientData;
@@ -185,8 +212,27 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
     
     // Only update state if it's actually changing to avoid unnecessary renders
     if (isLoading !== newLoadingState) {
-      setIsLoading(newLoadingState);
-      console.log(`[AuthContext] Updated loading state: ${newLoadingState} (initializing=${isStillInitializing}, clientDataLoading=${isClientDataLoading})`);
+      // For transitions to non-loading state, add a small delay to prevent flickering
+      // if the state changes rapidly back to loading
+      if (!newLoadingState && isLoading) {
+        const debounceId = setTimeout(() => {
+          // Double-check that we still want to set loading to false
+          const currentIsStillInitializing = !AuthService.isInitialized || AuthService.currentState === AuthState.INITIALIZING;
+          const currentIsClientDataLoading = AuthService.currentState === AuthState.AUTHENTICATED && loadingClientData;
+          const currentNewLoadingState = currentIsStillInitializing || currentIsClientDataLoading;
+          
+          if (!currentNewLoadingState) {
+            setIsLoading(false);
+            console.log('[AuthContext] Debounced loading state update: false');
+          }
+        }, 300); // 300ms debounce
+        
+        return () => clearTimeout(debounceId);
+      } else {
+        // For transitions to loading state, update immediately
+        setIsLoading(newLoadingState);
+        console.log(`[AuthContext] Updated loading state: ${newLoadingState} (initializing=${isStillInitializing}, clientDataLoading=${isClientDataLoading})`);
+      }
     }
   }, [authState, authInitialized, loadingClientData, isLoading]);
 

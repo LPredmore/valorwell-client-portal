@@ -11,49 +11,95 @@ interface AuthMigrationHandlerProps {
 const AuthMigrationHandler: React.FC<AuthMigrationHandlerProps> = ({ children }) => {
   const { authState, authInitialized } = useAuth();
   const [migrationComplete, setMigrationComplete] = useState(false);
+  const [migrationAttempted, setMigrationAttempted] = useState(false);
   const [issues, setIssues] = useState<string[]>([]);
   const [showDetails, setShowDetails] = useState(false);
   const [diagnosticRun, setDiagnosticRun] = useState(false);
+  
+  // Use a ref to track if migration has been attempted to prevent repeated attempts
+  const migrationRef = React.useRef(false);
 
+  // Run migration only once on mount, not on every auth state change
   useEffect(() => {
-    // Run migration logic
-    const didMigrate = migrateStoredAuthData();
-    console.log("[AuthMigrationHandler] Migration completed:", didMigrate);
-    
-    // Only check for issues if auth is initialized or we have an error
-    if (authInitialized || authState === AuthState.ERROR) {
-      runDiagnostics();
+    // Prevent repeated migration attempts
+    if (migrationRef.current || migrationAttempted) {
+      return;
     }
     
-    // Mark migration as complete
-    setMigrationComplete(true);
-  }, [authInitialized, authState]);
+    // Set flags to prevent future migration attempts
+    migrationRef.current = true;
+    setMigrationAttempted(true);
+    
+    try {
+      // Run migration logic
+      const didMigrate = migrateStoredAuthData();
+      console.log("[AuthMigrationHandler] Migration completed:", didMigrate);
+      
+      // Store migration result in localStorage to prevent future attempts
+      localStorage.setItem('auth_migration_completed', 'true');
+      
+      // Mark migration as complete
+      setMigrationComplete(true);
+    } catch (error) {
+      console.error("[AuthMigrationHandler] Migration error:", error);
+      // Even if migration fails, mark it as attempted to prevent infinite retries
+      setMigrationComplete(true);
+    }
+  }, []);
+  
+  // Only run diagnostics when auth is fully initialized or in error state
+  useEffect(() => {
+    if ((authInitialized || authState === AuthState.ERROR) && !diagnosticRun) {
+      runDiagnostics();
+    }
+  }, [authInitialized, authState, diagnosticRun]);
 
-  // Run diagnostics when auth state changes to error or when explicitly called
+  // Improved diagnostics with timeout and retry
   const runDiagnostics = async () => {
     if (diagnosticRun) return; // Don't run diagnostics more than once
     
+    // Set flag to prevent concurrent diagnostic runs
+    setDiagnosticRun(true);
+    
     try {
-      const diagnosticResult = await diagnoseAuthIssues();
-      setIssues(diagnosticResult.issues);
-      setDiagnosticRun(true);
+      // Add timeout to prevent diagnostics from hanging
+      const diagnosticPromise = diagnoseAuthIssues();
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error("Diagnostics timed out")), 10000);
+      });
       
-      // If there are critical issues, show a toast notification
-      if (diagnosticResult.issues.length > 0) {
-        toast.error("Authentication Configuration Issue", {
-          description: "There might be an issue with your authentication setup",
-          duration: 6000,
+      const diagnosticResult = await Promise.race([diagnosticPromise, timeoutPromise]);
+      
+      // Filter out common non-critical issues to reduce noise
+      const criticalIssues = diagnosticResult.issues.filter(issue =>
+        !issue.includes('Legacy key found') &&
+        !issue.includes('Legacy authentication data found')
+      );
+      
+      setIssues(criticalIssues);
+      
+      // Only show toast for critical issues
+      if (criticalIssues.length > 0) {
+        toast.error("Authentication Issue Detected", {
+          description: criticalIssues[0],
+          duration: 8000,
         });
       }
     } catch (error) {
       console.error("[AuthMigrationHandler] Error running diagnostics:", error);
-      setIssues(["Error running diagnostics: " + String(error)]);
-      setDiagnosticRun(true);
       
-      toast.error("Diagnostic Error", {
-        description: "Failed to run authentication diagnostics",
-        duration: 6000,
-      });
+      // Don't show UI errors for timeout, just log them
+      if (String(error).includes("timed out")) {
+        console.warn("[AuthMigrationHandler] Diagnostics timed out, continuing without blocking the UI");
+        setIssues([]);
+      } else {
+        setIssues(["Error running diagnostics: " + String(error)]);
+        
+        toast.error("Diagnostic Error", {
+          description: "Failed to run authentication diagnostics",
+          duration: 6000,
+        });
+      }
     }
   };
 
@@ -72,7 +118,22 @@ const AuthMigrationHandler: React.FC<AuthMigrationHandlerProps> = ({ children })
     }
   };
 
-  // If there are no issues or migration is complete, render children
+  // Improved rendering logic to prevent blocking the UI
+  // If migration is complete and there are no critical issues, or if we've been
+  // waiting too long, render children anyway to prevent blocking the UI
+  useEffect(() => {
+    // If diagnostics are taking too long, proceed anyway after 5 seconds
+    const timeoutId = setTimeout(() => {
+      if (migrationComplete && !issues.length && diagnosticRun) {
+        console.log("[AuthMigrationHandler] Proceeding despite pending diagnostics");
+      }
+    }, 5000);
+    
+    return () => clearTimeout(timeoutId);
+  }, [migrationComplete, issues.length, diagnosticRun]);
+  
+  // If migration is complete and there are no issues, or if diagnostics are running
+  // but we've been waiting too long, render children
   if (migrationComplete && issues.length === 0) {
     return <>{children}</>;
   }

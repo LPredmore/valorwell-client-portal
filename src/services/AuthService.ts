@@ -23,8 +23,9 @@ interface AuthSession {
 }
 
 const AUTH_STORAGE_KEY = 'auth_session_cache';
-const AUTH_TIMEOUT = 45000; // 45 seconds timeout for auth operations (increased from 15s)
-const SESSION_EXPIRY_BUFFER = 600000; // 10 minutes buffer before actual expiry (increased from 5m)
+const AUTH_TIMEOUT = 90000; // 90 seconds timeout for auth operations (increased from 45s)
+const SESSION_EXPIRY_BUFFER = 900000; // 15 minutes buffer before actual expiry (increased from 10m)
+const MAX_RETRIES = 3; // Maximum number of retries for auth operations
 
 class AuthService {
   private static instance: AuthService;
@@ -123,13 +124,20 @@ class AuthService {
     });
   }
   
-  // Initial auth check with timeout protection
+  // Initial auth check with improved timeout protection and fallback mechanisms
   private async performInitialSessionCheck(): Promise<void> {
     if (this._initialCheckComplete) return;
     
     try {
       console.log('[AuthService] Starting initial session check');
-      // Use Promise.race to implement timeout with better error handling
+      
+      // Check network connectivity first
+      if (!navigator.onLine) {
+        console.warn('[AuthService] Network appears to be offline');
+        throw new Error('Network connectivity issue detected');
+      }
+      
+      // Use Promise.race with a more generous timeout
       const sessionResult = await Promise.race([
         supabase.auth.getSession(),
         new Promise<{data: {session: null}}>((_, reject) =>
@@ -154,42 +162,84 @@ class AuthService {
     } catch (error) {
       console.error('[AuthService] Error during initial session check:', error);
       
-      // Enhanced fallback mechanism
+      // Improved fallback mechanism with retry logic
       try {
-        console.log('[AuthService] Attempting enhanced fallback check');
+        console.log('[AuthService] Attempting improved fallback check');
         
-        // First try getUser with timeout
-        const { data: userData, error: userError } = await Promise.race([
-          supabase.auth.getUser(),
-          new Promise<{data: {user: null}, error: any}>((_, reject) =>
-            setTimeout(() => reject(new Error('GetUser fallback timed out')), AUTH_TIMEOUT)
-          )
-        ]);
-
-        if (userError) throw userError;
-        
-        if (userData?.user) {
-          console.log('[AuthService] Found user via getUser fallback');
-          // We found a user, but no session. Try to get a session via refresh
-          const { data: refreshData } = await supabase.auth.refreshSession();
-          
-          if (refreshData?.session) {
-            console.log('[AuthService] Successfully refreshed session');
-            this.handleSuccessfulAuth(refreshData.session);
-          } else {
-            console.log('[AuthService] User found but could not refresh session');
-            this._currentState = AuthState.UNAUTHENTICATED;
+        // Try to restore from localStorage first if available
+        const storedData = localStorage.getItem(AUTH_STORAGE_KEY);
+        if (storedData) {
+          try {
+            const parsedData = JSON.parse(storedData);
+            if (parsedData?.user?.id) {
+              console.log('[AuthService] Using cached user data during network issues');
+              // We have a user ID, let's try to refresh the session
+              await this.attemptSessionRecovery(parsedData);
+              return;
+            }
+          } catch (parseError) {
+            console.error('[AuthService] Error parsing stored auth data:', parseError);
           }
-        } else {
-          console.log('[AuthService] No user found via getUser fallback');
-          this._currentState = AuthState.UNAUTHENTICATED;
         }
+        
+        // If no stored data or parsing failed, try getUser with timeout and retries
+        let lastError = error;
+        for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+          try {
+            console.log(`[AuthService] Fallback attempt ${attempt}/${MAX_RETRIES}`);
+            
+            // Use a shorter timeout for fallback attempts
+            const fallbackTimeout = AUTH_TIMEOUT / 2;
+            
+            const { data: userData, error: userError } = await Promise.race([
+              supabase.auth.getUser(),
+              new Promise<{data: {user: null}, error: any}>((_, reject) =>
+                setTimeout(() => reject(new Error(`GetUser fallback timed out (attempt ${attempt})`)), fallbackTimeout)
+              )
+            ]);
+            
+            if (userError) throw userError;
+            
+            if (userData?.user) {
+              console.log('[AuthService] Found user via getUser fallback');
+              // We found a user, but no session. Try to get a session via refresh
+              const { data: refreshData } = await supabase.auth.refreshSession();
+              
+              if (refreshData?.session) {
+                console.log('[AuthService] Successfully refreshed session');
+                this.handleSuccessfulAuth(refreshData.session);
+                return;
+              } else {
+                console.log('[AuthService] User found but could not refresh session');
+                this._currentState = AuthState.UNAUTHENTICATED;
+                return;
+              }
+            } else {
+              console.log('[AuthService] No user found via getUser fallback');
+              this._currentState = AuthState.UNAUTHENTICATED;
+              return;
+            }
+          } catch (retryError) {
+            console.error(`[AuthService] Fallback attempt ${attempt} failed:`, retryError);
+            lastError = retryError;
+            
+            // Wait before retrying (exponential backoff)
+            if (attempt < MAX_RETRIES) {
+              const delay = Math.pow(2, attempt) * 1000; // 2s, 4s, 8s
+              console.log(`[AuthService] Waiting ${delay}ms before next attempt`);
+              await new Promise(resolve => setTimeout(resolve, delay));
+            }
+          }
+        }
+        
+        // All retries failed
+        throw lastError;
       } catch (fallbackError) {
-        console.error('[AuthService] Fallback check failed:', fallbackError);
+        console.error('[AuthService] All fallback mechanisms failed:', fallbackError);
         // Even if there's an error, still mark initialization as complete
         this._currentState = AuthState.ERROR;
         this._error = {
-          message: 'Failed to check authentication status. Please try refreshing the page.',
+          message: 'Authentication check failed after multiple attempts. Please check your network connection and try refreshing the page.',
           originalError: error
         };
       }
@@ -468,16 +518,66 @@ class AuthService {
     return role.includes(currentRole);
   }
   
-  // Force refresh session with retry logic
+  // Helper method to attempt session recovery from stored data
+  private async attemptSessionRecovery(storedData: any): Promise<void> {
+    try {
+      console.log('[AuthService] Attempting session recovery from stored data');
+      
+      // Try to refresh the session
+      const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+      
+      if (refreshError) {
+        console.error('[AuthService] Session refresh failed during recovery:', refreshError);
+        
+        // If refresh fails but we have stored user data, use it temporarily
+        if (storedData?.user) {
+          console.log('[AuthService] Using stored user data as fallback');
+          this._sessionData = storedData;
+          this._currentState = AuthState.AUTHENTICATED;
+          this._error = {
+            message: 'Using cached authentication data. Some features may be limited until network connectivity is restored.',
+            code: 'USING_CACHED_AUTH'
+          };
+        } else {
+          this._currentState = AuthState.UNAUTHENTICATED;
+        }
+      } else if (refreshData?.session) {
+        console.log('[AuthService] Successfully recovered session');
+        this.handleSuccessfulAuth(refreshData.session);
+      } else {
+        console.log('[AuthService] No session could be recovered');
+        this._currentState = AuthState.UNAUTHENTICATED;
+      }
+    } catch (error) {
+      console.error('[AuthService] Error during session recovery:', error);
+      this._currentState = AuthState.ERROR;
+      this._error = {
+        message: 'Failed to recover authentication session',
+        originalError: error
+      };
+    }
+  }
+
+  // Improved refresh session with better retry logic and error handling
   public async refreshSession(attempt = 1): Promise<boolean> {
-    const MAX_RETRIES = 3;
-    const BASE_DELAY = 1000; // 1 second
+    const BASE_DELAY = 2000; // 2 seconds (increased from 1s)
     
     try {
-      console.log(`[AuthService] Refreshing session (attempt ${attempt})`);
+      console.log(`[AuthService] Refreshing session (attempt ${attempt}/${MAX_RETRIES})`);
       
-      // First try to get current session
-      const { data, error } = await supabase.auth.getSession();
+      // Check network connectivity
+      if (!navigator.onLine) {
+        console.warn('[AuthService] Network appears to be offline during refresh');
+        throw new Error('Network connectivity issue detected during refresh');
+      }
+      
+      // First try to get current session with timeout
+      const { data, error } = await Promise.race([
+        supabase.auth.getSession(),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('Session check timed out during refresh')), AUTH_TIMEOUT / 2)
+        )
+      ]);
       
       if (error) {
         throw error;
@@ -490,8 +590,13 @@ class AuthService {
         return true;
       }
       
-      // If no session, try explicit refresh
-      const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+      // If no session, try explicit refresh with timeout
+      const { data: refreshData, error: refreshError } = await Promise.race([
+        supabase.auth.refreshSession(),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('Session refresh timed out')), AUTH_TIMEOUT / 2)
+        )
+      ]);
       
       if (refreshError) {
         throw refreshError;
@@ -509,17 +614,22 @@ class AuthService {
       return false;
       
     } catch (error: any) {
+      console.error(`[AuthService] Refresh attempt ${attempt} failed:`, error);
+      
       if (attempt < MAX_RETRIES) {
-        // Exponential backoff
-        const delay = BASE_DELAY * Math.pow(2, attempt - 1);
-        console.log(`[AuthService] Refresh failed, retrying in ${delay}ms`);
+        // Improved exponential backoff with jitter
+        const baseDelay = BASE_DELAY * Math.pow(2, attempt - 1);
+        const jitter = Math.random() * 1000; // Add up to 1s of random jitter
+        const delay = baseDelay + jitter;
+        
+        console.log(`[AuthService] Refresh failed, retrying in ${Math.round(delay)}ms`);
         await new Promise(resolve => setTimeout(resolve, delay));
         return this.refreshSession(attempt + 1);
       }
       
       // Max retries reached
       this._error = {
-        code: error.status?.toString(),
+        code: error.status?.toString() || 'REFRESH_FAILED',
         message: error.message || 'Failed to refresh session after multiple attempts',
         originalError: error
       };

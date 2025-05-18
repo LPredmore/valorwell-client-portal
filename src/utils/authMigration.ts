@@ -17,26 +17,69 @@ const LEGACY_KEYS = ['supabase.auth.token', 'auth_initialization_forced'];
  * Migrates stored authentication data from the old format to the new format
  * @returns Object containing information about the migration
  */
-export const migrateStoredAuthData = (): { 
-  migrated: boolean; 
-  oldUserId?: string; 
+// Flag to track if migration has been attempted in this session
+let migrationAttempted = false;
+
+export const migrateStoredAuthData = (): {
+  migrated: boolean;
+  oldUserId?: string;
   oldRole?: string;
   message: string;
+  alreadyMigrated?: boolean;
 } => {
+  // Check if migration has already been completed in a previous session
+  const previouslyMigrated = localStorage.getItem('auth_migration_completed') === 'true';
+  if (previouslyMigrated) {
+    console.log('[AuthMigration] Migration was already completed in a previous session');
+    return {
+      migrated: false,
+      alreadyMigrated: true,
+      message: 'Migration was already completed in a previous session'
+    };
+  }
+  
+  // Check if migration has already been attempted in this session
+  if (migrationAttempted) {
+    console.log('[AuthMigration] Migration already attempted in this session');
+    return {
+      migrated: false,
+      alreadyMigrated: true,
+      message: 'Migration already attempted in this session'
+    };
+  }
+  
   console.log('[AuthMigration] Starting migration of stored auth data');
+  migrationAttempted = true;
   
   try {
     // Check if old auth data exists
     const oldAuthData = localStorage.getItem(OLD_AUTH_KEY);
     if (!oldAuthData) {
       console.log('[AuthMigration] No old auth data found');
+      // Mark migration as completed even if no data was found
+      localStorage.setItem('auth_migration_completed', 'true');
       return { migrated: false, message: 'No old auth data found' };
     }
     
-    // Parse old auth data
-    const parsedOldData = JSON.parse(oldAuthData);
-    const oldUserId = parsedOldData?.user?.id;
-    const oldRole = parsedOldData?.user?.role || 'client';
+    // Parse old auth data with error handling
+    let parsedOldData;
+    let oldUserId;
+    let oldRole;
+    
+    try {
+      parsedOldData = JSON.parse(oldAuthData);
+      oldUserId = parsedOldData?.user?.id;
+      oldRole = parsedOldData?.user?.role || 'client';
+    } catch (parseError) {
+      console.error('[AuthMigration] Error parsing old auth data:', parseError);
+      // Remove corrupted data
+      localStorage.removeItem(OLD_AUTH_KEY);
+      localStorage.setItem('auth_migration_completed', 'true');
+      return {
+        migrated: false,
+        message: `Error parsing old auth data: ${parseError}`
+      };
+    }
     
     console.log(`[AuthMigration] Found old auth data for user: ${oldUserId}, role: ${oldRole}`);
     
@@ -52,14 +95,19 @@ export const migrateStoredAuthData = (): {
       }
     });
     
-    return { 
-      migrated: true, 
-      oldUserId, 
+    // Mark migration as completed
+    localStorage.setItem('auth_migration_completed', 'true');
+    
+    return {
+      migrated: true,
+      oldUserId,
       oldRole,
-      message: `Successfully migrated auth data for user: ${oldUserId}` 
+      message: `Successfully migrated auth data for user: ${oldUserId}`
     };
   } catch (error) {
     console.error('[AuthMigration] Error migrating stored auth data:', error);
+    // Even if there's an error, mark migration as attempted to prevent infinite retries
+    localStorage.setItem('auth_migration_completed', 'true');
     return { migrated: false, message: `Error migrating auth data: ${error}` };
   }
 };
@@ -68,6 +116,16 @@ export const migrateStoredAuthData = (): {
  * Diagnoses common authentication issues
  * @returns Object containing diagnostic information
  */
+// Add timeout support for async operations
+const withTimeout = <T>(promise: Promise<T>, timeoutMs: number, errorMessage: string): Promise<T> => {
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error(errorMessage)), timeoutMs)
+    )
+  ]);
+};
+
 export const diagnoseAuthIssues = async (): Promise<{
   issues: string[];
   hasOldAuthData: boolean;
@@ -87,7 +145,7 @@ export const diagnoseAuthIssues = async (): Promise<{
   // Check network connectivity
   const networkConnected = navigator.onLine;
   if (!networkConnected) {
-    issues.push('Network connection unavailable');
+    issues.push('Network connection unavailable - please check your internet connection');
   }
   
   // Check Supabase configuration
@@ -96,7 +154,7 @@ export const diagnoseAuthIssues = async (): Promise<{
   const supabaseConfigured = !!supabaseUrl && !!supabaseKey;
   
   if (!supabaseConfigured) {
-    issues.push('Supabase configuration missing or incomplete');
+    issues.push('Supabase configuration missing or incomplete - contact support');
   }
   
   // Check for old auth data
@@ -104,14 +162,20 @@ export const diagnoseAuthIssues = async (): Promise<{
     const oldAuthData = localStorage.getItem(OLD_AUTH_KEY);
     if (oldAuthData) {
       hasOldAuthData = true;
-      issues.push('Legacy authentication data found');
+      issues.push('Legacy authentication data found - will be migrated automatically');
       
       // Extract user ID from old auth data
-      const parsedOldData = JSON.parse(oldAuthData);
-      oldUserId = parsedOldData?.user?.id || null;
+      try {
+        const parsedOldData = JSON.parse(oldAuthData);
+        oldUserId = parsedOldData?.user?.id || null;
+      } catch (parseError) {
+        console.error('[AuthMigration] Error parsing old auth data:', parseError);
+        // Don't add to issues, just log it
+      }
     }
   } catch (error) {
-    issues.push(`Error checking old auth data: ${error}`);
+    console.error('[AuthMigration] Error checking old auth data:', error);
+    // Don't add to issues, just log it
   }
   
   // Check for new auth data
@@ -121,36 +185,54 @@ export const diagnoseAuthIssues = async (): Promise<{
       hasNewAuthData = true;
       
       // Extract user ID from new auth data
-      const parsedNewData = JSON.parse(newAuthData);
-      newUserId = parsedNewData?.user?.id || null;
+      try {
+        const parsedNewData = JSON.parse(newAuthData);
+        newUserId = parsedNewData?.user?.id || null;
+      } catch (parseError) {
+        console.error('[AuthMigration] Error parsing new auth data:', parseError);
+        issues.push('Current authentication data may be corrupted - try clearing browser cache');
+      }
     }
   } catch (error) {
-    issues.push(`Error checking new auth data: ${error}`);
+    console.error('[AuthMigration] Error checking new auth data:', error);
+    // Don't add to issues, just log it
   }
   
   // Check for conflicting user IDs
   const conflictingUserIds = !!(oldUserId && newUserId && oldUserId !== newUserId);
   if (conflictingUserIds) {
-    issues.push(`Conflicting user IDs found: old=${oldUserId}, new=${newUserId}`);
+    issues.push(`Conflicting user IDs detected - please sign out and sign in again`);
   }
   
-  // Check for other legacy keys
+  // Check for other legacy keys (but don't add to issues to reduce noise)
   LEGACY_KEYS.forEach(key => {
     if (localStorage.getItem(key)) {
-      issues.push(`Legacy key found: ${key}`);
+      console.log(`[AuthMigration] Legacy key found: ${key}`);
+      // Don't add to issues to reduce noise
     }
   });
   
-  // Check current session
-  try {
-    const { data, error } = await supabase.auth.getSession();
-    if (error) {
-      issues.push(`Error getting current session: ${error.message}`);
-    } else if (!data.session) {
-      issues.push('No active session found');
+  // Check current session with timeout
+  if (networkConnected && supabaseConfigured) {
+    try {
+      const { data, error } = await withTimeout(
+        supabase.auth.getSession(),
+        5000, // 5 second timeout
+        'Session check timed out'
+      );
+      
+      if (error) {
+        issues.push(`Authentication error: ${error.message}`);
+      } else if (!data.session && newUserId) {
+        issues.push('Session expired - please sign in again');
+      }
+    } catch (error: any) {
+      if (error.message.includes('timed out')) {
+        issues.push('Authentication service response timeout - please try again later');
+      } else {
+        issues.push(`Authentication error: ${error.message}`);
+      }
     }
-  } catch (error: any) {
-    issues.push(`Exception checking session: ${error.message}`);
   }
   
   return {

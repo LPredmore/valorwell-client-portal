@@ -25,6 +25,7 @@ import UpdatePassword from "./pages/UpdatePassword";
 import AuthDebugPage from "./pages/AuthDebugPage";
 import Clients from "./pages/Clients";
 import PatientProfile from "./pages/PatientProfile";
+import TherapistSelectionTestPage from "./debug/TherapistSelectionTestPage";
 
 // Create a query client
 const queryClient = new QueryClient();
@@ -84,6 +85,11 @@ function App() {
                 
                 {/* Debug routes */}
                 <Route path="/debug/auth-public" element={<AuthDebugPage />} />
+                <Route path="/debug/therapist-selection" element={
+                  <AuthProtectedRoute allowedRoles={["client", "admin"]}>
+                    <TherapistSelectionTestPage />
+                  </AuthProtectedRoute>
+                } />
                 
                 <Route path="*" element={<NotFound />} />
                 </Routes>

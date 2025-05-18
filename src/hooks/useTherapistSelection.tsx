@@ -208,10 +208,14 @@ export const useTherapistSelection = ({
   const filterTherapists = (therapistList: Therapist[], state: string | null, age: number): Therapist[] => {
     // Add defensive check for null therapist list
     if (!therapistList || therapistList.length === 0) {
+      console.log('[useTherapistSelection] filterTherapists: Empty or null therapist list');
       return [];
     }
     
-    return therapistList.filter(therapist => {
+    console.log('[useTherapistSelection] filterTherapists: Starting with', therapistList.length, 'therapists');
+    console.log('[useTherapistSelection] filterTherapists: Filtering by state:', state, 'and age:', age);
+    
+    const filteredList = therapistList.filter(therapist => {
       // Skip null therapist entries
       if (!therapist) return false;
       
@@ -221,22 +225,40 @@ export const useTherapistSelection = ({
       // State Matching Logic
       if (state && therapist.clinician_licensed_states && therapist.clinician_licensed_states.length > 0) {
         const clientStateNormalized = state.toLowerCase().trim();
+        console.log(`[useTherapistSelection] Checking therapist ${therapist.id} licensed states:`, therapist.clinician_licensed_states);
+        
         matchesState = therapist.clinician_licensed_states.some(s => {
           if (!s) return false;
           const stateNormalized = s.toLowerCase().trim();
-          return stateNormalized.includes(clientStateNormalized) || clientStateNormalized.includes(stateNormalized);
+          const matches = stateNormalized.includes(clientStateNormalized) || clientStateNormalized.includes(stateNormalized);
+          if (matches) {
+            console.log(`[useTherapistSelection] Therapist ${therapist.id} matches state ${state} with licensed state ${s}`);
+          }
+          return matches;
         });
       } else if (state && (!therapist.clinician_licensed_states || therapist.clinician_licensed_states.length === 0)) {
+        console.log(`[useTherapistSelection] Therapist ${therapist.id} has no licensed states but client state is ${state}`);
         matchesState = false;
       }
       
       // Age Matching Logic
       if (age > 0 && therapist.clinician_min_client_age !== null) {
         matchesAge = age >= therapist.clinician_min_client_age;
+        if (!matchesAge) {
+          console.log(`[useTherapistSelection] Therapist ${therapist.id} requires min age ${therapist.clinician_min_client_age} but client age is ${age}`);
+        }
       }
       
-      return matchesState && matchesAge;
+      const isMatch = matchesState && matchesAge;
+      if (!isMatch) {
+        console.log(`[useTherapistSelection] Therapist ${therapist.id} filtered out: matchesState=${matchesState}, matchesAge=${matchesAge}`);
+      }
+      
+      return isMatch;
     });
+    
+    console.log('[useTherapistSelection] filterTherapists: Filtered to', filteredList.length, 'therapists');
+    return filteredList;
   };
   
   // Retry fetch function - increments attempt count to trigger the useEffect
@@ -250,6 +272,10 @@ export const useTherapistSelection = ({
     try {
       setSelectingTherapistId(therapistId);
       console.log(`[useTherapistSelection] Selecting therapist with ID: ${therapistId}`);
+      
+      // Find the selected therapist to log details
+      const selectedTherapist = therapists.find(t => t.id === therapistId);
+      console.log('[useTherapistSelection] Selected therapist details:', selectedTherapist);
       
       const userId = await getUserId();
       if (!userId) {
