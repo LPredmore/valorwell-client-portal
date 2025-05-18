@@ -27,8 +27,23 @@ import Clients from "./pages/Clients";
 import PatientProfile from "./pages/PatientProfile";
 import TherapistSelectionTestPage from "./debug/TherapistSelectionTestPage";
 
-// Create a query client
-const queryClient = new QueryClient();
+// Create a query client with improved error handling and retry logic
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 2,                // Limit to 2 retries
+      retryDelay: attempt => Math.min(1000 * 2 ** attempt, 30000), // Exponential backoff with max of 30 seconds
+      staleTime: 60 * 1000,    // 1 minute
+      cacheTime: 5 * 60 * 1000, // 5 minutes
+      refetchOnWindowFocus: false, // Don't refetch on window focus to prevent unnecessary requests
+      refetchOnReconnect: true, // Refetch when reconnecting to network
+    },
+    mutations: {
+      retry: 1,                // Only retry mutations once
+      retryDelay: 1000,        // 1 second delay before retry
+    }
+  }
+});
 
 function App() {
   return (

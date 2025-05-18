@@ -1,8 +1,9 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { ClinicianQueryDebugger } from '@/debug/clinicianQueryDebugger';
 import { useToast } from '@/hooks/use-toast';
 import { ClientDetails } from '@/types/client';
+import { toast } from 'sonner';
 
 export interface Therapist {
   id: string;
@@ -36,9 +37,15 @@ interface UseTherapistSelectionResult {
   selectingTherapistId: string | null;
 }
 
+// Constants for circuit breaker and retries
+const MAX_RETRY_ATTEMPTS = 3;
+const INITIAL_RETRY_DELAY = 1000; // 1 second
+const TIMEOUT_MS = 10000; // 10 seconds
+const NETWORK_CHECK_URL = 'https://www.google.com/generate_204';
+
 /**
  * A specialized hook for loading therapist data with enhanced error recovery
- * to handle the clinician_title/clinician_type schema mismatch issue
+ * to handle network issues and prevent infinite retry loops
  */
 export const useTherapistSelection = ({
   clientState,
@@ -55,28 +62,131 @@ export const useTherapistSelection = ({
   const [selectingTherapistId, setSelectingTherapistId] = useState<string | null>(null);
   const [attemptCount, setAttemptCount] = useState<number>(0);
   
+  // Circuit breaker state
+  const [circuitOpen, setCircuitOpen] = useState<boolean>(false);
+  const circuitResetTimerRef = useRef<number | null>(null);
+  const retryCountRef = useRef<number>(0);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  
   // Log initial hook parameters for debugging
   console.log(`[useTherapistSelection] Hook initialized with clientState: ${clientState}, clientAge: ${clientAge}, enableFiltering: ${enableFiltering}`);
   
+  // Check if network is connected
+  const checkNetworkConnectivity = async (): Promise<boolean> => {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+      
+      const response = await fetch(NETWORK_CHECK_URL, { 
+        method: 'HEAD',
+        mode: 'no-cors',
+        signal: controller.signal 
+      });
+      
+      clearTimeout(timeoutId);
+      console.log('[useTherapistSelection] Network connectivity check:', response.ok ? 'Online' : 'Offline');
+      return response.ok;
+    } catch (error) {
+      console.log('[useTherapistSelection] Network connectivity check failed:', error);
+      return false;
+    }
+  };
+  
+  // Reset circuit breaker after cooldown period
+  const resetCircuitBreaker = useCallback(() => {
+    if (circuitResetTimerRef.current) {
+      window.clearTimeout(circuitResetTimerRef.current);
+    }
+    
+    // Reset after 30 seconds
+    circuitResetTimerRef.current = window.setTimeout(() => {
+      console.log('[useTherapistSelection] Circuit breaker reset');
+      setCircuitOpen(false);
+      retryCountRef.current = 0;
+    }, 30000);
+  }, []);
+  
   // Function to fetch therapists with multi-layered fallback strategies
   const fetchTherapists = useCallback(async () => {
+    // Cancel any in-flight requests
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    
+    // Create a new AbortController for this request
+    abortControllerRef.current = new AbortController();
+    
+    // Check if circuit breaker is open
+    if (circuitOpen) {
+      console.log('[useTherapistSelection] Circuit breaker is open, not attempting fetch');
+      setErrorMessage('Too many failed attempts. Please try again later.');
+      setLoading(false);
+      return;
+    }
+    
+    // Check retry count
+    if (retryCountRef.current >= MAX_RETRY_ATTEMPTS) {
+      console.log(`[useTherapistSelection] Maximum retry attempts (${MAX_RETRY_ATTEMPTS}) reached`);
+      setCircuitOpen(true);
+      resetCircuitBreaker();
+      setErrorMessage('Maximum retry attempts reached. Please try again later.');
+      setLoading(false);
+      return;
+    }
+    
     setLoading(true);
     setErrorMessage(null);
     setFilteringApplied(false);
     
-    console.log(`[useTherapistSelection] Fetching therapists (attempt ${attemptCount + 1})`);
+    // Increment retry count
+    retryCountRef.current++;
+    
+    // Calculate backoff delay based on retry count (exponential backoff)
+    const backoffDelay = retryCountRef.current > 1 ? 
+      INITIAL_RETRY_DELAY * Math.pow(2, retryCountRef.current - 1) : 
+      0;
+    
+    console.log(`[useTherapistSelection] Fetching therapists (attempt ${retryCountRef.current}/${MAX_RETRY_ATTEMPTS}), backoff: ${backoffDelay}ms`);
+    
+    // Apply backoff delay if this is a retry
+    if (backoffDelay > 0) {
+      await new Promise(resolve => setTimeout(resolve, backoffDelay));
+    }
+    
+    // Check network connectivity before making request
+    const isConnected = await checkNetworkConnectivity();
+    if (!isConnected) {
+      console.log('[useTherapistSelection] Network connectivity check failed');
+      setErrorMessage('Network connectivity issue. Please check your internet connection.');
+      setLoading(false);
+      return;
+    }
+    
     let therapistData: Therapist[] = [];
     let fetchError: any = null;
     
+    // Create a timeout promise
+    const timeoutPromise = new Promise<{data: null, error: any}>((_, reject) => {
+      setTimeout(() => reject({
+        data: null,
+        error: { message: 'Request timed out. Please try again.' }
+      }), TIMEOUT_MS);
+    });
+    
     try {
-      // Strategy 1: Use the debug wrapper with the normal query - FIXED: removed clinician_profile_image
+      // Strategy 1: Use the debug wrapper with the normal query
       console.log('[useTherapistSelection] Strategy 1: Using debug wrapper with normal query');
-      const result = await ClinicianQueryDebugger.debugQuery<Therapist>(
-        'clinicians',
-        (query) => query
-          .select('id, clinician_first_name, clinician_last_name, clinician_professional_name, clinician_type, clinician_bio, clinician_licensed_states, clinician_min_client_age, clinician_image_url')
-          .eq('clinician_status', 'Active')
-      );
+      
+      // Race between the actual query and the timeout
+      const result = await Promise.race([
+        ClinicianQueryDebugger.debugQuery<Therapist>(
+          'clinicians',
+          (query) => query
+            .select('id, clinician_first_name, clinician_last_name, clinician_professional_name, clinician_type, clinician_bio, clinician_licensed_states, clinician_min_client_age, clinician_image_url')
+            .eq('clinician_status', 'Active')
+        ),
+        timeoutPromise
+      ]);
       
       therapistData = result.data || [];
       fetchError = result.error;
@@ -85,13 +195,16 @@ export const useTherapistSelection = ({
       if (fetchError && fetchError.message && fetchError.message.includes('clinician_title')) {
         console.log('[useTherapistSelection] Strategy 1 failed with clinician_title error. Trying Strategy 2...');
         
-        // Strategy 2: Use the compatibility view - FIXED: removed clinician_profile_image
-        const compatResult = await ClinicianQueryDebugger.debugQuery<Therapist>(
-          'clinicians_compatibility_view',
-          (query) => query
-            .select('id, clinician_first_name, clinician_last_name, clinician_professional_name, clinician_type, clinician_bio, clinician_licensed_states, clinician_min_client_age, clinician_image_url')
-            .eq('clinician_status', 'Active')
-        );
+        // Strategy 2: Use the compatibility view
+        const compatResult = await Promise.race([
+          ClinicianQueryDebugger.debugQuery<Therapist>(
+            'clinicians_compatibility_view',
+            (query) => query
+              .select('id, clinician_first_name, clinician_last_name, clinician_professional_name, clinician_type, clinician_bio, clinician_licensed_states, clinician_min_client_age, clinician_image_url')
+              .eq('clinician_status', 'Active')
+          ),
+          timeoutPromise
+        ]);
         
         if (!compatResult.error) {
           console.log('[useTherapistSelection] Strategy 2 succeeded using compatibility view');
@@ -100,12 +213,15 @@ export const useTherapistSelection = ({
         } else {
           console.log('[useTherapistSelection] Strategy 2 also failed. Trying Strategy 3...');
           
-          // Strategy 3: Try without status filter (in case the enum is causing issues) - FIXED: removed clinician_profile_image
-          const noStatusResult = await ClinicianQueryDebugger.debugQuery<Therapist>(
-            'clinicians',
-            (query) => query
-              .select('id, clinician_first_name, clinician_last_name, clinician_professional_name, clinician_type, clinician_bio, clinician_licensed_states, clinician_min_client_age, clinician_image_url')
-          );
+          // Strategy 3: Try without status filter (in case the enum is causing issues)
+          const noStatusResult = await Promise.race([
+            ClinicianQueryDebugger.debugQuery<Therapist>(
+              'clinicians',
+              (query) => query
+                .select('id, clinician_first_name, clinician_last_name, clinician_professional_name, clinician_type, clinician_bio, clinician_licensed_states, clinician_min_client_age, clinician_image_url')
+            ),
+            timeoutPromise
+          ]);
           
           if (!noStatusResult.error) {
             console.log('[useTherapistSelection] Strategy 3 succeeded (no status filter)');
@@ -116,10 +232,13 @@ export const useTherapistSelection = ({
           } else {
             console.log('[useTherapistSelection] Strategy 3 also failed. Trying Strategy 4 (direct query)...');
             
-            // Strategy 4: Direct query as a last resort - FIXED: removed clinician_profile_image
-            const directResult = await supabase
-              .from('clinicians')
-              .select('id, clinician_first_name, clinician_last_name, clinician_professional_name, clinician_type, clinician_bio, clinician_licensed_states, clinician_min_client_age, clinician_image_url');
+            // Strategy 4: Direct query as a last resort
+            const directResult = await Promise.race([
+              supabase
+                .from('clinicians')
+                .select('id, clinician_first_name, clinician_last_name, clinician_professional_name, clinician_type, clinician_bio, clinician_licensed_states, clinician_min_client_age, clinician_image_url'),
+              timeoutPromise
+            ]);
             
             if (!directResult.error) {
               console.log('[useTherapistSelection] Strategy 4 succeeded (direct query)');
@@ -146,7 +265,7 @@ export const useTherapistSelection = ({
           });
         }
         
-        // NEW: Map clinician_image_url to clinician_profile_image for backward compatibility
+        // Map clinician_image_url to clinician_profile_image for backward compatibility
         therapistData = therapistData.map(t => {
           const therapist = { ...t };
           therapist.clinician_profile_image = t.clinician_image_url;
@@ -154,6 +273,10 @@ export const useTherapistSelection = ({
         });
         
         console.log('[useTherapistSelection] Loaded', therapistData.length, 'therapists');
+        
+        // Reset retry count on success
+        retryCountRef.current = 0;
+        
         // Store all therapists for reference
         setAllTherapists(therapistData);
         
@@ -185,9 +308,19 @@ export const useTherapistSelection = ({
         console.log('[useTherapistSelection] No therapists found, but no error either');
         setTherapists([]);
         setAllTherapists([]);
+        // Reset retry count since this is a valid empty result
+        retryCountRef.current = 0;
       }
     } catch (error: any) {
       console.error('[useTherapistSelection] Unexpected error:', error);
+      
+      // Check if this was an abort error (user navigated away)
+      if (error.name === 'AbortError') {
+        console.log('[useTherapistSelection] Request was aborted');
+        // Don't update state for aborted requests
+        return;
+      }
+      
       setErrorMessage(`Unexpected error: ${error.message || 'Unknown error'}`);
       setTherapists([]);
       setAllTherapists([]);
@@ -198,11 +331,14 @@ export const useTherapistSelection = ({
         variant: "destructive"
       });
     } finally {
-      setLoading(false);
-      setAttemptCount(prev => prev + 1);
-      console.log('[useTherapistSelection] Fetch completed, loading set to false');
+      // Only set loading to false if the component is still mounted
+      if (!abortControllerRef.current?.signal.aborted) {
+        setLoading(false);
+        setAttemptCount(prev => prev + 1);
+        console.log('[useTherapistSelection] Fetch completed, loading set to false');
+      }
     }
-  }, [clientState, clientAge, enableFiltering, attemptCount, toast]);
+  }, [clientState, clientAge, enableFiltering, resetCircuitBreaker, circuitOpen, toast]);
   
   // Filter therapists based on client state and age
   const filterTherapists = (therapistList: Therapist[], state: string | null, age: number): Therapist[] => {
@@ -264,6 +400,9 @@ export const useTherapistSelection = ({
   // Retry fetch function - increments attempt count to trigger the useEffect
   const retryFetch = useCallback(() => {
     console.log('[useTherapistSelection] Manual retry triggered');
+    // Reset circuit breaker on manual retry
+    setCircuitOpen(false);
+    retryCountRef.current = 0;
     setAttemptCount(prev => prev + 1);
   }, []);
   
@@ -289,13 +428,27 @@ export const useTherapistSelection = ({
       }
       
       console.log(`[useTherapistSelection] Updating client record for user ID: ${userId}`);
-      const { error } = await supabase
-        .from('clients')
-        .update({
-          client_assigned_therapist: therapistId,
-          client_status: 'Therapist Selected'
+      
+      // Create timeout for this operation
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000);
+      
+      const { error } = await Promise.race([
+        supabase
+          .from('clients')
+          .update({
+            client_assigned_therapist: therapistId,
+            client_status: 'Therapist Selected'
+          })
+          .eq('id', userId),
+        new Promise<{error: {message: string}}>((_, reject) => {
+          setTimeout(() => reject({
+            error: {message: 'Update operation timed out. Please try again.'}
+          }), 8000);
         })
-        .eq('id', userId);
+      ]);
+      
+      clearTimeout(timeoutId);
         
       if (error) {
         console.error("[useTherapistSelection] Error selecting therapist:", error);
@@ -354,6 +507,21 @@ export const useTherapistSelection = ({
       return null;
     }
   };
+  
+  // Cleanup function to abort in-flight requests and clear timers
+  useEffect(() => {
+    return () => {
+      // Abort any in-flight requests when component unmounts
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      
+      // Clear any circuit breaker timers
+      if (circuitResetTimerRef.current) {
+        window.clearTimeout(circuitResetTimerRef.current);
+      }
+    };
+  }, []);
   
   // Fetch therapists when component mounts or when deps change
   useEffect(() => {

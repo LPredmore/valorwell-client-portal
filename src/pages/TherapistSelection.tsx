@@ -7,12 +7,13 @@ import NewLayout from '@/components/layout/NewLayout';
 import { toast } from 'sonner';
 import { useAuth } from '@/context/NewAuthContext';
 import { useTherapistSelection } from '@/hooks/useTherapistSelection';
-import { Loader } from 'lucide-react';
+import { Loader, WifiOff, AlertTriangle } from 'lucide-react';
 import { TherapistSelectionDebugger } from '@/debug/therapistSelectionDebugger';
 
 const TherapistSelection = () => {
   const navigate = useNavigate();
   const [selectedTherapist, setSelectedTherapist] = useState<string | null>(null);
+  const [networkOnline, setNetworkOnline] = useState<boolean>(navigator.onLine);
   
   // Get client data from auth context
   const { clientProfile } = useAuth();
@@ -23,6 +24,27 @@ const TherapistSelection = () => {
   console.log('[TherapistSelection] Client profile:', clientProfile);
   console.log('[TherapistSelection] Client state:', clientState);
   console.log('[TherapistSelection] Client age:', clientAge);
+
+  // Handle network status changes
+  useEffect(() => {
+    const handleOnline = () => {
+      console.log('[TherapistSelection] Network is online');
+      setNetworkOnline(true);
+    };
+    
+    const handleOffline = () => {
+      console.log('[TherapistSelection] Network is offline');
+      setNetworkOnline(false);
+    };
+    
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
   // Use the therapist selection hook to get real therapist data
   const { 
@@ -64,6 +86,11 @@ const TherapistSelection = () => {
       return;
     }
     
+    if (!networkOnline) {
+      toast.error("You appear to be offline. Please check your internet connection and try again.");
+      return;
+    }
+    
     try {
       const success = await selectTherapist(selectedTherapist);
       
@@ -89,6 +116,33 @@ const TherapistSelection = () => {
     
     return '';
   };
+
+  // Render offline state
+  if (!networkOnline) {
+    return (
+      <NewLayout>
+        <div className="container mx-auto max-w-4xl">
+          <div className="mb-8">
+            <h1 className="text-3xl font-bold mb-2">Select Your Therapist</h1>
+            <p className="text-gray-600">
+              You appear to be offline. Please check your internet connection.
+            </p>
+          </div>
+          
+          <div className="flex flex-col justify-center items-center py-16 bg-gray-50 border border-gray-200 rounded-lg">
+            <WifiOff className="h-12 w-12 text-gray-400 mb-4" />
+            <h2 className="text-xl font-semibold mb-2">No Internet Connection</h2>
+            <p className="text-gray-600 mb-6 text-center max-w-md">
+              Please check your connection and try again. You need to be online to view and select therapists.
+            </p>
+            <Button onClick={retryFetch}>
+              Retry Connection
+            </Button>
+          </div>
+        </div>
+      </NewLayout>
+    );
+  }
 
   // Render loading state
   if (loading) {
@@ -124,11 +178,17 @@ const TherapistSelection = () => {
           </div>
           
           <div className="bg-red-50 border border-red-200 rounded-lg p-8 text-center">
+            <AlertTriangle className="h-12 w-12 text-red-500 mx-auto mb-4" />
             <h2 className="text-lg font-semibold text-red-700 mb-2">Error Loading Therapists</h2>
             <p className="text-gray-600 mb-6">{error}</p>
-            <Button onClick={retryFetch}>
-              Try Again
-            </Button>
+            <div className="flex flex-col sm:flex-row justify-center gap-3">
+              <Button onClick={retryFetch} className="mb-3 sm:mb-0">
+                Try Again
+              </Button>
+              <Button variant="outline" onClick={() => navigate('/patient-dashboard')}>
+                Return to Dashboard
+              </Button>
+            </div>
           </div>
         </div>
       </NewLayout>
@@ -267,7 +327,7 @@ const TherapistSelection = () => {
           </Button>
           <Button 
             onClick={handleSubmit}
-            disabled={!selectedTherapist || isSubmitting}
+            disabled={!selectedTherapist || isSubmitting || !networkOnline}
           >
             {isSubmitting ? "Confirming..." : "Confirm Selection"}
           </Button>
