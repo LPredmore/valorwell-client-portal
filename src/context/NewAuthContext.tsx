@@ -181,6 +181,11 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
   // Match the refreshUserData return type with the interface
   const refreshUserDataWrapper = async (): Promise<void> => {
     await AuthService.refreshSession();
+    // After refreshing the session, explicitly reload client data
+    if (userId) {
+      await loadClientData(userId);
+      DebugUtils.log(sessionId, '[AuthProvider] Client data explicitly reloaded after session refresh');
+    }
   };
 
   // Fix: Ensure methods are bound to the AuthService instance

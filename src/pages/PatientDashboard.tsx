@@ -25,9 +25,9 @@ const PatientDashboard = () => {
   useEffect(() => {
     // Strong safety check for "New" clients - do an immediate redirect
     const isNewOrIncompleteClient = 
-      clientStatus === 'New' || 
+      (clientStatus === 'New' || 
       clientStatus === null || 
-      clientStatus === undefined || 
+      clientStatus === undefined) && 
       clientProfile?.client_is_profile_complete !== true;
     
     console.log("[PatientDashboard] Initial mount check:", {
@@ -55,9 +55,9 @@ const PatientDashboard = () => {
     
     // SECOND REDIRECTION CHECK: Runs whenever data changes
     const isNewOrIncompleteClient = 
-      clientStatus === 'New' || 
+      (clientStatus === 'New' || 
       clientStatus === null || 
-      clientStatus === undefined || 
+      clientStatus === undefined) && 
       clientProfile?.client_is_profile_complete !== true;
     
     if (isNewOrIncompleteClient) {
@@ -73,9 +73,9 @@ const PatientDashboard = () => {
     // Add a slight delay to ensure this runs after the component has fully rendered
     const timer = setTimeout(() => {
       const isNewOrIncompleteClient = 
-        clientStatus === 'New' || 
+        (clientStatus === 'New' || 
         clientStatus === null || 
-        clientStatus === undefined || 
+        clientStatus === undefined) && 
         clientProfile?.client_is_profile_complete !== true;
       
       if (isNewOrIncompleteClient) {
@@ -131,9 +131,9 @@ const PatientDashboard = () => {
   
   // FINAL RENDER CHECK: Even after loading is complete, check status one final time
   const isNewOrIncompleteClient = 
-    clientStatus === 'New' || 
+    (clientStatus === 'New' || 
     clientStatus === null || 
-    clientStatus === undefined || 
+    clientStatus === undefined) && 
     clientProfile?.client_is_profile_complete !== true;
   
   if (isNewOrIncompleteClient) {

@@ -13,7 +13,7 @@ const TherapistSelection = () => {
   const navigate = useNavigate();
   
   // Get client data from auth context
-  const { clientProfile, isLoading: authLoading } = useAuth();
+  const { clientProfile, isLoading: authLoading, refreshUserData } = useAuth();
   const clientState = clientProfile?.client_state || null;
 
   // Use the simplified therapist selection hook
@@ -37,6 +37,11 @@ const TherapistSelection = () => {
     
     const success = await selectTherapist(selectedTherapistId);
     if (success) {
+      // Refresh the user data to get the updated status
+      await refreshUserData();
+      
+      // Navigate to dashboard
+      toast.success("Your therapist has been selected! Redirecting to dashboard...");
       navigate('/patient-dashboard');
     }
   };

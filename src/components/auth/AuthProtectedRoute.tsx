@@ -1,4 +1,3 @@
-
 import React, { useEffect } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth, AuthState } from '@/context/NewAuthContext';
@@ -162,15 +161,19 @@ const AuthProtectedRoute: React.FC<AuthProtectedRouteProps> = ({
   // ENHANCED PROTECTION: Explicitly check for "New" status, null status, undefined status, incomplete profile
   // Making sure we treat non-loaded status as "New" for safety
   const isNewOrIncompleteClient = 
-    clientStatus === 'New' || 
+    (clientStatus === 'New' || 
     clientStatus === null || 
-    clientStatus === undefined || 
+    clientStatus === undefined) && 
     clientProfile?.client_is_profile_complete !== true;
   
+  // Allow "Therapist Selected" status to access protected routes
+  if (clientStatus === 'Therapist Selected') {
+    console.log("[AuthProtectedRoute] Client has Therapist Selected status, granting access");
+  } 
   // CRITICAL FIX: When authentication is fully loaded (not in loading state),
   // if we're blocking new clients, AND the client is new or has incomplete profile,
   // AND we're not already on the profile setup page, redirect to profile setup
-  if (blockNewClients && 
+  else if (blockNewClients && 
       !isLoading && 
       authInitialized && 
       isNewOrIncompleteClient && 
