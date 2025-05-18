@@ -23,8 +23,8 @@ interface AuthSession {
 }
 
 const AUTH_STORAGE_KEY = 'auth_session_cache';
-const AUTH_TIMEOUT = 15000; // 15 seconds timeout for auth operations
-const SESSION_EXPIRY_BUFFER = 300000; // 5 minutes buffer before actual expiry (in milliseconds)
+const AUTH_TIMEOUT = 45000; // 45 seconds timeout for auth operations (increased from 15s)
+const SESSION_EXPIRY_BUFFER = 600000; // 10 minutes buffer before actual expiry (increased from 5m)
 
 class AuthService {
   private static instance: AuthService;
@@ -129,11 +129,14 @@ class AuthService {
     
     try {
       console.log('[AuthService] Starting initial session check');
-      // Use Promise.race to implement timeout
+      // Use Promise.race to implement timeout with better error handling
       const sessionResult = await Promise.race([
         supabase.auth.getSession(),
-        new Promise<{data: {session: null}}>((_, reject) => 
-          setTimeout(() => reject(new Error('Auth session check timed out')), AUTH_TIMEOUT)
+        new Promise<{data: {session: null}}>((_, reject) =>
+          setTimeout(() => {
+            console.warn('[AuthService] Initial session check timeout reached');
+            reject(new Error('Auth session check timed out'));
+          }, AUTH_TIMEOUT)
         )
       ]);
       
@@ -150,10 +153,20 @@ class AuthService {
       }
     } catch (error) {
       console.error('[AuthService] Error during initial session check:', error);
-      // Fallback to direct user check if getSession times out
+      
+      // Enhanced fallback mechanism
       try {
-        console.log('[AuthService] Attempting fallback to getUser');
-        const { data: userData } = await supabase.auth.getUser();
+        console.log('[AuthService] Attempting enhanced fallback check');
+        
+        // First try getUser with timeout
+        const { data: userData, error: userError } = await Promise.race([
+          supabase.auth.getUser(),
+          new Promise<{data: {user: null}, error: any}>((_, reject) =>
+            setTimeout(() => reject(new Error('GetUser fallback timed out')), AUTH_TIMEOUT)
+          )
+        ]);
+
+        if (userError) throw userError;
         
         if (userData?.user) {
           console.log('[AuthService] Found user via getUser fallback');

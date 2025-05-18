@@ -82,7 +82,7 @@ export const testAuthFixes = async () => {
 };
 
 /**
- * Verifies the authInitialized flag in the UserContext
+ * Verifies the authInitialized flag in the NewAuthContext
  */
 export const verifyAuthInitializedFlag = () => {
   console.group("=== VERIFY AUTH STATE INITIALIZATION ===");
