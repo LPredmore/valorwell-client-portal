@@ -20,7 +20,30 @@ const PatientDashboard = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
   const { clientStatus, authState, isLoading, clientProfile } = useAuth();
   
-  // Enhanced debugging
+  // IMMEDIATE REDIRECTION: Run this effect first and with highest priority
+  // This will run as soon as the component mounts, before any other effects
+  useEffect(() => {
+    // Strong safety check for "New" clients - do an immediate redirect
+    const isNewOrIncompleteClient = 
+      clientStatus === 'New' || 
+      clientStatus === null || 
+      clientStatus === undefined || 
+      clientProfile?.client_is_profile_complete !== true;
+    
+    console.log("[PatientDashboard] Initial mount check:", {
+      clientStatus,
+      profileComplete: clientProfile?.client_is_profile_complete,
+      isNewOrIncompleteClient
+    });
+    
+    if (isNewOrIncompleteClient) {
+      console.log("[PatientDashboard] IMMEDIATE REDIRECT: User has New status or incomplete profile");
+      toast.info("Please complete your profile setup first");
+      navigate('/profile-setup', { replace: true });
+    }
+  }, []); // Empty dependency array ensures this runs once on mount
+  
+  // Enhanced debugging log
   useEffect(() => {
     console.log("[PatientDashboard] Current state:", {
       clientStatus,
@@ -30,30 +53,40 @@ const PatientDashboard = () => {
       path: window.location.pathname
     });
     
-    // FIXED: Strong safety check for "New" clients - redirect them even if loading
-    // This ensures redirection happens both on initial load and when data is fully loaded
-    const isNewClient = clientStatus === 'New' || (clientStatus === null && !isLoading);
+    // SECOND REDIRECTION CHECK: Runs whenever data changes
+    const isNewOrIncompleteClient = 
+      clientStatus === 'New' || 
+      clientStatus === null || 
+      clientStatus === undefined || 
+      clientProfile?.client_is_profile_complete !== true;
     
-    if (isNewClient) {
-      console.log("[PatientDashboard] User has New status, redirecting to profile setup immediately");
+    if (isNewOrIncompleteClient) {
+      console.log("[PatientDashboard] UPDATE REDIRECT: User has New status or incomplete profile, redirecting to profile setup");
       toast.info("Please complete your profile setup first");
       navigate('/profile-setup', { replace: true });
       return;
     }
   }, [clientStatus, navigate, isLoading, authState, clientProfile]);
   
-  // Safety check - run after render is complete to catch any issues that might have been missed
+  // THIRD SAFETY CHECK: Final verification after the component has fully rendered
   useEffect(() => {
     // Add a slight delay to ensure this runs after the component has fully rendered
     const timer = setTimeout(() => {
-      if (clientStatus === 'New') {
-        console.log("[PatientDashboard] Final safety check - User still has New status, redirecting to profile setup");
+      const isNewOrIncompleteClient = 
+        clientStatus === 'New' || 
+        clientStatus === null || 
+        clientStatus === undefined || 
+        clientProfile?.client_is_profile_complete !== true;
+      
+      if (isNewOrIncompleteClient) {
+        console.log("[PatientDashboard] FINAL SAFETY CHECK: User still has New status or incomplete profile, redirecting to profile setup");
+        toast.info("Please complete your profile setup first");
         navigate('/profile-setup', { replace: true });
       }
     }, 300);
     
     return () => clearTimeout(timer);
-  }, [clientStatus, navigate]);
+  }, [clientStatus, navigate, clientProfile]);
   
   // If still loading, show loading indicator with timeout handling
   const [showLoadingTimeout, setShowLoadingTimeout] = useState(false);
@@ -96,14 +129,27 @@ const PatientDashboard = () => {
     );
   }
   
-  // ADDITIONAL SAFETY: Even after loading is complete, check clientStatus again
-  if (clientStatus === 'New') {
-    console.log("[PatientDashboard] Post-loading check - User has New status, redirecting to profile setup");
+  // FINAL RENDER CHECK: Even after loading is complete, check status one final time
+  const isNewOrIncompleteClient = 
+    clientStatus === 'New' || 
+    clientStatus === null || 
+    clientStatus === undefined || 
+    clientProfile?.client_is_profile_complete !== true;
+  
+  if (isNewOrIncompleteClient) {
+    console.log("[PatientDashboard] PRE-RENDER CHECK: User has New status or incomplete profile, redirecting to profile setup");
     // Use a timeout to avoid potential rendering issues
     setTimeout(() => {
       navigate('/profile-setup', { replace: true });
     }, 0);
-    return null; // Return null to prevent rendering the dashboard at all
+    
+    // Show a temporary loading state to avoid flashing content before redirect happens
+    return (
+      <div className="flex items-center justify-center h-screen flex-col">
+        <Loader2 className="h-12 w-12 animate-spin text-blue-500 mb-4" />
+        <p className="text-gray-600">Redirecting to profile setup...</p>
+      </div>
+    );
   }
   
   return (

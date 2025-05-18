@@ -43,6 +43,15 @@ const queryClient = new QueryClient({
 });
 
 function App() {
+  // EXTENDED DEBUG: Log which routes are being rendered on app start
+  React.useEffect(() => {
+    console.log('[App] Initializing routes with proper protection:');
+    console.log('- /profile-setup: blockNewClients=false (allows new clients)');
+    console.log('- /patient-dashboard: blockNewClients=true (blocks new clients)');
+    console.log('- /patient-documents: blockNewClients=true (blocks new clients)');
+    console.log('- /patient-profile: blockNewClients=true (blocks new clients)');
+  }, []);
+
   return (
     <React.StrictMode>
       <BrowserRouter>

@@ -23,7 +23,8 @@ const AuthProtectedRoute: React.FC<AuthProtectedRouteProps> = ({
     authInitialized, 
     userRole, 
     clientStatus, 
-    authError 
+    authError,
+    clientProfile
   } = useAuth();
   
   const location = useLocation();
@@ -57,6 +58,16 @@ const AuthProtectedRoute: React.FC<AuthProtectedRouteProps> = ({
       }
     };
   }, [authInitialized, isLoading, showLoadingTimeout]);
+
+  // Add specific debug for client status detection
+  useEffect(() => {
+    if (blockNewClients && authState === AuthState.AUTHENTICATED) {
+      const isClientStatusNew = clientStatus === 'New' || clientStatus === null || clientStatus === undefined;
+      const clientProfileComplete = clientProfile?.client_is_profile_complete === true;
+      
+      console.log(`[AuthProtectedRoute] Protection Check: clientStatus=${clientStatus}, isNew=${isClientStatusNew}, profileComplete=${clientProfileComplete}, blockingEnabled=${blockNewClients}, path=${location.pathname}`);
+    }
+  }, [clientStatus, clientProfile, blockNewClients, authState, location.pathname]);
 
   // Create loading component
   const loadingComponent = React.useMemo(() => {
@@ -148,13 +159,32 @@ const AuthProtectedRoute: React.FC<AuthProtectedRouteProps> = ({
   }
 
   // For clients, handle the blocking of new clients if specified
-  // FIXED: Explicitly check for "New" status, null status, or undefined status
+  // ENHANCED PROTECTION: Explicitly check for "New" status, null status, undefined status, incomplete profile
   // Making sure we treat non-loaded status as "New" for safety
-  const isNewClient = clientStatus === 'New' || clientStatus === null || clientStatus === undefined;
+  const isNewOrIncompleteClient = 
+    clientStatus === 'New' || 
+    clientStatus === null || 
+    clientStatus === undefined || 
+    clientProfile?.client_is_profile_complete !== true;
   
-  if (blockNewClients && isNewClient && location.pathname !== '/profile-setup') {
-    console.log("[AuthProtectedRoute] Blocking new client, redirecting to profile setup");
+  // CRITICAL FIX: When authentication is fully loaded (not in loading state),
+  // if we're blocking new clients, AND the client is new or has incomplete profile,
+  // AND we're not already on the profile setup page, redirect to profile setup
+  if (blockNewClients && 
+      !isLoading && 
+      authInitialized && 
+      isNewOrIncompleteClient && 
+      location.pathname !== '/profile-setup') {
+    console.log("[AuthProtectedRoute] Blocking new/incomplete client, redirecting to profile setup", {
+      clientStatus, 
+      isNewOrIncompleteClient, 
+      profileComplete: clientProfile?.client_is_profile_complete
+    });
+    
+    // Show a toast message to inform the user
     toast.info("Please complete your profile first");
+    
+    // Redirect to profile setup
     return <Navigate to="/profile-setup" replace />;
   }
 

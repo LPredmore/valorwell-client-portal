@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useEffect, useState, useMemo, useRef } from 'react';
 import AuthService, { AuthState, AuthError } from '@/services/AuthService';
 import { supabase } from '@/integrations/supabase/client';
@@ -118,6 +117,8 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
   const loadClientData = async (userId: string | null) => {
     if (!userId) {
       setIsLoading(false);
+      // CRITICAL FIX: Default to New status when no user ID
+      setClientStatus('New');
       return;
     }
     
@@ -144,22 +145,30 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
         }
         
         setClientProfile(null);
-        // FIXED: Default to "New" status when data retrieval fails to ensure safe routing
+        // CRITICAL FIX: Always default to "New" status when data retrieval fails
         setClientStatus('New');
         DebugUtils.log(sessionId, '[AuthProvider] Setting default status to "New" after failed retrieval');
       } else if (data) {
         DebugUtils.log(sessionId, '[AuthProvider] Client data loaded', data);
         setClientProfile(data as ClientProfile);
         
-        // FIXED: Ensure we're explicitly setting client_status with a sensible default
-        setClientStatus(data.client_status || 'New');
-        DebugUtils.log(sessionId, `[AuthProvider] Client status set to "${data.client_status || 'New'}"`);
+        // CRITICAL FIX: Ensure we're explicitly setting client_status with "New" default
+        // Only use a different status if it's explicitly set in the database
+        const status = data.client_status || 'New';
+        setClientStatus(status);
+        DebugUtils.log(sessionId, `[AuthProvider] Client status explicitly set to "${status}"`);
+      } else {
+        // CRITICAL FIX: No data returned but no error either (unusual case)
+        setClientProfile(null);
+        setClientStatus('New');
+        DebugUtils.log(sessionId, '[AuthProvider] No client data found, setting default status to "New"');
       }
     } catch (err) {
       DebugUtils.error(sessionId, '[AuthProvider] Exception loading client data', err);
-      // FIXED: Default to "New" status on error to ensure safe routing
+      // CRITICAL FIX: Default to "New" status on any kind of error
       setClientProfile(null);
       setClientStatus('New');
+      DebugUtils.log(sessionId, '[AuthProvider] Exception occurred, setting default status to "New"');
     } finally {
       // Always set isLoading to false when client data loading completes or fails
       DebugUtils.log(sessionId, '[AuthProvider] Client data loading complete, setting isLoading to false');
