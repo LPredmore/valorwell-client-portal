@@ -35,26 +35,31 @@ const AuthProtectedRoute: React.FC<AuthProtectedRouteProps> = ({
     }
   }, [authState, isLoading, authInitialized, userRole, clientStatus, blockNewClients]);
 
-  // Handle initialization and loading state with a time limit
-  // Memoize the loading timeout state to reduce re-renders
+  // Handle loading timeout - FIXED: Always initialize the state, never conditionally
   const [showLoadingTimeout, setShowLoadingTimeout] = React.useState(false);
   
   useEffect(() => {
     // Only set up the timeout if we're in a loading state
+    let timeoutId: NodeJS.Timeout | undefined;
+    
     if (!authInitialized || isLoading) {
-      const timeoutId = setTimeout(() => {
+      timeoutId = setTimeout(() => {
         setShowLoadingTimeout(true);
       }, 5000); // Show timeout message after 5 seconds
-      
-      return () => clearTimeout(timeoutId);
     } else if (showLoadingTimeout) {
       // Reset the timeout state when loading is complete
       setShowLoadingTimeout(false);
     }
+    
+    return () => {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+    };
   }, [authInitialized, isLoading, showLoadingTimeout]);
 
-  // Handle loading state
-  // Memoize the loading component to prevent unnecessary re-renders
+  // FIXED: Move all useMemo hooks outside of conditionals and always initialize them
+  // Create loading component
   const loadingComponent = React.useMemo(() => {
     if (!authInitialized || isLoading) {
       return (
@@ -84,11 +89,7 @@ const AuthProtectedRoute: React.FC<AuthProtectedRouteProps> = ({
     return null;
   }, [authInitialized, isLoading, showLoadingTimeout]);
   
-  if (loadingComponent) {
-    return loadingComponent;
-  }
-
-  // Memoize the error component to prevent unnecessary re-renders
+  // Create error component
   const errorComponent = React.useMemo(() => {
     if (authState === AuthState.ERROR) {
       return (
@@ -124,6 +125,14 @@ const AuthProtectedRoute: React.FC<AuthProtectedRouteProps> = ({
     return null;
   }, [authState, authError]);
   
+  // FIXED: Properly handle component rendering to avoid conditional hook calls
+  
+  // Check if loading component should be shown
+  if (loadingComponent) {
+    return loadingComponent;
+  }
+  
+  // Check if error component should be shown
   if (errorComponent) {
     return errorComponent;
   }
