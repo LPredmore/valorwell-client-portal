@@ -156,6 +156,11 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
     await AuthService.refreshSession();
   };
 
+  // Fix: Ensure methods are bound to the AuthService instance
+  const login = (email: string, password: string) => AuthService.signIn(email, password);
+  const logout = () => AuthService.signOut();
+  const resetPassword = (email: string) => AuthService.resetPassword(email);
+
   const contextValue = useMemo(() => ({
     authState,
     isLoading,
@@ -166,9 +171,9 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
     userRole,
     clientStatus,
     clientProfile,
-    login: AuthService.signIn,
-    logout: AuthService.signOut,
-    resetPassword: AuthService.resetPassword,
+    login,
+    logout,
+    resetPassword,
     refreshUserData: refreshUserDataWrapper,
     hasRole: AuthService.hasRole
   }), [authState, isLoading, authInitialized, authError, user, userId, userRole, clientStatus, clientProfile]);
