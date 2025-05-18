@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useEffect, useState, useMemo, useRef } from 'react';
 import AuthService, { AuthState, AuthError } from '@/services/AuthService';
 import { supabase } from '@/integrations/supabase/client';
@@ -57,6 +58,7 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
   
   // Use refs to track loading state for safety timeouts
   const loadingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const clientDataAttempts = useRef<number>(0);
   const sessionId = useRef(DebugUtils.generateSessionId()).current;
 
   // Clear any existing timeout to prevent memory leaks
@@ -112,7 +114,7 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
     };
   }, [sessionId]);
 
-  // Load client data
+  // Load client data with retry mechanism
   const loadClientData = async (userId: string | null) => {
     if (!userId) {
       setIsLoading(false);
@@ -121,9 +123,10 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
     
     // Reset safety timeout when starting to load client data
     setLoadingSafetyTimeout();
+    clientDataAttempts.current += 1;
     
     try {
-      DebugUtils.log(sessionId, '[AuthProvider] Loading client data', { userId });
+      DebugUtils.log(sessionId, '[AuthProvider] Loading client data', { userId, attempt: clientDataAttempts.current });
       const { data, error } = await supabase
         .from('clients')
         .select('*')
@@ -132,22 +135,37 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
 
       if (error) {
         DebugUtils.error(sessionId, '[AuthProvider] Error loading client data', error);
+        
+        // If we get an error but have tried less than 3 times, retry after a short delay
+        if (clientDataAttempts.current < 3) {
+          DebugUtils.log(sessionId, `[AuthProvider] Retrying client data load (attempt ${clientDataAttempts.current + 1})`);
+          setTimeout(() => loadClientData(userId), 1000);
+          return;
+        }
+        
         setClientProfile(null);
-        setClientStatus('ErrorFetchingStatus');
+        // FIXED: Default to "New" status when data retrieval fails to ensure safe routing
+        setClientStatus('New');
+        DebugUtils.log(sessionId, '[AuthProvider] Setting default status to "New" after failed retrieval');
       } else if (data) {
         DebugUtils.log(sessionId, '[AuthProvider] Client data loaded', data);
         setClientProfile(data as ClientProfile);
+        
+        // FIXED: Ensure we're explicitly setting client_status with a sensible default
         setClientStatus(data.client_status || 'New');
+        DebugUtils.log(sessionId, `[AuthProvider] Client status set to "${data.client_status || 'New'}"`);
       }
     } catch (err) {
       DebugUtils.error(sessionId, '[AuthProvider] Exception loading client data', err);
+      // FIXED: Default to "New" status on error to ensure safe routing
       setClientProfile(null);
-      setClientStatus('ErrorFetchingStatus');
+      setClientStatus('New');
     } finally {
       // Always set isLoading to false when client data loading completes or fails
       DebugUtils.log(sessionId, '[AuthProvider] Client data loading complete, setting isLoading to false');
       setIsLoading(false);
       clearLoadingTimeout();
+      clientDataAttempts.current = 0;
     }
   };
 

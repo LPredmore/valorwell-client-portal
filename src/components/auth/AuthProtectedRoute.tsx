@@ -31,9 +31,9 @@ const AuthProtectedRoute: React.FC<AuthProtectedRouteProps> = ({
   // Log the current state for debugging - only in development environment
   useEffect(() => {
     if (import.meta.env.DEV) {
-      console.log(`[AuthProtectedRoute] Status: authState=${authState}, isLoading=${isLoading}, authInitialized=${authInitialized}, userRole=${userRole}, clientStatus=${clientStatus}, blockNewClients=${blockNewClients}`);
+      console.log(`[AuthProtectedRoute] Status: authState=${authState}, isLoading=${isLoading}, authInitialized=${authInitialized}, userRole=${userRole}, clientStatus=${clientStatus}, blockNewClients=${blockNewClients}, path=${location.pathname}`);
     }
-  }, [authState, isLoading, authInitialized, userRole, clientStatus, blockNewClients]);
+  }, [authState, isLoading, authInitialized, userRole, clientStatus, blockNewClients, location]);
 
   // Handle loading timeout - Always initialize the state
   const [showLoadingTimeout, setShowLoadingTimeout] = React.useState(false);
@@ -147,8 +147,12 @@ const AuthProtectedRoute: React.FC<AuthProtectedRouteProps> = ({
     return <Navigate to="/login" replace />;
   }
 
-  // For clients, block new clients if specified
-  if (blockNewClients && clientStatus === 'New') {
+  // For clients, handle the blocking of new clients if specified
+  // FIXED: Explicitly check for "New" status, null status, or undefined status
+  // Making sure we treat non-loaded status as "New" for safety
+  const isNewClient = clientStatus === 'New' || clientStatus === null || clientStatus === undefined;
+  
+  if (blockNewClients && isNewClient && location.pathname !== '/profile-setup') {
     console.log("[AuthProtectedRoute] Blocking new client, redirecting to profile setup");
     toast.info("Please complete your profile first");
     return <Navigate to="/profile-setup" replace />;

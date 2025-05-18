@@ -18,18 +18,42 @@ import { toast } from 'sonner';
 const PatientDashboard = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('dashboard');
-  const { clientStatus, authState, isLoading } = useAuth();
+  const { clientStatus, authState, isLoading, clientProfile } = useAuth();
   
+  // Enhanced debugging
   useEffect(() => {
-    console.log("[PatientDashboard] Current state: clientStatus=", clientStatus, "isLoading=", isLoading, "authState=", authState);
+    console.log("[PatientDashboard] Current state:", {
+      clientStatus,
+      isLoading,
+      authState,
+      clientProfileComplete: clientProfile?.client_is_profile_complete,
+      path: window.location.pathname
+    });
     
-    // Redirect to profile setup if client status is "New" and loading is complete
-    if (!isLoading && clientStatus === 'New') {
-      console.log("[PatientDashboard] User has New status, redirecting to profile setup");
+    // FIXED: Strong safety check for "New" clients - redirect them even if loading
+    // This ensures redirection happens both on initial load and when data is fully loaded
+    const isNewClient = clientStatus === 'New' || (clientStatus === null && !isLoading);
+    
+    if (isNewClient) {
+      console.log("[PatientDashboard] User has New status, redirecting to profile setup immediately");
       toast.info("Please complete your profile setup first");
       navigate('/profile-setup', { replace: true });
+      return;
     }
-  }, [clientStatus, navigate, isLoading, authState]);
+  }, [clientStatus, navigate, isLoading, authState, clientProfile]);
+  
+  // Safety check - run after render is complete to catch any issues that might have been missed
+  useEffect(() => {
+    // Add a slight delay to ensure this runs after the component has fully rendered
+    const timer = setTimeout(() => {
+      if (clientStatus === 'New') {
+        console.log("[PatientDashboard] Final safety check - User still has New status, redirecting to profile setup");
+        navigate('/profile-setup', { replace: true });
+      }
+    }, 300);
+    
+    return () => clearTimeout(timer);
+  }, [clientStatus, navigate]);
   
   // If still loading, show loading indicator with timeout handling
   const [showLoadingTimeout, setShowLoadingTimeout] = useState(false);
@@ -70,6 +94,16 @@ const PatientDashboard = () => {
         )}
       </div>
     );
+  }
+  
+  // ADDITIONAL SAFETY: Even after loading is complete, check clientStatus again
+  if (clientStatus === 'New') {
+    console.log("[PatientDashboard] Post-loading check - User has New status, redirecting to profile setup");
+    // Use a timeout to avoid potential rendering issues
+    setTimeout(() => {
+      navigate('/profile-setup', { replace: true });
+    }, 0);
+    return null; // Return null to prevent rendering the dashboard at all
   }
   
   return (

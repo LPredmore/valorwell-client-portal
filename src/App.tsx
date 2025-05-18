@@ -1,3 +1,4 @@
+
 import React from "react";
 import { Toaster } from "sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -58,9 +59,15 @@ function App() {
                   <Route path="/signup" element={<Signup />} />
                   <Route path="/reset-password" element={<ResetPassword />} />
                   <Route path="/update-password" element={<UpdatePassword />} />
-                  <Route path="/profile-setup" element={<ProfileSetup />} />
                   
-                  {/* Protected routes - Only authenticated clients can access */}
+                  {/* Profile setup - accessible for all client roles including New */}
+                  <Route path="/profile-setup" element={
+                    <AuthProtectedRoute allowedRoles={["client"]} blockNewClients={false}>
+                      <ProfileSetup />
+                    </AuthProtectedRoute>
+                  } />
+                  
+                  {/* Protected routes - Block New clients */}
                   <Route path="/patient-dashboard" element={
                     <AuthProtectedRoute allowedRoles={["client"]} blockNewClients={true}>
                       <PatientDashboard />
