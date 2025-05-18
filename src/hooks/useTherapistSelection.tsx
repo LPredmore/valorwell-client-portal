@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { ClinicianQueryDebugger } from '@/debug/clinicianQueryDebugger';
@@ -47,6 +48,8 @@ const CIRCUIT_BREAKER_RESET_TIME = 30000; // 30 seconds
 
 // Use localStorage key to persist circuit breaker state across component renders
 const CIRCUIT_BREAKER_STORAGE_KEY = 'therapist_selection_circuit_breaker';
+const CIRCUIT_BREAKER_RESET_EVENT = 'therapist_selection_circuit_breaker_reset';
+const CIRCUIT_BREAKER_OPEN_EVENT = 'therapist_selection_circuit_breaker_open';
 
 /**
  * A specialized hook for loading therapist data with enhanced error recovery
@@ -77,6 +80,43 @@ export const useTherapistSelection = ({
   // Log initial hook parameters for debugging
   console.log(`[useTherapistSelection] Hook initialized with clientState: ${clientState}, clientAge: ${clientAge}, enableFiltering: ${enableFiltering}`);
   
+  // Handle circuit breaker events from TherapistSelectionDebugger
+  useEffect(() => {
+    // Handler for reset events
+    const handleCircuitBreakerReset = () => {
+      console.log('[useTherapistSelection] Received circuit breaker reset event');
+      if (mountedRef.current) {
+        setCircuitOpen(false);
+        retryCountRef.current = 0;
+        
+        // Clear any pending auto-reset
+        if (circuitResetTimerRef.current) {
+          window.clearTimeout(circuitResetTimerRef.current);
+          circuitResetTimerRef.current = null;
+        }
+      }
+    };
+    
+    // Handler for open events
+    const handleCircuitBreakerOpen = () => {
+      console.log('[useTherapistSelection] Received circuit breaker open event');
+      if (mountedRef.current) {
+        setCircuitOpen(true);
+        resetCircuitBreaker(); // Start the reset timer
+      }
+    };
+    
+    // Add event listeners for circuit breaker events
+    window.addEventListener(CIRCUIT_BREAKER_RESET_EVENT, handleCircuitBreakerReset);
+    window.addEventListener(CIRCUIT_BREAKER_OPEN_EVENT, handleCircuitBreakerOpen);
+    
+    return () => {
+      // Remove event listeners when component unmounts
+      window.removeEventListener(CIRCUIT_BREAKER_RESET_EVENT, handleCircuitBreakerReset);
+      window.removeEventListener(CIRCUIT_BREAKER_OPEN_EVENT, handleCircuitBreakerOpen);
+    };
+  }, []);
+  
   // Get circuit breaker state from storage on mount
   useEffect(() => {
     try {
@@ -84,22 +124,32 @@ export const useTherapistSelection = ({
       if (storedState === 'open') {
         console.log('[useTherapistSelection] Loading circuit breaker state from storage: open');
         setCircuitOpen(true);
+        
+        // Start reset timer
+        resetCircuitBreaker();
       } else {
         // Reset circuit breaker on fresh component mount
         console.log('[useTherapistSelection] Resetting circuit breaker state on component mount');
         setCircuitOpen(false);
+        
+        // Ensure storage is clear
         sessionStorage.removeItem(CIRCUIT_BREAKER_STORAGE_KEY);
+        
+        // Reset retry count
+        retryCountRef.current = 0;
       }
     } catch (err) {
       // If storage access fails, just reset the circuit breaker
       setCircuitOpen(false);
+      retryCountRef.current = 0;
     }
     
     // Check if the debugger has any circuit breaker state
     const debuggerCircuitState = TherapistSelectionDebugger.getCircuitBreakerState();
     if (debuggerCircuitState === 'open') {
-      console.warn('[useTherapistSelection] Debugger reported circuit breaker in open state, resetting');
-      TherapistSelectionDebugger.resetCircuitBreaker();
+      console.warn('[useTherapistSelection] Debugger reported circuit breaker in open state');
+      setCircuitOpen(true);
+      resetCircuitBreaker(); // Start reset timer
     }
   }, []);
   
@@ -107,12 +157,14 @@ export const useTherapistSelection = ({
   useEffect(() => {
     try {
       if (circuitOpen) {
+        console.log('[useTherapistSelection] Saving circuit breaker state to storage: open');
         sessionStorage.setItem(CIRCUIT_BREAKER_STORAGE_KEY, 'open');
       } else {
+        console.log('[useTherapistSelection] Removing circuit breaker state from storage');
         sessionStorage.removeItem(CIRCUIT_BREAKER_STORAGE_KEY);
       }
     } catch (err) {
-      // Ignore storage errors
+      console.error('[useTherapistSelection] Error handling circuit breaker storage:', err);
     }
   }, [circuitOpen]);
   
@@ -152,8 +204,11 @@ export const useTherapistSelection = ({
         retryCountRef.current = 0;
         try {
           sessionStorage.removeItem(CIRCUIT_BREAKER_STORAGE_KEY);
+          
+          // Notify TherapistSelectionDebugger of reset
+          TherapistSelectionDebugger.resetCircuitBreaker();
         } catch (err) {
-          // Ignore storage errors
+          console.error('[useTherapistSelection] Error during circuit breaker reset:', err);
         }
       }
     }, CIRCUIT_BREAKER_RESET_TIME);
@@ -171,7 +226,7 @@ export const useTherapistSelection = ({
     try {
       sessionStorage.removeItem(CIRCUIT_BREAKER_STORAGE_KEY);
     } catch (err) {
-      // Ignore storage errors
+      console.error('[useTherapistSelection] Error removing circuit breaker from storage:', err);
     }
     
     // Cancel any pending auto-reset
@@ -598,6 +653,8 @@ export const useTherapistSelection = ({
         window.clearTimeout(circuitResetTimerRef.current);
         circuitResetTimerRef.current = null;
       }
+      
+      console.log('[useTherapistSelection] Component unmounted, cleaned up resources');
     };
   }, [manualResetCircuitBreaker]);
   

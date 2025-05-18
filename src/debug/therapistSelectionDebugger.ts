@@ -1,6 +1,11 @@
 
 import { supabase } from '@/integrations/supabase/client';
 
+// Constants for circuit breaker - matching the ones in useTherapistSelection
+const CIRCUIT_BREAKER_STORAGE_KEY = 'therapist_selection_circuit_breaker';
+const CIRCUIT_BREAKER_RESET_EVENT = 'therapist_selection_circuit_breaker_reset';
+const CIRCUIT_BREAKER_OPEN_EVENT = 'therapist_selection_circuit_breaker_open';
+
 /**
  * Utility to debug the TherapistSelection page and verify it's working correctly
  * with the updated authentication system. Enhanced with network connectivity and
@@ -55,23 +60,56 @@ export class TherapistSelectionDebugger {
         
         if (error) {
           console.error('[TherapistSelectionDebugger] Error fetching client state:', error);
-          this.circuitBreakerState = 'open';
+          this.setCircuitBreakerOpen();
           console.warn('[TherapistSelectionDebugger] Circuit breaker opened due to database error');
         } else if (data) {
           console.log('[TherapistSelectionDebugger] Client state from database:', data.client_state);
           console.log('[TherapistSelectionDebugger] Client age from database:', data.client_age);
-          this.circuitBreakerState = 'closed';
+          this.setCircuitBreakerClosed();
         } else {
           console.warn('[TherapistSelectionDebugger] No client data found');
         }
       } catch (error) {
         console.error('[TherapistSelectionDebugger] Query timed out or was aborted:', error);
-        this.circuitBreakerState = 'open';
+        this.setCircuitBreakerOpen();
         console.warn('[TherapistSelectionDebugger] Circuit breaker opened due to timeout');
       }
     } catch (error) {
       console.error('[TherapistSelectionDebugger] Exception verifying client state:', error);
-      this.circuitBreakerState = 'open';
+      this.setCircuitBreakerOpen();
+    }
+  }
+
+  /**
+   * Set circuit breaker to open state and synchronize across components
+   */
+  private static setCircuitBreakerOpen(): void {
+    console.log('[TherapistSelectionDebugger] Setting circuit breaker state to open');
+    this.circuitBreakerState = 'open';
+    
+    try {
+      // Store in sessionStorage for persistence
+      sessionStorage.setItem(CIRCUIT_BREAKER_STORAGE_KEY, 'open');
+      
+      // Dispatch event to notify other components (especially useTherapistSelection)
+      window.dispatchEvent(new CustomEvent(CIRCUIT_BREAKER_OPEN_EVENT));
+    } catch (err) {
+      console.error('[TherapistSelectionDebugger] Error storing circuit breaker state:', err);
+    }
+  }
+
+  /**
+   * Set circuit breaker to closed state and synchronize across components
+   */
+  private static setCircuitBreakerClosed(): void {
+    console.log('[TherapistSelectionDebugger] Setting circuit breaker state to closed');
+    this.circuitBreakerState = 'closed';
+    
+    try {
+      // Remove from sessionStorage
+      sessionStorage.removeItem(CIRCUIT_BREAKER_STORAGE_KEY);
+    } catch (err) {
+      console.error('[TherapistSelectionDebugger] Error removing circuit breaker state:', err);
     }
   }
 
@@ -81,12 +119,34 @@ export class TherapistSelectionDebugger {
   public static resetCircuitBreaker(): void {
     console.log('[TherapistSelectionDebugger] Manually resetting circuit breaker state to closed');
     this.circuitBreakerState = 'closed';
+    
+    try {
+      // Clear from sessionStorage
+      sessionStorage.removeItem(CIRCUIT_BREAKER_STORAGE_KEY);
+      
+      // Dispatch event to notify other components (especially useTherapistSelection)
+      window.dispatchEvent(new CustomEvent(CIRCUIT_BREAKER_RESET_EVENT));
+      
+      console.log('[TherapistSelectionDebugger] Circuit breaker reset event dispatched');
+    } catch (err) {
+      console.error('[TherapistSelectionDebugger] Error during circuit breaker reset:', err);
+    }
   }
 
   /**
    * Get the current circuit breaker state
    */
   public static getCircuitBreakerState(): 'open' | 'closed' {
+    // Always check sessionStorage first to ensure synchronization with useTherapistSelection
+    try {
+      const storedState = sessionStorage.getItem(CIRCUIT_BREAKER_STORAGE_KEY);
+      if (storedState === 'open') {
+        this.circuitBreakerState = 'open';
+      }
+    } catch (err) {
+      // Ignore storage errors and use the current in-memory state
+    }
+    
     return this.circuitBreakerState;
   }
 
@@ -141,7 +201,7 @@ export class TherapistSelectionDebugger {
     if (therapists && therapists.length > 0) {
       this.verifyTherapistFields(therapists);
       this.logRenderTime('TherapistSelection with data');
-      this.circuitBreakerState = 'closed'; // Successful data load indicates system is working
+      this.setCircuitBreakerClosed(); // Successful data load indicates system is working
     } else {
       console.warn('[TherapistSelectionDebugger] No therapists data provided for field verification');
     }
