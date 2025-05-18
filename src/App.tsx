@@ -5,6 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/context/NewAuthContext";
+import { UserProvider } from "@/context/UserContext";
 
 // Protected Route Component
 import AuthProtectedRoute from "@/components/auth/AuthProtectedRoute";
@@ -34,54 +35,56 @@ function App() {
       <BrowserRouter>
         <QueryClientProvider client={queryClient}>
           <AuthProvider>
-            <TooltipProvider>
-              {/* Sonner Toaster - the only toast component we need */}
-              <Toaster richColors position="top-right" />
-              <Routes>
-                {/* Public routes */}
-                <Route path="/" element={<Index />} />
-                <Route path="/login" element={<Login />} />
-                <Route path="/signup" element={<Signup />} />
-                <Route path="/reset-password" element={<ResetPassword />} />
-                <Route path="/update-password" element={<UpdatePassword />} />
-                <Route path="/profile-setup" element={<ProfileSetup />} />
-                <Route path="/therapist-selection" element={<TherapistSelection />} />
-                
-                {/* Protected routes - Only authenticated clients can access */}
-                <Route path="/patient-dashboard" element={
-                  <AuthProtectedRoute allowedRoles={["client"]} blockNewClients={true}>
-                    <PatientDashboard />
-                  </AuthProtectedRoute>
-                } />
-                <Route path="/patient-documents" element={
-                  <AuthProtectedRoute allowedRoles={["client"]} blockNewClients={true}>
-                    <PatientDocuments />
-                  </AuthProtectedRoute>
-                } />
-                <Route path="/patient-profile" element={
-                  <AuthProtectedRoute allowedRoles={["client"]} blockNewClients={true}>
-                    <PatientProfile />
-                  </AuthProtectedRoute>
-                } />
-                
-                {/* Clinician routes */}
-                <Route path="/clients" element={
-                  <AuthProtectedRoute allowedRoles={["clinician", "admin"]}>
-                    <Clients />
-                  </AuthProtectedRoute>
-                } />
-                <Route path="/clients/:clientId" element={
-                  <AuthProtectedRoute allowedRoles={["clinician", "admin"]}>
-                    <ClientDetails />
-                  </AuthProtectedRoute>
-                } />
-                
-                {/* Debug routes */}
-                <Route path="/debug/auth-public" element={<AuthDebugPage />} />
-                
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-            </TooltipProvider>
+            <UserProvider>
+              <TooltipProvider>
+                {/* Sonner Toaster - the only toast component we need */}
+                <Toaster richColors position="top-right" />
+                <Routes>
+                  {/* Public routes */}
+                  <Route path="/" element={<Index />} />
+                  <Route path="/login" element={<Login />} />
+                  <Route path="/signup" element={<Signup />} />
+                  <Route path="/reset-password" element={<ResetPassword />} />
+                  <Route path="/update-password" element={<UpdatePassword />} />
+                  <Route path="/profile-setup" element={<ProfileSetup />} />
+                  <Route path="/therapist-selection" element={<TherapistSelection />} />
+                  
+                  {/* Protected routes - Only authenticated clients can access */}
+                  <Route path="/patient-dashboard" element={
+                    <AuthProtectedRoute allowedRoles={["client"]} blockNewClients={true}>
+                      <PatientDashboard />
+                    </AuthProtectedRoute>
+                  } />
+                  <Route path="/patient-documents" element={
+                    <AuthProtectedRoute allowedRoles={["client"]} blockNewClients={true}>
+                      <PatientDocuments />
+                    </AuthProtectedRoute>
+                  } />
+                  <Route path="/patient-profile" element={
+                    <AuthProtectedRoute allowedRoles={["client"]} blockNewClients={true}>
+                      <PatientProfile />
+                    </AuthProtectedRoute>
+                  } />
+                  
+                  {/* Clinician routes */}
+                  <Route path="/clients" element={
+                    <AuthProtectedRoute allowedRoles={["clinician", "admin"]}>
+                      <Clients />
+                    </AuthProtectedRoute>
+                  } />
+                  <Route path="/clients/:clientId" element={
+                    <AuthProtectedRoute allowedRoles={["clinician", "admin"]}>
+                      <ClientDetails />
+                    </AuthProtectedRoute>
+                  } />
+                  
+                  {/* Debug routes */}
+                  <Route path="/debug/auth-public" element={<AuthDebugPage />} />
+                  
+                  <Route path="*" element={<NotFound />} />
+                </Routes>
+              </TooltipProvider>
+            </UserProvider>
           </AuthProvider>
         </QueryClientProvider>
       </BrowserRouter>
