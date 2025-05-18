@@ -14,11 +14,13 @@ import { Calendar, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/NewAuthContext';
 import { toast } from 'sonner';
+import AppointmentBookingDialog from '@/components/patient/AppointmentBookingDialog';
 
 const PatientDashboard = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('dashboard');
-  const { clientStatus, authState, isLoading, clientProfile } = useAuth();
+  const { clientStatus, authState, isLoading, clientProfile, userId } = useAuth();
+  const [isBookingDialogOpen, setIsBookingDialogOpen] = useState(false);
   
   // IMMEDIATE REDIRECTION: Run this effect first and with highest priority
   // This will run as soon as the component mounts, before any other effects
@@ -106,6 +108,16 @@ const PatientDashboard = () => {
       }
     };
   }, [isLoading]);
+  
+  // Handle booking dialog
+  const handleOpenBookingDialog = () => {
+    setIsBookingDialogOpen(true);
+  };
+  
+  const handleBookingComplete = () => {
+    toast.success("Appointment booked successfully!");
+    setIsBookingDialogOpen(false);
+  };
   
   if (isLoading) {
     return (
@@ -228,7 +240,7 @@ const PatientDashboard = () => {
                   <div>
                     <CardTitle className="text-lg">Your Therapist</CardTitle>
                   </div>
-                  <Button variant="outline" size="sm">
+                  <Button variant="outline" size="sm" onClick={handleOpenBookingDialog}>
                     Book New Appointment
                   </Button>
                 </CardHeader>
@@ -258,7 +270,7 @@ const PatientDashboard = () => {
                     <Calendar className="h-16 w-16 text-gray-300 mb-4" />
                     <h3 className="text-lg font-medium">No upcoming appointments</h3>
                     <p className="text-sm text-gray-500 mt-1">Schedule a session with your therapist</p>
-                    <Button className="mt-4">
+                    <Button className="mt-4" onClick={handleOpenBookingDialog}>
                       Book Appointment
                     </Button>
                   </div>
@@ -268,6 +280,17 @@ const PatientDashboard = () => {
           </TabsContent>
         </Tabs>
       </div>
+      
+      {/* Appointment Booking Dialog */}
+      <AppointmentBookingDialog 
+        open={isBookingDialogOpen}
+        onOpenChange={setIsBookingDialogOpen}
+        clinicianId={clientProfile?.client_assigned_therapist || null}
+        clinicianName={null} // We could fetch this if needed
+        clientId={userId}
+        onAppointmentBooked={handleBookingComplete}
+        userTimeZone={clientProfile?.client_time_zone}
+      />
     </NewLayout>
   );
 };
