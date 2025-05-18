@@ -83,6 +83,30 @@ export class TherapistSelectionDebugger {
   }
 
   /**
+   * Cleanup resources and event listeners when component unmounts
+   */
+  public static cleanup(): void {
+    this.logWithTimestamp('Cleaning up TherapistSelectionDebugger resources');
+    
+    try {
+      // Clean up event listeners
+      window.removeEventListener('beforeunload', () => this.cleanupCircuitBreakerState());
+      window.removeEventListener('pagehide', () => this.cleanupCircuitBreakerState());
+      
+      // Clean up circuit breaker state if appropriate
+      this.cleanupCircuitBreakerState();
+      
+      // Reset internal state
+      this.cleanupEventAttached = false;
+      this.logHistory = [];
+      
+      this.logWithTimestamp('TherapistSelectionDebugger cleanup complete');
+    } catch (err) {
+      console.error('Error during TherapistSelectionDebugger cleanup:', err);
+    }
+  }
+
+  /**
    * Log with timestamp and optional stack trace
    */
   private static logWithTimestamp(message: string, data?: any, captureStack: boolean = false): void {

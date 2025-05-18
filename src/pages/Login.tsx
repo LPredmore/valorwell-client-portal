@@ -1,5 +1,4 @@
-
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,6 +8,7 @@ import { toast } from "sonner";
 import { useAuth, AuthState } from '@/context/NewAuthContext';
 import { AlertCircle, Loader2, Bug } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { DebugUtils } from "@/utils/debugUtils";
 
 const Login = () => {
   const navigate = useNavigate();

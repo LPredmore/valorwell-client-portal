@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
@@ -54,8 +53,7 @@ const TherapistSelection = () => {
   } = useTherapistSelection({
     clientState,
     clientAge,
-    enableFiltering: true,
-    sessionId
+    enableFiltering: true
   });
 
   // Handle network status changes
@@ -113,6 +111,14 @@ const TherapistSelection = () => {
       </NewLayout>
     );
   }
+
+  // Fix the type conversion for client_is_profile_complete
+  const isProfileComplete = (): boolean => {
+    if (clientProfile?.client_is_profile_complete === true) return true;
+    if (clientProfile?.client_is_profile_complete === false) return false;
+    if (clientProfile?.client_is_profile_complete === "true") return true;
+    return false;
+  };
 
   return (
     <NewLayout>

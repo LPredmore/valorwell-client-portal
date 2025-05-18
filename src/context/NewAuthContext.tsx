@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useEffect, useState, useMemo, useRef } from 'react';
 import AuthService, { AuthState, AuthError } from '@/services/AuthService';
 import { supabase } from '@/integrations/supabase/client';
@@ -152,6 +151,11 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
     }
   };
 
+  // Match the refreshUserData return type with the interface
+  const refreshUserDataWrapper = async (): Promise<void> => {
+    await AuthService.refreshSession();
+  };
+
   const contextValue = useMemo(() => ({
     authState,
     isLoading,
@@ -165,7 +169,7 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
     login: AuthService.signIn,
     logout: AuthService.signOut,
     resetPassword: AuthService.resetPassword,
-    refreshUserData: AuthService.refreshSession,
+    refreshUserData: refreshUserDataWrapper,
     hasRole: AuthService.hasRole
   }), [authState, isLoading, authInitialized, authError, user, userId, userRole, clientStatus, clientProfile]);
 
