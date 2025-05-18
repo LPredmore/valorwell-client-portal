@@ -15,6 +15,7 @@ import {
   LogOut,
   UserCheck
 } from 'lucide-react';
+import { useAuth } from '@/context/NewAuthContext';
 
 // Function to determine if a route is active
 const isRouteActive = (currentPath: string, route: string) => {
@@ -27,9 +28,14 @@ const Sidebar = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const currentPath = location.pathname;
+  const { userRole } = useAuth();
   
-  // Determine user type based on current path for demo purposes
-  const userType = currentPath.includes('patient') ? 'patient' : 'clinician';
+  // Determine user type based on role from auth context or fallback to path detection
+  const isPatientView = userRole === 'client' || 
+    currentPath.includes('patient') || 
+    currentPath.includes('therapist-selection');
+  
+  const userType = isPatientView ? 'patient' : 'clinician';
   
   // Navigation items shared between different user types
   const commonNavItems = [

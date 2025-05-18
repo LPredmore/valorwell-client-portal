@@ -1,7 +1,7 @@
 
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import NewLayout from '@/components/layout/NewLayout';
 import { toast } from 'sonner';
@@ -12,7 +12,7 @@ const mockTherapists = [
     id: '1',
     clinician_first_name: 'Emma',
     clinician_last_name: 'Johnson',
-    clinician_type: 'Licensed Clinical Psychologist', // Updated from clinician_title to clinician_type
+    clinician_type: 'Licensed Clinical Psychologist', 
     clinician_bio: 'Dr. Johnson specializes in cognitive behavioral therapy with 10+ years of experience working with adults dealing with anxiety and depression.',
     clinician_avatar: 'https://randomuser.me/api/portraits/women/44.jpg'
   },
@@ -20,7 +20,7 @@ const mockTherapists = [
     id: '2',
     clinician_first_name: 'Michael',
     clinician_last_name: 'Chen',
-    clinician_type: 'Licensed Marriage and Family Therapist', // Updated from clinician_title to clinician_type
+    clinician_type: 'Licensed Marriage and Family Therapist',
     clinician_bio: 'Michael has extensive experience in family dynamics and couples therapy, focusing on communication strategies and relationship building.',
     clinician_avatar: 'https://randomuser.me/api/portraits/men/32.jpg'
   },
@@ -28,7 +28,7 @@ const mockTherapists = [
     id: '3',
     clinician_first_name: 'Sarah',
     clinician_last_name: 'Williams',
-    clinician_type: 'Clinical Social Worker', // Updated from clinician_title to clinician_type
+    clinician_type: 'Clinical Social Worker',
     clinician_bio: 'Sarah specializes in trauma-informed care and has worked extensively with individuals recovering from PTSD and childhood trauma.',
     clinician_avatar: 'https://randomuser.me/api/portraits/women/68.jpg'
   }
