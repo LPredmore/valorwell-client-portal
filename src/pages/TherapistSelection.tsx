@@ -25,6 +25,19 @@ const TherapistSelection = () => {
   console.log('[TherapistSelection] Client state:', clientState);
   console.log('[TherapistSelection] Client age:', clientAge);
 
+  // Initialize the debugger
+  useEffect(() => {
+    console.log('[TherapistSelection] Initializing component');
+    // Initialize the debugger
+    TherapistSelectionDebugger.initialize();
+    
+    return () => {
+      console.log('[TherapistSelection] Component unmounting, triggering cleanup');
+      // Dispatch the cleanup event when this component unmounts
+      window.dispatchEvent(new CustomEvent('therapist_selection_circuit_breaker_cleanup'));
+    };
+  }, []);
+
   // Use the therapist selection hook
   const { 
     therapists, 
@@ -115,6 +128,8 @@ const TherapistSelection = () => {
       const success = await selectTherapist(selectedTherapist);
       
       if (success) {
+        // Reset circuit breaker on successful selection
+        TherapistSelectionDebugger.resetCircuitBreaker();
         // If successful, navigate to dashboard
         navigate('/patient-dashboard');
       }

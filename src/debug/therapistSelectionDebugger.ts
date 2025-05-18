@@ -5,6 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 const CIRCUIT_BREAKER_STORAGE_KEY = 'therapist_selection_circuit_breaker';
 const CIRCUIT_BREAKER_RESET_EVENT = 'therapist_selection_circuit_breaker_reset';
 const CIRCUIT_BREAKER_OPEN_EVENT = 'therapist_selection_circuit_breaker_open';
+const CIRCUIT_BREAKER_CLEANUP_EVENT = 'therapist_selection_circuit_breaker_cleanup';
 
 /**
  * Utility to debug the TherapistSelection page and verify it's working correctly
@@ -16,6 +17,54 @@ export class TherapistSelectionDebugger {
   private static debugStartTime = Date.now();
   private static lastNetworkStatus: boolean = navigator.onLine;
   private static circuitBreakerState: 'open' | 'closed' = 'closed';
+  private static cleanupEventAttached = false;
+
+  /**
+   * Initialize the debugger and set up global event listeners
+   */
+  public static initialize(): void {
+    console.log('[TherapistSelectionDebugger] Initializing debugger');
+    
+    // Add a cleanup listener for page unload/navigation
+    if (!this.cleanupEventAttached) {
+      window.addEventListener('beforeunload', () => this.cleanupCircuitBreakerState());
+      window.addEventListener('pagehide', () => this.cleanupCircuitBreakerState());
+      
+      // Listen for reset events from other instances
+      window.addEventListener(CIRCUIT_BREAKER_RESET_EVENT, () => {
+        console.log('[TherapistSelectionDebugger] Received reset event from another component');
+        this.circuitBreakerState = 'closed';
+      });
+      
+      // Listen for cleanup events
+      window.addEventListener(CIRCUIT_BREAKER_CLEANUP_EVENT, () => {
+        console.log('[TherapistSelectionDebugger] Received cleanup event');
+        this.cleanupCircuitBreakerState();
+      });
+      
+      this.cleanupEventAttached = true;
+    }
+    
+    // Check if circuit breaker is stuck in 'open' state
+    try {
+      const storedState = sessionStorage.getItem(CIRCUIT_BREAKER_STORAGE_KEY);
+      const timestamp = sessionStorage.getItem(`${CIRCUIT_BREAKER_STORAGE_KEY}_timestamp`);
+      
+      if (storedState === 'open') {
+        // Check if it's been open for more than 5 minutes
+        if (timestamp && (Date.now() - parseInt(timestamp)) > 300000) {
+          console.log('[TherapistSelectionDebugger] Circuit breaker stuck open for >5 minutes, resetting');
+          this.resetCircuitBreaker();
+        } else {
+          console.log('[TherapistSelectionDebugger] Circuit breaker found in open state');
+          this.circuitBreakerState = 'open';
+        }
+      }
+    } catch (err) {
+      // Ignore storage errors and use the current in-memory state
+      console.error('[TherapistSelectionDebugger] Error checking stored circuit breaker state:', err);
+    }
+  }
 
   /**
    * Verify client state is being correctly retrieved from the database
@@ -88,8 +137,9 @@ export class TherapistSelectionDebugger {
     this.circuitBreakerState = 'open';
     
     try {
-      // Store in sessionStorage for persistence
+      // Store in sessionStorage for persistence with timestamp
       sessionStorage.setItem(CIRCUIT_BREAKER_STORAGE_KEY, 'open');
+      sessionStorage.setItem(`${CIRCUIT_BREAKER_STORAGE_KEY}_timestamp`, Date.now().toString());
       
       // Dispatch event to notify other components (especially useTherapistSelection)
       window.dispatchEvent(new CustomEvent(CIRCUIT_BREAKER_OPEN_EVENT));
@@ -106,8 +156,9 @@ export class TherapistSelectionDebugger {
     this.circuitBreakerState = 'closed';
     
     try {
-      // Remove from sessionStorage
+      // Remove from sessionStorage including timestamp
       sessionStorage.removeItem(CIRCUIT_BREAKER_STORAGE_KEY);
+      sessionStorage.removeItem(`${CIRCUIT_BREAKER_STORAGE_KEY}_timestamp`);
     } catch (err) {
       console.error('[TherapistSelectionDebugger] Error removing circuit breaker state:', err);
     }
@@ -121,8 +172,9 @@ export class TherapistSelectionDebugger {
     this.circuitBreakerState = 'closed';
     
     try {
-      // Clear from sessionStorage
+      // Clear from sessionStorage including timestamp
       sessionStorage.removeItem(CIRCUIT_BREAKER_STORAGE_KEY);
+      sessionStorage.removeItem(`${CIRCUIT_BREAKER_STORAGE_KEY}_timestamp`);
       
       // Dispatch event to notify other components (especially useTherapistSelection)
       window.dispatchEvent(new CustomEvent(CIRCUIT_BREAKER_RESET_EVENT));
@@ -130,6 +182,31 @@ export class TherapistSelectionDebugger {
       console.log('[TherapistSelectionDebugger] Circuit breaker reset event dispatched');
     } catch (err) {
       console.error('[TherapistSelectionDebugger] Error during circuit breaker reset:', err);
+    }
+  }
+
+  /**
+   * Clean up circuit breaker state as part of unmounting or navigation
+   */
+  private static cleanupCircuitBreakerState(): void {
+    console.log('[TherapistSelectionDebugger] Cleaning up circuit breaker state');
+    
+    try {
+      // Only clean up if the circuit breaker is in closed state or has been open too long
+      const storedState = sessionStorage.getItem(CIRCUIT_BREAKER_STORAGE_KEY);
+      const timestamp = sessionStorage.getItem(`${CIRCUIT_BREAKER_STORAGE_KEY}_timestamp`);
+      
+      if (this.circuitBreakerState === 'closed' || 
+          (storedState === 'open' && timestamp && (Date.now() - parseInt(timestamp)) > 30000)) {
+        sessionStorage.removeItem(CIRCUIT_BREAKER_STORAGE_KEY);
+        sessionStorage.removeItem(`${CIRCUIT_BREAKER_STORAGE_KEY}_timestamp`);
+        
+        // Notify other components
+        window.dispatchEvent(new CustomEvent(CIRCUIT_BREAKER_CLEANUP_EVENT));
+        console.log('[TherapistSelectionDebugger] Circuit breaker state cleaned up');
+      }
+    } catch (err) {
+      console.error('[TherapistSelectionDebugger] Error during circuit breaker cleanup:', err);
     }
   }
 
@@ -190,6 +267,9 @@ export class TherapistSelectionDebugger {
     console.log('[TherapistSelectionDebugger] Running all verification checks');
     console.log(`[TherapistSelectionDebugger] Debug session ID: ${this.debugId}`);
     
+    // Make sure the debugger is initialized
+    this.initialize();
+    
     // Reset circuit breaker at the start of checks
     this.resetCircuitBreaker();
     
@@ -236,3 +316,6 @@ export class TherapistSelectionDebugger {
     console.log(`[TherapistSelectionDebugger] ${componentName} rendered - Time since debug start: ${elapsed}ms`);
   }
 }
+
+// Initialize the debugger when the file is loaded
+TherapistSelectionDebugger.initialize();
