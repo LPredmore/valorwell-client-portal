@@ -6,8 +6,9 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/context/NewAuthContext";
 
-// Protected Route Component
+// Auth Components
 import AuthProtectedRoute from "@/components/auth/AuthProtectedRoute";
+import AuthMigrationHandler from "@/components/auth/AuthMigrationHandler";
 
 // Pages
 import Index from "./pages/Index";
@@ -34,9 +35,10 @@ function App() {
       <BrowserRouter>
         <QueryClientProvider client={queryClient}>
           <AuthProvider>
-            <TooltipProvider>
-              {/* Sonner Toaster - the only toast component we need */}
-              <Toaster richColors position="top-right" />
+            <AuthMigrationHandler>
+              <TooltipProvider>
+                {/* Sonner Toaster - the only toast component we need */}
+                <Toaster richColors position="top-right" />
               <Routes>
                 {/* Public routes */}
                 <Route path="/" element={<Index />} />
@@ -84,8 +86,9 @@ function App() {
                 <Route path="/debug/auth-public" element={<AuthDebugPage />} />
                 
                 <Route path="*" element={<NotFound />} />
-              </Routes>
-            </TooltipProvider>
+                </Routes>
+              </TooltipProvider>
+            </AuthMigrationHandler>
           </AuthProvider>
         </QueryClientProvider>
       </BrowserRouter>

@@ -30,25 +30,46 @@ const AuthMigrationHandler: React.FC<AuthMigrationHandlerProps> = ({ children })
   }, [authInitialized, authState]);
 
   // Run diagnostics when auth state changes to error or when explicitly called
-  const runDiagnostics = () => {
+  const runDiagnostics = async () => {
     if (diagnosticRun) return; // Don't run diagnostics more than once
     
-    const { issues } = diagnoseAuthIssues();
-    setIssues(issues);
-    setDiagnosticRun(true);
-    
-    // If there are critical issues, show a toast notification
-    if (issues.length > 0) {
-      toast.error("Authentication Configuration Issue", {
-        description: "There might be an issue with your authentication setup",
+    try {
+      const diagnosticResult = await diagnoseAuthIssues();
+      setIssues(diagnosticResult.issues);
+      setDiagnosticRun(true);
+      
+      // If there are critical issues, show a toast notification
+      if (diagnosticResult.issues.length > 0) {
+        toast.error("Authentication Configuration Issue", {
+          description: "There might be an issue with your authentication setup",
+          duration: 6000,
+        });
+      }
+    } catch (error) {
+      console.error("[AuthMigrationHandler] Error running diagnostics:", error);
+      setIssues(["Error running diagnostics: " + String(error)]);
+      setDiagnosticRun(true);
+      
+      toast.error("Diagnostic Error", {
+        description: "Failed to run authentication diagnostics",
         duration: 6000,
       });
     }
   };
 
-  const handleReset = async () => {
+  const handleReset = () => {
     toast.loading("Resetting authentication state...");
-    await resetAuthState();
+    const result = resetAuthState(true); // Use hard reset
+    
+    if (result.success) {
+      toast.success("Authentication state reset", {
+        description: "Please wait while the page reloads...",
+      });
+    } else {
+      toast.error("Reset failed", {
+        description: result.message,
+      });
+    }
   };
 
   // If there are no issues or migration is complete, render children
