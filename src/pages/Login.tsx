@@ -19,15 +19,21 @@ const Login = () => {
   const [error, setError] = useState<string | null>(null);
   const [loginTimeout, setLoginTimeout] = useState<NodeJS.Timeout | null>(null);
   const [showDebug, setShowDebug] = useState(false);
+  const sessionId = useRef(DebugUtils.generateSessionId()).current;
   
   // Reset form state when auth state changes
   useEffect(() => {
-    console.log("Auth state changed in Login component:", authState, "userRole:", userRole, 
-      "clientStatus:", clientStatus, "isLoading:", isLoading);
+    DebugUtils.log(sessionId, "Auth state changed in Login component", {
+      authState, 
+      userRole, 
+      clientStatus, 
+      isLoading,
+      isSubmitting
+    });
     
-    // If we're authenticated, client status is loaded, and form was submitting, handle redirection
+    // If we're authenticated, client data is loaded, and form was submitting, handle redirection
     if (authState === AuthState.AUTHENTICATED && !isLoading && isSubmitting) {
-      console.log("Auth complete and client data loaded. Ready for redirection.");
+      DebugUtils.log(sessionId, "Auth complete and client data loaded. Ready for redirection.");
       setIsSubmitting(false);
       
       // Clear safety timeout if it exists
@@ -50,7 +56,13 @@ const Login = () => {
         setLoginTimeout(null);
       }
     }
-  }, [authState, userRole, clientStatus, isLoading, loginTimeout]);
+    
+    // If auth is initialized but not authenticated, reset submitting state
+    if (authInitialized && authState === AuthState.UNAUTHENTICATED && isSubmitting) {
+      DebugUtils.log(sessionId, "Auth initialized but not authenticated. Resetting submitting state.");
+      setIsSubmitting(false);
+    }
+  }, [authState, userRole, clientStatus, isLoading, authInitialized, loginTimeout, sessionId]);
 
   // Clean up timeout on unmount
   useEffect(() => {
@@ -62,16 +74,16 @@ const Login = () => {
   }, [loginTimeout]);
 
   const handleSuccessfulLogin = () => {
-    console.log("Handling successful login. userRole:", userRole, "clientStatus:", clientStatus);
+    DebugUtils.log(sessionId, "Handling successful login", { userRole, clientStatus });
     toast.success("Login successful", { description: "Welcome back!" });
     
     // Handle redirection based on role and client status
     if (userRole === 'client') {
       if (clientStatus === 'New') {
-        console.log("Redirecting client with New status to profile setup");
+        DebugUtils.log(sessionId, "Redirecting client with New status to profile setup");
         navigate("/profile-setup");
       } else {
-        console.log("Redirecting client to dashboard");
+        DebugUtils.log(sessionId, "Redirecting client to dashboard");
         navigate("/patient-dashboard");
       }
     } else if (userRole === 'clinician') {
@@ -95,24 +107,24 @@ const Login = () => {
     setIsSubmitting(true);
     
     try {
-      console.log("Attempting login with:", email);
+      DebugUtils.log(sessionId, "Attempting login with", { email });
       const { success, error } = await login(email, password);
-      console.log("Login result:", success, error);
+      DebugUtils.log(sessionId, "Login result", { success, error });
       
       if (success) {
         // Set a safety timeout to reset loading state if client data loading doesn't complete
         const timeout = setTimeout(() => {
-          console.log("Safety timeout reached - force handling login completion");
+          DebugUtils.log(sessionId, "Safety timeout reached - force handling login completion");
           
           if (isSubmitting) {
             setIsSubmitting(false);
             
             // If we're already authenticated but client data is taking too long, try redirecting anyway
             if (authState === AuthState.AUTHENTICATED) {
-              console.log("Auth is complete but client data may be incomplete. Forcing redirection.");
+              DebugUtils.log(sessionId, "Auth is complete but client data may be incomplete. Forcing redirection.");
               handleSuccessfulLogin();
             } else {
-              console.log("Auth still not complete after timeout. Showing error message.");
+              DebugUtils.log(sessionId, "Auth still not complete after timeout. Showing error message.");
               setError("Login process is taking longer than expected. Please try again.");
             }
           }
@@ -125,7 +137,7 @@ const Login = () => {
         setIsSubmitting(false);
       }
     } catch (err: any) {
-      console.error("Login error:", err);
+      DebugUtils.error(sessionId, "Login error", err);
       setError(err.message || "An unexpected error occurred. Please try again.");
       setIsSubmitting(false);
     }

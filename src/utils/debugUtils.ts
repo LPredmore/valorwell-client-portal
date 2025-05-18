@@ -1,3 +1,4 @@
+
 export class DebugUtils {
   private static sessionId: string = `session-${Math.random().toString(36).substr(2, 9)}`;
   private static logHistory: { timestamp: string, message: string, data?: any, stack?: string }[] = [];
@@ -26,6 +27,29 @@ export class DebugUtils {
     console.log(`[${sessionId}] ${timestamp} - ${message}`, data);
     if (stack) {
       console.log(`[${sessionId}] Stack trace:\n${stack}`);
+    }
+  }
+
+  static error(sessionId: string, message: string, error?: any): void {
+    const timestamp = new Date().toISOString();
+    let stack: string | undefined;
+    
+    try {
+      if (error instanceof Error) {
+        stack = error.stack;
+      } else {
+        throw new Error('Stack trace capture');
+      }
+    } catch (e) {
+      stack = e.stack?.split('\n').slice(2).join('\n');
+    }
+    
+    const logEntry = { timestamp, message, error, stack };
+    this.logHistory.push(logEntry);
+    
+    console.error(`[${sessionId}] ${timestamp} - ERROR: ${message}`, error);
+    if (stack) {
+      console.error(`[${sessionId}] Stack trace:\n${stack}`);
     }
   }
 
