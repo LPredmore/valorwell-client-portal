@@ -35,4 +35,36 @@ export class DebugUtils {
   static error(sessionId: string, message: string, error?: any): void {
     this.log(sessionId, message, error, true);
   }
+
+  /**
+   * Log a warning message to the console
+   */
+  static warn(sessionId: string, message: string, data?: any): void {
+    if (this.VERBOSE) {
+      const timestamp = new Date().toISOString();
+      const prefix = '⚠️ [WARNING]';
+      
+      if (data) {
+        console.warn(`${timestamp} ${prefix} [${sessionId}] ${message}`, data);
+      } else {
+        console.warn(`${timestamp} ${prefix} [${sessionId}] ${message}`);
+      }
+    }
+  }
+
+  /**
+   * Log an informational message to the console
+   */
+  static info(sessionId: string, message: string, data?: any): void {
+    if (this.VERBOSE) {
+      const timestamp = new Date().toISOString();
+      const prefix = '📝 [INFO]';
+      
+      if (data) {
+        console.info(`${timestamp} ${prefix} [${sessionId}] ${message}`, data);
+      } else {
+        console.info(`${timestamp} ${prefix} [${sessionId}] ${message}`);
+      }
+    }
+  }
 }

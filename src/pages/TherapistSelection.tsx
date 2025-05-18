@@ -1,7 +1,6 @@
 
-import { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import NewLayout from '@/components/layout/NewLayout';
 import { toast } from 'sonner';
@@ -10,6 +9,7 @@ import { useTherapistSelection } from '@/hooks/useTherapistSelection';
 import { Loader, WifiOff, AlertTriangle, RefreshCw } from 'lucide-react';
 import { TherapistSelectionDebugger } from '@/debug/therapistSelectionDebugger';
 import { DebugUtils } from '@/utils/debugUtils';
+import TherapistCard from '@/components/therapist/TherapistCard';
 
 const TherapistSelection = () => {
   const navigate = useNavigate();
@@ -38,7 +38,6 @@ const TherapistSelection = () => {
     return () => {
       DebugUtils.log(sessionId, '[TherapistSelection] Component unmounting, triggering cleanup');
       TherapistSelectionDebugger.cleanup();
-      window.dispatchEvent(new CustomEvent('therapist_selection_circuit_breaker_cleanup'));
     };
   }, [sessionId]);
 
@@ -94,6 +93,7 @@ const TherapistSelection = () => {
       if (success) {
         TherapistSelectionDebugger.resetCircuitBreaker();
         navigate('/patient-dashboard');
+        toast.success("Your therapist has been selected successfully!");
       }
     } catch (error) {
       DebugUtils.error(sessionId, '[TherapistSelection] Error selecting therapist', error);
@@ -122,7 +122,7 @@ const TherapistSelection = () => {
 
   return (
     <NewLayout>
-      <div className="container mx-auto max-w-4xl">
+      <div className="container mx-auto max-w-5xl px-4 py-8">
         <div className="mb-8">
           <h1 className="text-3xl font-bold mb-2">Select Your Therapist</h1>
           <p className="text-gray-600">
@@ -169,18 +169,21 @@ const TherapistSelection = () => {
           </div>
         )}
 
-        {!loading && therapists.map(therapist => (
-          <Card 
-            key={therapist.id} 
-            onClick={() => setSelectedTherapist(therapist.id)}
-            className={`cursor-pointer transition-all mb-4 ${selectedTherapist === therapist.id ? 'ring-2 ring-blue-500 bg-blue-50' : 'hover:bg-gray-50'}`}
-          >
-            <CardContent className="p-6">
-              <h3 className="text-xl font-semibold">{therapist.clinician_professional_name || 'Unnamed Therapist'}</h3>
-              <p className="text-gray-600">{therapist.clinician_bio || 'No bio available'}</p>
-            </CardContent>
-          </Card>
-        ))}
+        {!loading && therapists.length > 0 && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {therapists.map(therapist => (
+              <TherapistCard
+                key={therapist.id}
+                id={therapist.id}
+                name={therapist.clinician_professional_name || `${therapist.clinician_first_name || ''} ${therapist.clinician_last_name || ''}`.trim()}
+                bio={therapist.clinician_bio}
+                imageUrl={therapist.clinician_image_url || therapist.clinician_profile_image || null}
+                isSelected={selectedTherapist === therapist.id}
+                onSelect={setSelectedTherapist}
+              />
+            ))}
+          </div>
+        )}
 
         {!networkOnline && (
           <div className="bg-yellow-50 border border-yellow-200 rounded-md p-4 mb-6 flex items-center">
@@ -196,7 +199,8 @@ const TherapistSelection = () => {
           </Button>
           <Button 
             onClick={handleSubmit} 
-            disabled={!selectedTherapist || selectingTherapistId || !networkOnline}
+            disabled={!selectedTherapist || selectingTherapistId !== null || !networkOnline}
+            className="bg-blue-600 hover:bg-blue-700"
           >
             {selectingTherapistId ? (
               <>
