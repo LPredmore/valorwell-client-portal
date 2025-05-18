@@ -3,7 +3,7 @@
  * authHelpers.ts - Utilities for authentication and debugging
  */
 
-import { AuthState } from '@/context/UserContext';
+import { AuthState } from '../context/NewAuthContext';
 
 // Helper to log AuthState changes for debugging
 export const logAuthStateChange = (

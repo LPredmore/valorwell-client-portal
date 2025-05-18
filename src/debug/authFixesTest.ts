@@ -5,6 +5,15 @@
 import { supabase } from "@/integrations/supabase/client";
 import { debugAuthOperation } from "./authDebugUtils";
 
+interface AuthResponse {
+  data: {
+    user: {
+      id: string;
+    };
+  };
+  error: Error | null;
+}
+
 // Test credentials - replace with valid test credentials
 const TEST_EMAIL = "test@example.com";
 const TEST_PASSWORD = "password123";
@@ -19,16 +28,16 @@ export const testAuthFixes = async () => {
   
   // Step 1: Check initial state
   console.log("\n--- Step 1: Checking Initial State ---");
-  console.log("UserContext should set authInitialized=true immediately on mount");
-  console.log("Check browser console for '[UserContext] Main useEffect: Setting up initial session check and auth listener.'");
-  console.log("Followed by '[UserContext] Setting authInitialized to true immediately to prevent deadlocks'");
+  console.log("NewAuthContext should initialize auth state immediately");
+  console.log("Check browser console for '[NewAuthContext] Initializing auth state'");
+  console.log("Followed by '[NewAuthContext] Auth state initialized'");
   
   // Step 2: Test login flow
   console.log("\n--- Step 2: Testing Login Flow ---");
   try {
     console.log(`Attempting to sign in with test account: ${TEST_EMAIL}`);
     
-    const { data, error } = await debugAuthOperation("signInWithPassword", () => 
+    const { data, error } = await debugAuthOperation<AuthResponse>("signInWithPassword", () =>
       supabase.auth.signInWithPassword({
         email: TEST_EMAIL,
         password: TEST_PASSWORD,
@@ -41,8 +50,8 @@ export const testAuthFixes = async () => {
     } else {
       console.log("Login successful:", data.user?.id);
       console.log("Check browser console for:");
-      console.log("1. '[UserContext] onAuthStateChange event: SIGNED_IN, User: <user-id>'");
-      console.log("2. '[UserContext] onAuthStateChange: User is signed in, authInitialized is true.'");
+      console.log("1. '[NewAuthContext] Auth state changed: SIGNED_IN, User: <user-id>'");
+      console.log("2. '[NewAuthContext] Auth state updated for signed in user'");
     }
   } catch (error) {
     console.error("Login test exception:", error);
@@ -58,9 +67,9 @@ export const testAuthFixes = async () => {
   
   // Step 4: Test timeout prevention
   console.log("\n--- Step 4: Verifying Timeout Prevention ---");
-  console.log("The timeout issue should be resolved by setting authInitialized=true immediately");
-  console.log("The Index page should no longer wait indefinitely for authentication");
-  console.log("If you previously experienced the timeout issue, it should now be resolved");
+  console.log("The timeout issue should be resolved by the new auth initialization flow");
+  console.log("The Index page should handle auth state changes efficiently");
+  console.log("If you previously experienced timeout issues, they should now be resolved");
   
   console.log("\n=== TEST INSTRUCTIONS ===");
   console.log("1. Open browser console (F12 or Ctrl+Shift+I)");
@@ -76,13 +85,13 @@ export const testAuthFixes = async () => {
  * Verifies the authInitialized flag in the UserContext
  */
 export const verifyAuthInitializedFlag = () => {
-  console.group("=== VERIFY AUTH INITIALIZED FLAG ===");
-  console.log("To verify the authInitialized flag is properly set:");
+  console.group("=== VERIFY AUTH STATE INITIALIZATION ===");
+  console.log("To verify the auth state is properly initialized:");
   
   console.log("\n1. Open React DevTools");
-  console.log("2. Find the UserProvider component");
-  console.log("3. Check that authInitialized is true");
-  console.log("4. Verify that isLoading transitions from true to false");
+  console.log("2. Find the AuthProvider component");
+  console.log("3. Check that auth state is initialized");
+  console.log("4. Verify that loading state transitions properly");
   
   console.log("\nAlternatively, add this code to Index.tsx temporarily:");
   console.log(`
