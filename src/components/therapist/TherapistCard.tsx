@@ -23,14 +23,14 @@ const TherapistCard = ({
   return (
     <Card 
       onClick={() => onSelect(id)}
-      className={`cursor-pointer transition-all mb-6 h-full ${isSelected 
+      className={`cursor-pointer transition-all mb-6 w-full ${isSelected 
         ? 'ring-2 ring-blue-500 bg-blue-50' 
         : 'hover:bg-gray-50'}`}
     >
-      <CardContent className="p-6 flex flex-col h-full">
-        <div className="flex items-center mb-4">
+      <CardContent className="p-6 flex flex-col">
+        <div className="flex items-center mb-6">
           {imageUrl ? (
-            <div className="w-16 h-16 rounded-full overflow-hidden flex-shrink-0 border border-gray-200">
+            <div className="w-20 h-20 rounded-full overflow-hidden flex-shrink-0 border border-gray-200">
               <img 
                 src={imageUrl} 
                 alt={`${name}'s profile`} 
@@ -41,23 +41,18 @@ const TherapistCard = ({
               />
             </div>
           ) : (
-            <div className="w-16 h-16 rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0">
-              <User className="w-8 h-8 text-gray-500" />
+            <div className="w-20 h-20 rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0">
+              <User className="w-10 h-10 text-gray-500" />
             </div>
           )}
-          <h3 className="text-xl font-semibold ml-4">{name || 'Unnamed Therapist'}</h3>
+          <h3 className="text-2xl font-semibold ml-5">{name || 'Unnamed Therapist'}</h3>
         </div>
 
-        <div className="text-gray-600 flex-grow">
+        <div className="text-gray-700 mb-4">
           {bio ? (
-            <>
-              {bio.length > 200 ? (
-                <div>
-                  {bio.substring(0, 200)}...
-                  <p className="text-sm text-blue-600 mt-2">Click to select and see full bio</p>
-                </div>
-              ) : bio}
-            </>
+            <div className="prose max-w-none">
+              {bio}
+            </div>
           ) : (
             <p className="text-gray-400 italic">No bio available</p>
           )}
@@ -65,7 +60,7 @@ const TherapistCard = ({
 
         {isSelected && (
           <div className="mt-4 flex items-center text-blue-600">
-            <span className="text-sm font-medium">✓ Selected</span>
+            <span className="font-medium">✓ Selected</span>
           </div>
         )}
       </CardContent>
