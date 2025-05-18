@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { ClinicianQueryDebugger } from '@/debug/clinicianQueryDebugger';
@@ -42,6 +43,7 @@ const MAX_RETRY_ATTEMPTS = 3;
 const INITIAL_RETRY_DELAY = 1000; // 1 second
 const TIMEOUT_MS = 10000; // 10 seconds
 const NETWORK_CHECK_URL = 'https://www.google.com/generate_204';
+const CIRCUIT_BREAKER_RESET_TIME = 30000; // 30 seconds
 
 /**
  * A specialized hook for loading therapist data with enhanced error recovery
@@ -67,6 +69,7 @@ export const useTherapistSelection = ({
   const circuitResetTimerRef = useRef<number | null>(null);
   const retryCountRef = useRef<number>(0);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const mountedRef = useRef<boolean>(true);
   
   // Log initial hook parameters for debugging
   console.log(`[useTherapistSelection] Hook initialized with clientState: ${clientState}, clientAge: ${clientAge}, enableFiltering: ${enableFiltering}`);
@@ -85,10 +88,10 @@ export const useTherapistSelection = ({
       
       clearTimeout(timeoutId);
       console.log('[useTherapistSelection] Network connectivity check:', response.ok ? 'Online' : 'Offline');
-      return response.ok;
+      return true; // If we get here, network is connected (even if response is not ok due to CORS)
     } catch (error) {
       console.log('[useTherapistSelection] Network connectivity check failed:', error);
-      return false;
+      return navigator.onLine; // Fallback to navigator.onLine
     }
   };
   
@@ -98,12 +101,28 @@ export const useTherapistSelection = ({
       window.clearTimeout(circuitResetTimerRef.current);
     }
     
-    // Reset after 30 seconds
+    console.log('[useTherapistSelection] Setting circuit breaker reset timer');
+    // Reset after defined reset time
     circuitResetTimerRef.current = window.setTimeout(() => {
-      console.log('[useTherapistSelection] Circuit breaker reset');
-      setCircuitOpen(false);
-      retryCountRef.current = 0;
-    }, 30000);
+      if (mountedRef.current) {
+        console.log('[useTherapistSelection] Circuit breaker reset');
+        setCircuitOpen(false);
+        retryCountRef.current = 0;
+      }
+    }, CIRCUIT_BREAKER_RESET_TIME);
+  }, []);
+
+  // Function to manually reset the circuit breaker
+  const manualResetCircuitBreaker = useCallback(() => {
+    console.log('[useTherapistSelection] Manual circuit breaker reset');
+    setCircuitOpen(false);
+    retryCountRef.current = 0;
+    
+    // Cancel any pending auto-reset
+    if (circuitResetTimerRef.current) {
+      window.clearTimeout(circuitResetTimerRef.current);
+      circuitResetTimerRef.current = null;
+    }
   }, []);
   
   // Function to fetch therapists with multi-layered fallback strategies
@@ -151,6 +170,12 @@ export const useTherapistSelection = ({
     // Apply backoff delay if this is a retry
     if (backoffDelay > 0) {
       await new Promise(resolve => setTimeout(resolve, backoffDelay));
+      
+      // Check if component is still mounted after the delay
+      if (!mountedRef.current) {
+        console.log('[useTherapistSelection] Component unmounted during backoff, aborting fetch');
+        return;
+      }
     }
     
     // Check network connectivity before making request
@@ -332,7 +357,7 @@ export const useTherapistSelection = ({
       });
     } finally {
       // Only set loading to false if the component is still mounted
-      if (!abortControllerRef.current?.signal.aborted) {
+      if (mountedRef.current && !abortControllerRef.current?.signal.aborted) {
         setLoading(false);
         setAttemptCount(prev => prev + 1);
         console.log('[useTherapistSelection] Fetch completed, loading set to false');
@@ -401,10 +426,9 @@ export const useTherapistSelection = ({
   const retryFetch = useCallback(() => {
     console.log('[useTherapistSelection] Manual retry triggered');
     // Reset circuit breaker on manual retry
-    setCircuitOpen(false);
-    retryCountRef.current = 0;
+    manualResetCircuitBreaker();
     setAttemptCount(prev => prev + 1);
-  }, []);
+  }, [manualResetCircuitBreaker]);
   
   // Select therapist function
   const selectTherapist = useCallback(async (therapistId: string): Promise<boolean> => {
@@ -428,6 +452,17 @@ export const useTherapistSelection = ({
       }
       
       console.log(`[useTherapistSelection] Updating client record for user ID: ${userId}`);
+      
+      // Check network connectivity before operation
+      const isConnected = await checkNetworkConnectivity();
+      if (!isConnected) {
+        toast({
+          title: "Network Error",
+          description: "You appear to be offline. Please check your internet connection and try again.",
+          variant: "destructive"
+        });
+        return false;
+      }
       
       // Create timeout for this operation
       const controller = new AbortController();
@@ -495,7 +530,7 @@ export const useTherapistSelection = ({
     } finally {
       setSelectingTherapistId(null);
     }
-  }, [therapists, toast]);
+  }, [therapists, toast, checkNetworkConnectivity]);
   
   // Helper function to get the authenticated user ID
   const getUserId = async (): Promise<string | null> => {
@@ -508,9 +543,15 @@ export const useTherapistSelection = ({
     }
   };
   
-  // Cleanup function to abort in-flight requests and clear timers
+  // Set the mountedRef to false when component unmounts
   useEffect(() => {
+    mountedRef.current = true;
+    // Reset circuit breaker on component mount
+    manualResetCircuitBreaker();
+    
     return () => {
+      mountedRef.current = false;
+      
       // Abort any in-flight requests when component unmounts
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
@@ -519,15 +560,19 @@ export const useTherapistSelection = ({
       // Clear any circuit breaker timers
       if (circuitResetTimerRef.current) {
         window.clearTimeout(circuitResetTimerRef.current);
+        circuitResetTimerRef.current = null;
       }
     };
-  }, []);
+  }, [manualResetCircuitBreaker]);
   
   // Fetch therapists when component mounts or when deps change
   useEffect(() => {
     console.log('[useTherapistSelection] useEffect triggered - calling fetchTherapists()');
-    fetchTherapists();
-  }, [fetchTherapists]);
+    
+    if (mountedRef.current) {
+      fetchTherapists();
+    }
+  }, [fetchTherapists, attemptCount]);
   
   return {
     therapists,

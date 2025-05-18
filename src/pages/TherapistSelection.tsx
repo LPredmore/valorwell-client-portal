@@ -7,13 +7,14 @@ import NewLayout from '@/components/layout/NewLayout';
 import { toast } from 'sonner';
 import { useAuth } from '@/context/NewAuthContext';
 import { useTherapistSelection } from '@/hooks/useTherapistSelection';
-import { Loader, WifiOff, AlertTriangle } from 'lucide-react';
+import { Loader, WifiOff, AlertTriangle, RefreshCw } from 'lucide-react';
 import { TherapistSelectionDebugger } from '@/debug/therapistSelectionDebugger';
 
 const TherapistSelection = () => {
   const navigate = useNavigate();
   const [selectedTherapist, setSelectedTherapist] = useState<string | null>(null);
   const [networkOnline, setNetworkOnline] = useState<boolean>(navigator.onLine);
+  const [manualRefreshCount, setManualRefreshCount] = useState<number>(0);
   
   // Get client data from auth context
   const { clientProfile } = useAuth();
@@ -30,6 +31,8 @@ const TherapistSelection = () => {
     const handleOnline = () => {
       console.log('[TherapistSelection] Network is online');
       setNetworkOnline(true);
+      // Trigger a refresh when connection is restored
+      setManualRefreshCount(prev => prev + 1);
     };
     
     const handleOffline = () => {
@@ -104,6 +107,22 @@ const TherapistSelection = () => {
     }
   };
 
+  // Helper function to handle manual refresh
+  const handleManualRefresh = () => {
+    console.log('[TherapistSelection] Manual refresh triggered');
+    
+    // First check network status
+    if (!networkOnline && !navigator.onLine) {
+      toast.error("You appear to be offline. Please check your internet connection.");
+      return;
+    }
+    
+    // Trigger retry fetch from the hook
+    retryFetch();
+    // Show loading toast
+    toast.info("Refreshing therapist list...");
+  };
+
   // Helper function to get appropriate title prefix for therapist
   const getTherapistTitle = (therapist: any) => {
     const type = therapist?.clinician_type?.toLowerCase() || '';
@@ -136,6 +155,7 @@ const TherapistSelection = () => {
               Please check your connection and try again. You need to be online to view and select therapists.
             </p>
             <Button onClick={retryFetch}>
+              <RefreshCw className="mr-2 h-4 w-4" />
               Retry Connection
             </Button>
           </div>
@@ -182,7 +202,8 @@ const TherapistSelection = () => {
             <h2 className="text-lg font-semibold text-red-700 mb-2">Error Loading Therapists</h2>
             <p className="text-gray-600 mb-6">{error}</p>
             <div className="flex flex-col sm:flex-row justify-center gap-3">
-              <Button onClick={retryFetch} className="mb-3 sm:mb-0">
+              <Button onClick={handleManualRefresh} className="mb-3 sm:mb-0">
+                <RefreshCw className="mr-2 h-4 w-4" />
                 Try Again
               </Button>
               <Button variant="outline" onClick={() => navigate('/patient-dashboard')}>
@@ -220,7 +241,8 @@ const TherapistSelection = () => {
               <Button onClick={() => navigate('/patient-dashboard')}>
                 Return to Dashboard
               </Button>
-              <Button variant="outline" onClick={retryFetch}>
+              <Button variant="outline" onClick={handleManualRefresh}>
+                <RefreshCw className="mr-2 h-4 w-4" />
                 Refresh List
               </Button>
             </div>
@@ -255,8 +277,11 @@ const TherapistSelection = () => {
             });
             
             const title = getTherapistTitle(therapist);
-            const fullName = `${title} ${therapist.clinician_first_name || ''} ${therapist.clinician_last_name || ''}`.trim();
-            // Use clinician_image_url as the primary image source
+            // Calculate the full name prioritizing professional name, then first/last name
+            const fullName = therapist.clinician_professional_name || 
+                            `${title} ${therapist.clinician_first_name || ''} ${therapist.clinician_last_name || ''}`.trim();
+            
+            // Use clinician_image_url as the primary image source with a fallback
             const imageUrl = therapist.clinician_image_url || 'https://randomuser.me/api/portraits/lego/1.jpg';
             
             return (
@@ -318,19 +343,30 @@ const TherapistSelection = () => {
           })}
         </div>
         
-        <div className="mt-8 flex justify-end space-x-4">
+        <div className="mt-8 flex justify-between">
           <Button 
-            variant="outline" 
-            onClick={() => navigate('/patient-dashboard')}
+            variant="outline"
+            onClick={handleManualRefresh}
+            disabled={loading}
           >
-            Cancel
+            <RefreshCw className="mr-2 h-4 w-4" />
+            Refresh List
           </Button>
-          <Button 
-            onClick={handleSubmit}
-            disabled={!selectedTherapist || isSubmitting || !networkOnline}
-          >
-            {isSubmitting ? "Confirming..." : "Confirm Selection"}
-          </Button>
+          
+          <div className="space-x-4">
+            <Button 
+              variant="outline" 
+              onClick={() => navigate('/patient-dashboard')}
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleSubmit}
+              disabled={!selectedTherapist || isSubmitting || !networkOnline}
+            >
+              {isSubmitting ? "Confirming..." : "Confirm Selection"}
+            </Button>
+          </div>
         </div>
       </div>
     </NewLayout>

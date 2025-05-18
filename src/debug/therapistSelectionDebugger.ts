@@ -3,9 +3,14 @@ import { supabase } from '@/integrations/supabase/client';
 
 /**
  * Utility to debug the TherapistSelection page and verify it's working correctly
- * with the updated authentication system. Enhanced with network connectivity checks.
+ * with the updated authentication system. Enhanced with network connectivity and
+ * circuit breaker monitoring.
  */
 export class TherapistSelectionDebugger {
+  private static debugId = `debug-${Math.random().toString(36).substring(2, 9)}`;
+  private static debugStartTime = Date.now();
+  private static lastNetworkStatus: boolean = navigator.onLine;
+
   /**
    * Verify client state is being correctly retrieved from the database
    */
@@ -219,10 +224,48 @@ export class TherapistSelectionDebugger {
   }
 
   /**
+   * Monitor network status changes
+   */
+  public static monitorNetworkStatus(): void {
+    const currentStatus = navigator.onLine;
+    
+    if (currentStatus !== this.lastNetworkStatus) {
+      console.log(`[TherapistSelectionDebugger] Network status changed: ${currentStatus ? 'Online' : 'Offline'}`);
+      this.lastNetworkStatus = currentStatus;
+    }
+    
+    // Setup listeners if not already set
+    if (!window.onstorage) {
+      window.addEventListener('online', () => {
+        console.log('[TherapistSelectionDebugger] Network came online');
+        this.lastNetworkStatus = true;
+      });
+      
+      window.addEventListener('offline', () => {
+        console.log('[TherapistSelectionDebugger] Network went offline');
+        this.lastNetworkStatus = false;
+      });
+    }
+  }
+  
+  /**
+   * Performance monitoring for render times
+   */
+  public static logRenderTime(componentName: string): void {
+    const now = Date.now();
+    const elapsed = now - this.debugStartTime;
+    console.log(`[TherapistSelectionDebugger] ${componentName} rendered - Time since debug start: ${elapsed}ms`);
+  }
+
+  /**
    * Run all verification checks
    */
   public static async runAllChecks(userId: string | null, clientState: string | null, therapists: any[]): Promise<void> {
     console.log('[TherapistSelectionDebugger] Running all verification checks');
+    console.log(`[TherapistSelectionDebugger] Debug session ID: ${this.debugId}`);
+    
+    // Monitor network status
+    this.monitorNetworkStatus();
     
     // First check connectivity
     const isConnected = await this.checkDatabaseConnectivity();
@@ -234,6 +277,7 @@ export class TherapistSelectionDebugger {
     await this.verifyClientState(userId);
     await this.verifyTherapistFiltering(clientState);
     this.verifyTherapistFields(therapists);
+    this.logRenderTime('TherapistSelection with data');
     
     console.log('[TherapistSelectionDebugger] All verification checks completed');
   }
