@@ -5,12 +5,15 @@ import AuthDiagnostics from "@/components/auth/AuthDiagnostics";
 import AuthFixesTestPanel from "@/components/auth/AuthFixesTestPanel";
 import { Button } from "@/components/ui/button";
 import { inspectAuthState } from "@/debug/authDebugUtils";
+import authSystemCleanup from "@/utils/authSystemCleanup";
 
 const AuthDebugPage = () => {
   const navigate = useNavigate();
   const { userId, userRole, authInitialized } = useAuth();
   const [authState, setAuthState] = useState<any>(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [diagnosticResults, setDiagnosticResults] = useState<any>(null);
+  const [isRunningDiagnostics, setIsRunningDiagnostics] = useState(false);
 
   useEffect(() => {
     // Check if this is the public debug route
@@ -88,6 +91,93 @@ const AuthDebugPage = () => {
           <AuthFixesTestPanel />
 
           <AuthDiagnostics />
+          
+          {/* Advanced Auth System Diagnostics */}
+          <div className="bg-gray-50 border rounded-md p-4">
+            <h2 className="text-lg font-medium mb-2">Advanced Authentication Diagnostics</h2>
+            <p className="text-sm mb-4">
+              These tools can help identify and fix issues with the authentication system, including phantom UserContext references.
+            </p>
+            
+            <div className="flex flex-wrap gap-2 mb-4">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setIsRunningDiagnostics(true);
+                  try {
+                    authSystemCleanup.checkForUserContextReferences();
+                    setDiagnosticResults("UserContext reference check completed. Check console for details.");
+                  } finally {
+                    setIsRunningDiagnostics(false);
+                  }
+                }}
+                disabled={isRunningDiagnostics}
+              >
+                Check for UserContext References
+              </Button>
+              
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setIsRunningDiagnostics(true);
+                  try {
+                    authSystemCleanup.monitorForUserContextLogs();
+                    setDiagnosticResults("Console monitoring active. Any UserContext logs will be traced.");
+                  } finally {
+                    setIsRunningDiagnostics(false);
+                  }
+                }}
+                disabled={isRunningDiagnostics}
+              >
+                Monitor for UserContext Logs
+              </Button>
+              
+              <Button
+                variant="destructive"
+                onClick={() => {
+                  if (window.confirm("This will clear all authentication data from localStorage. You will need to log in again. Continue?")) {
+                    setIsRunningDiagnostics(true);
+                    try {
+                      authSystemCleanup.cleanupAuthSystem();
+                      setDiagnosticResults("Auth system cleanup complete. Please refresh the page.");
+                    } finally {
+                      setIsRunningDiagnostics(false);
+                    }
+                  }
+                }}
+                disabled={isRunningDiagnostics}
+              >
+                Deep Clean Auth System
+              </Button>
+              
+              <Button
+                variant="default"
+                onClick={() => {
+                  setIsRunningDiagnostics(true);
+                  try {
+                    authSystemCleanup.runFullAuthDiagnostics();
+                    setDiagnosticResults("Full diagnostics complete. Check console for details.");
+                  } finally {
+                    setIsRunningDiagnostics(false);
+                  }
+                }}
+                disabled={isRunningDiagnostics}
+              >
+                Run Full Diagnostics
+              </Button>
+            </div>
+            
+            {diagnosticResults && (
+              <div className="mt-4 p-3 bg-gray-100 rounded text-sm">
+                <h3 className="font-medium mb-1">Diagnostic Results:</h3>
+                <pre className="whitespace-pre-wrap">
+                  {typeof diagnosticResults === 'string'
+                    ? diagnosticResults
+                    : JSON.stringify(diagnosticResults, null, 2)}
+                </pre>
+              </div>
+            )}
+          </div>
 
           <div className="bg-gray-50 border rounded-md p-4">
             <h2 className="text-lg font-medium mb-2">Recent Migrations</h2>

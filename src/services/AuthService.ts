@@ -260,10 +260,16 @@ class AuthService {
     }
   }
   
-  // Persist session data to local storage
+  // Persist session data to local storage with validation
   private saveSessionToStorage(user: User | null, session: Session | null, role?: string | null): void {
     try {
       if (user && session) {
+        // Validate session data before storing
+        if (!session.access_token || !session.expires_at) {
+          console.error('[AuthService] Invalid session data, not saving to storage');
+          return;
+        }
+        
         // Only store critical auth data, not the entire objects
         const dataToStore: AuthSession = {
           user: {
@@ -288,12 +294,30 @@ class AuthService {
         // Only write to localStorage if the data has changed
         if (!currentData || currentData !== newData) {
           localStorage.setItem(AUTH_STORAGE_KEY, newData);
+          console.log('[AuthService] Session data saved to storage');
         }
       } else {
         localStorage.removeItem(AUTH_STORAGE_KEY);
+        console.log('[AuthService] Session data removed from storage');
+        
+        // Also clean up any legacy keys that might still exist
+        const legacyKeys = ['valorwell_auth_state', 'supabase.auth.token', 'auth_initialization_forced'];
+        legacyKeys.forEach(key => {
+          if (localStorage.getItem(key)) {
+            console.log(`[AuthService] Removing legacy key: ${key}`);
+            localStorage.removeItem(key);
+          }
+        });
       }
     } catch (error) {
       console.error('[AuthService] Error saving session to storage:', error);
+      
+      // In case of error, try to clean up potentially corrupted data
+      try {
+        localStorage.removeItem(AUTH_STORAGE_KEY);
+      } catch (cleanupError) {
+        console.error('[AuthService] Error cleaning up storage:', cleanupError);
+      }
     }
   }
   
