@@ -14,52 +14,18 @@ const TherapistSelection = () => {
   const navigate = useNavigate();
   const [selectedTherapist, setSelectedTherapist] = useState<string | null>(null);
   const [networkOnline, setNetworkOnline] = useState<boolean>(navigator.onLine);
-  const [manualRefreshCount, setManualRefreshCount] = useState<number>(0);
   
   // Get client data from auth context
   const { clientProfile } = useAuth();
   const clientState = clientProfile?.client_state || null;
   const clientAge = clientProfile?.client_age || 18;
   
-  // Add console logs to verify client data
+  // Log client data for debugging
   console.log('[TherapistSelection] Client profile:', clientProfile);
   console.log('[TherapistSelection] Client state:', clientState);
   console.log('[TherapistSelection] Client age:', clientAge);
 
-  // Handle network status changes
-  useEffect(() => {
-    const handleOnline = () => {
-      console.log('[TherapistSelection] Network is online');
-      setNetworkOnline(true);
-      // Trigger a refresh when connection is restored
-      setManualRefreshCount(prev => prev + 1);
-      // Reset circuit breaker in debugger
-      TherapistSelectionDebugger.resetCircuitBreaker();
-    };
-    
-    const handleOffline = () => {
-      console.log('[TherapistSelection] Network is offline');
-      setNetworkOnline(false);
-    };
-    
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-    
-    // Reset any circuit breaker state at component mount
-    try {
-      sessionStorage.removeItem('therapist_selection_circuit_breaker');
-      TherapistSelectionDebugger.resetCircuitBreaker();
-    } catch (err) {
-      // Ignore storage errors
-    }
-    
-    return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-    };
-  }, []);
-
-  // Use the therapist selection hook to get real therapist data
+  // Use the therapist selection hook
   const { 
     therapists, 
     loading, 
@@ -74,6 +40,47 @@ const TherapistSelection = () => {
     enableFiltering: true
   });
 
+  // Handle network status changes
+  useEffect(() => {
+    const checkNetworkAndUpdate = () => {
+      const isOnline = navigator.onLine;
+      if (networkOnline !== isOnline) {
+        console.log(`[TherapistSelection] Network status changed: ${isOnline ? 'online' : 'offline'}`);
+        setNetworkOnline(isOnline);
+      }
+    };
+    
+    const handleOnline = () => {
+      console.log('[TherapistSelection] Network is online');
+      setNetworkOnline(true);
+      // Auto refresh when connection is restored
+      retryFetch();
+      // Reset circuit breaker in debugger
+      TherapistSelectionDebugger.resetCircuitBreaker();
+    };
+    
+    const handleOffline = () => {
+      console.log('[TherapistSelection] Network is offline');
+      setNetworkOnline(false);
+    };
+    
+    // Check network status immediately
+    checkNetworkAndUpdate();
+    
+    // Set up event listeners
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    
+    // Set up periodic network check
+    const networkCheckInterval = setInterval(checkNetworkAndUpdate, 10000);
+    
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+      clearInterval(networkCheckInterval);
+    };
+  }, [networkOnline, retryFetch]);
+
   // Run verification checks when therapists are loaded
   useEffect(() => {
     if (!loading && !error && therapists.length > 0) {
@@ -86,7 +93,7 @@ const TherapistSelection = () => {
     }
   }, [loading, error, therapists, clientProfile, clientState]);
 
-  // Track if any submission is in progress (either our local state or from the hook)
+  // Track if any submission is in progress
   const isSubmitting = !!selectingTherapistId;
 
   const handleSelectTherapist = (therapistId: string) => {
@@ -122,7 +129,7 @@ const TherapistSelection = () => {
     console.log('[TherapistSelection] Manual refresh triggered');
     
     // First check network status
-    if (!networkOnline && !navigator.onLine) {
+    if (!navigator.onLine) {
       toast.error("You appear to be offline. Please check your internet connection.");
       return;
     }
@@ -130,14 +137,7 @@ const TherapistSelection = () => {
     // Reset circuit breaker in debugger
     TherapistSelectionDebugger.resetCircuitBreaker();
     
-    // Reset circuit breaker state in session storage
-    try {
-      sessionStorage.removeItem('therapist_selection_circuit_breaker');
-    } catch (err) {
-      // Ignore storage errors
-    }
-    
-    // Trigger retry fetch from the hook
+    // Trigger retry fetch
     retryFetch();
     // Show loading toast
     toast.info("Refreshing therapist list...");
@@ -287,21 +287,12 @@ const TherapistSelection = () => {
         
         <div className="space-y-6">
           {therapists.map((therapist) => {
-            // Log therapist data to verify correct fields are being used
-            console.log('[TherapistSelection] Therapist data:', {
-              id: therapist.id,
-              name: therapist.clinician_professional_name,
-              type: therapist.clinician_type,
-              states: therapist.clinician_licensed_states,
-              imageUrl: therapist.clinician_image_url
-            });
-            
+            // Calculate title and name
             const title = getTherapistTitle(therapist);
-            // Calculate the full name prioritizing professional name, then first/last name
             const fullName = therapist.clinician_professional_name || 
                             `${title} ${therapist.clinician_first_name || ''} ${therapist.clinician_last_name || ''}`.trim();
             
-            // Use clinician_image_url as the primary image source with a fallback
+            // Use clinician_image_url as the primary image source
             const imageUrl = therapist.clinician_image_url || 'https://randomuser.me/api/portraits/lego/1.jpg';
             
             return (
