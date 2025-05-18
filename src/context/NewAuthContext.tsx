@@ -3,6 +3,7 @@ import React, { createContext, useContext, useEffect, useState, useMemo } from '
 import AuthService, { AuthState, AuthError } from '@/services/AuthService';
 import { supabase } from '@/integrations/supabase/client';
 import { User } from '@supabase/supabase-js';
+import { cleanupOldAuthKeys } from '@/utils/authCleanup';
 
 // Types for client profile
 export interface ClientProfile {
@@ -67,6 +68,12 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
   // Force authInitialized to match AuthService.isInitialized
   const [authInitialized, setAuthInitialized] = useState<boolean>(AuthService.isInitialized);
   
+  // Clean up old localStorage keys on startup
+  useEffect(() => {
+    console.log('[AuthContext] Cleaning up old localStorage keys');
+    cleanupOldAuthKeys();
+  }, []);
+
   // Safety timeout for initialization
   useEffect(() => {
     // If initialization takes too long, consider it done anyway
@@ -89,13 +96,14 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
     setAuthInitialized(AuthService.isInitialized);
     console.log(`[AuthContext] AuthService.isInitialized: ${AuthService.isInitialized}`);
     
-    // Monitor changes to initialization state
+    // Monitor changes to initialization state - using a more efficient approach
+    // Only check every second instead of every 500ms to reduce overhead
     const checkInitInterval = setInterval(() => {
       if (AuthService.isInitialized !== authInitialized) {
         console.log(`[AuthContext] AuthService initialization changed: ${AuthService.isInitialized}`);
         setAuthInitialized(AuthService.isInitialized);
       }
-    }, 500); // Check every 500ms
+    }, 1000); // Check every 1000ms (1 second) instead of 500ms
     
     return () => clearInterval(checkInitInterval);
   }, [authInitialized]);
@@ -173,11 +181,14 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
   useEffect(() => {
     const isStillInitializing = !authInitialized || authState === AuthState.INITIALIZING;
     const isClientDataLoading = authState === AuthState.AUTHENTICATED && loadingClientData;
+    const newLoadingState = isStillInitializing || isClientDataLoading;
     
-    setIsLoading(isStillInitializing || isClientDataLoading);
-    
-    console.log(`[AuthContext] Updated loading state: ${isStillInitializing || isClientDataLoading} (initializing=${isStillInitializing}, clientDataLoading=${isClientDataLoading})`);
-  }, [authState, authInitialized, loadingClientData]);
+    // Only update state if it's actually changing to avoid unnecessary renders
+    if (isLoading !== newLoadingState) {
+      setIsLoading(newLoadingState);
+      console.log(`[AuthContext] Updated loading state: ${newLoadingState} (initializing=${isStillInitializing}, clientDataLoading=${isClientDataLoading})`);
+    }
+  }, [authState, authInitialized, loadingClientData, isLoading]);
 
   // Load initial client data if user is already present
   useEffect(() => {
@@ -214,8 +225,8 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
     return AuthService.hasRole(role);
   };
 
-  // Context value
-  const contextValue: AuthContextType = {
+  // Context value - memoized to prevent unnecessary re-renders
+  const contextValue = useMemo<AuthContextType>(() => ({
     authState,
     isLoading,
     authInitialized,
@@ -230,7 +241,17 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
     resetPassword,
     refreshUserData,
     hasRole
-  };
+  }), [
+    authState,
+    isLoading,
+    authInitialized,
+    authError,
+    user,
+    userId,
+    userRole,
+    clientStatus,
+    clientProfile
+  ]);
 
   return (
     <AuthContext.Provider value={contextValue}>

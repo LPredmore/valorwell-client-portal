@@ -23,7 +23,8 @@ interface AuthSession {
 }
 
 const AUTH_STORAGE_KEY = 'auth_session_cache';
-const AUTH_TIMEOUT = 15000; // Increased from 5000 to 15000 (15 seconds)
+const AUTH_TIMEOUT = 15000; // 15 seconds timeout for auth operations
+const SESSION_EXPIRY_BUFFER = 300000; // 5 minutes buffer before actual expiry (in milliseconds)
 
 class AuthService {
   private static instance: AuthService;
@@ -57,24 +58,29 @@ class AuthService {
   private restoreSessionFromStorage(): void {
     try {
       const storedData = localStorage.getItem(AUTH_STORAGE_KEY);
-      if (storedData) {
-        const parsedData = JSON.parse(storedData) as AuthSession;
-        // Only use cached data if it hasn't expired
-        if (parsedData.expiresAt && parsedData.expiresAt > Date.now()) {
-          console.log('[AuthService] Restored session from storage');
-          this._sessionData = parsedData;
-          if (parsedData.user) {
-            this._currentState = AuthState.AUTHENTICATED;
-          } else {
-            this._currentState = AuthState.UNAUTHENTICATED;
-          }
+      if (!storedData) return;
+      
+      const parsedData = JSON.parse(storedData) as AuthSession;
+      
+      // Only use cached data if it hasn't expired (with buffer time)
+      // Add a 5-minute buffer to ensure we don't use a session that's about to expire
+      if (parsedData.expiresAt && parsedData.expiresAt > (Date.now() + SESSION_EXPIRY_BUFFER)) {
+        console.log('[AuthService] Restored session from storage');
+        this._sessionData = parsedData;
+        
+        if (parsedData.user) {
+          this._currentState = AuthState.AUTHENTICATED;
         } else {
-          console.log('[AuthService] Stored session expired, removing');
-          localStorage.removeItem(AUTH_STORAGE_KEY);
+          this._currentState = AuthState.UNAUTHENTICATED;
         }
+      } else {
+        console.log('[AuthService] Stored session expired or expiring soon, removing');
+        localStorage.removeItem(AUTH_STORAGE_KEY);
       }
     } catch (error) {
       console.error('[AuthService] Error restoring session from storage:', error);
+      // Clean up potentially corrupted data
+      localStorage.removeItem(AUTH_STORAGE_KEY);
     }
   }
   
@@ -241,7 +247,14 @@ class AuthService {
           role
         };
         
-        localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(dataToStore));
+        // Use a more efficient approach by checking if the data has actually changed
+        const currentData = localStorage.getItem(AUTH_STORAGE_KEY);
+        const newData = JSON.stringify(dataToStore);
+        
+        // Only write to localStorage if the data has changed
+        if (!currentData || currentData !== newData) {
+          localStorage.setItem(AUTH_STORAGE_KEY, newData);
+        }
       } else {
         localStorage.removeItem(AUTH_STORAGE_KEY);
       }
@@ -379,19 +392,22 @@ class AuthService {
     }
   }
   
-  // Check if user has specific role
+  // Check if user has specific role - optimized for performance
   public hasRole(role: string | string[]): boolean {
     const currentRole = this.userRole;
     
+    // Early return for unauthenticated users
     if (!currentRole || this._currentState !== AuthState.AUTHENTICATED) {
       return false;
     }
     
-    if (Array.isArray(role)) {
-      return role.includes(currentRole);
+    // Optimize for the common case of a single role check
+    if (typeof role === 'string') {
+      return role === currentRole;
     }
     
-    return role === currentRole;
+    // For array of roles, use includes
+    return role.includes(currentRole);
   }
   
   // Force refresh session

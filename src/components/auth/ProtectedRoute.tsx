@@ -1,8 +1,7 @@
 
 import React, { useEffect } from 'react';
 import { Navigate, useParams } from 'react-router-dom';
-import { useUser } from '@/context/UserContext';
-import { AuthState } from '@/context/UserContext';
+import { useAuth, AuthState } from '@/context/NewAuthContext';
 import { useToast } from '@/hooks/use-toast';
 
 interface ProtectedRouteProps {
@@ -22,8 +21,8 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     isLoading, 
     authInitialized, 
     authState,
-    authError 
-  } = useUser();
+    authError
+  } = useAuth();
   const { toast } = useToast();
   const { clientId } = useParams();
   

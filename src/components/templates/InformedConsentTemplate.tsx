@@ -8,7 +8,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Video, Shield, AlertTriangle, Calendar, FileText, Check } from 'lucide-react';
 import { format } from 'date-fns';
-import { useUser } from '@/context/UserContext';
+import { useAuth } from '@/context/NewAuthContext';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
 import { handleFormSubmission } from '@/utils/formSubmissionUtils';
@@ -32,7 +32,7 @@ const InformedConsentTemplate: React.FC<InformedConsentTemplateProps> = ({
   onClose 
 }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { userId } = useUser();
+  const { userId } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const formRef = useRef<HTMLDivElement>(null);

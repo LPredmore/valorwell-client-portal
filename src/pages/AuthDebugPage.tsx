@@ -1,14 +1,14 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useUser } from "@/context/UserContext";
+import { useAuth } from "@/context/NewAuthContext";
 import AuthDiagnostics from "@/components/auth/AuthDiagnostics";
 import AuthFixesTestPanel from "@/components/auth/AuthFixesTestPanel";
 import { Button } from "@/components/ui/button";
-import { inspectAuthState } from "@/utils/authDebugUtils";
+import { inspectAuthState } from "@/debug/authDebugUtils";
 
 const AuthDebugPage = () => {
   const navigate = useNavigate();
-  const { userId, userRole, authInitialized } = useUser();
+  const { userId, userRole, authInitialized } = useAuth();
   const [authState, setAuthState] = useState<any>(null);
   const [isAdmin, setIsAdmin] = useState(false);
 

@@ -7,7 +7,7 @@ import { getUserTimeZone } from '@/utils/timeZoneUtils';
 import { TimeZoneService } from '@/utils/timeZoneService';
 import { DateTime } from 'luxon';
 import { useNavigate } from 'react-router-dom';
-import { useUser } from '@/context/UserContext';
+import { useAuth } from '@/context/NewAuthContext';
 
 import { 
   Dialog, 
@@ -109,8 +109,8 @@ export const AppointmentBookingDialog: React.FC<AppointmentBookingDialogProps> =
   const { toast } = useToast();
   const navigate = useNavigate();
   
-  // Get auth state from UserContext
-  const { userId, isLoading: userIsLoading, authInitialized } = useUser();
+  // Get auth state from AuthContext
+  const { userId, isLoading: userIsLoading, authInitialized } = useAuth();
   const [authError, setAuthError] = useState<string | null>(null);
   const [loadingTimeout, setLoadingTimeout] = useState(false);
   

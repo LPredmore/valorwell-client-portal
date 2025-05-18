@@ -11,7 +11,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
-import { useUser } from '@/context/UserContext';
+import { useAuth } from '@/context/NewAuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { FileText, Save, Calendar } from 'lucide-react';
 import { format } from 'date-fns';
@@ -44,7 +44,7 @@ interface ClientHistoryTemplateProps {
 
 const ClientHistoryTemplate: React.FC<ClientHistoryTemplateProps> = ({ clientData, onClose, onSubmit }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { userId } = useUser();
+  const { userId } = useAuth();
   const { toast } = useToast();
   
   const form = useForm<FormData>({

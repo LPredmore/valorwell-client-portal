@@ -2,7 +2,7 @@
  * Comprehensive utilities for troubleshooting authentication issues
  */
 import { supabase } from "@/integrations/supabase/client";
-import { debugAuthOperation, logSupabaseConfig, logAuthContext } from "./authDebugUtils";
+import { debugAuthOperation, logSupabaseConfig, logAuthContext } from "@/debug/authDebugUtils";
 
 /**
  * Runs a comprehensive test of the authentication system

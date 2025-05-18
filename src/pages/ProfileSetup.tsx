@@ -22,7 +22,7 @@ import SignupNotAVeteran from '@/components/signup/SignupNotAVeteran';
 import AdditionalInsurance from '@/components/signup/AdditionalInsurance';
 import MoreAdditionalInsurance from '@/components/signup/MoreAdditionalInsurance';
 import SignupLast from '@/components/signup/SignupLast';
-import { useUser } from '@/context/UserContext';
+import { useAuth } from '@/context/NewAuthContext';
 import { parseDateString, calculateAge, formatDateForDB } from '@/utils/dateUtils';
 
 type ClientFormData = {
@@ -143,7 +143,7 @@ type ProfileFormValues = z.infer<typeof profileStep1Schema> &
 const ProfileSetup = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { user, isLoading: isUserContextLoading, authInitialized, userId, refreshUserData } = useUser();
+  const { user, isLoading, authInitialized, userId, refreshUserData } = useAuth();
 
   const [clientId, setClientId] = useState<string | null>(null);
   const [currentStep, setCurrentStep] = useState(1);
@@ -154,13 +154,17 @@ const ProfileSetup = () => {
   const [loadingTimeout, setLoadingTimeout] = useState(false);
   const initialDataLoadedForUser = useRef<string | null>(null);
   
-  // Add timeout mechanism to prevent indefinite loading
+  // Add timeout mechanism to prevent indefinite loading - optimized to reduce unnecessary state updates
   useEffect(() => {
-    let timeoutId: NodeJS.Timeout;
-    
-    if ((isUserContextLoading || !authInitialized) && !authError) {
+    // Only set up timeouts if we're in a loading state and don't have an error
+    if ((isLoading || !authInitialized) && !authError) {
       console.log("[ProfileSetup] Starting loading timeout check");
-      timeoutId = setTimeout(() => {
+      
+      // Use a single cleanup function for both timeouts
+      const timeouts: NodeJS.Timeout[] = [];
+      
+      // First timeout for warning
+      timeouts.push(setTimeout(() => {
         console.log("[ProfileSetup] Loading timeout reached after 10 seconds");
         setLoadingTimeout(true);
         toast({
@@ -168,10 +172,10 @@ const ProfileSetup = () => {
           description: "User data is taking longer than expected to load.",
           variant: "default"
         });
-      }, 10000); // 10 seconds timeout
+      }, 10000)); // 10 seconds timeout
       
-      // Add a second timeout for critical failure
-      const criticalTimeoutId = setTimeout(() => {
+      // Second timeout for critical failure
+      timeouts.push(setTimeout(() => {
         console.log("[ProfileSetup] Critical loading timeout reached after 30 seconds");
         setAuthError("Authentication process is taking too long. Please refresh the page.");
         toast({
@@ -179,24 +183,26 @@ const ProfileSetup = () => {
           description: "Failed to load user data. Please refresh the page.",
           variant: "destructive"
         });
-      }, 30000); // 30 seconds for critical timeout
+      }, 30000)); // 30 seconds for critical timeout
       
+      // Single cleanup function for all timeouts
       return () => {
-        clearTimeout(timeoutId);
-        clearTimeout(criticalTimeoutId);
+        timeouts.forEach(clearTimeout);
+      };
+    } else if (!isLoading && authInitialized && loadingTimeout) {
+      // Reset loading timeout when loading is complete
+      setLoadingTimeout(false);
+    }
+  }, [isLoading, authInitialized, authError, toast, loadingTimeout]);
+
+  // Only log in development environment
+  useEffect(() => {
+    if (import.meta.env.DEV) {
+      console.log('[ProfileSetup] Component Mounted');
+      return () => {
+        console.log('[ProfileSetup] Component Will Unmount');
       };
     }
-    
-    return () => {
-      if (timeoutId) clearTimeout(timeoutId);
-    };
-  }, [isUserContextLoading, authInitialized, authError, toast]);
-
-  useEffect(() => {
-    console.log('[ProfileSetup] Component Mounted');
-    return () => {
-      console.log('[ProfileSetup] Component Will Unmount');
-    };
   }, []);
 
   const form = useForm<ProfileFormValues>({
@@ -267,7 +273,7 @@ const ProfileSetup = () => {
       } else {
         console.log(`[ProfileSetup] Successfully saved ${String(fieldName)} immediately.`);
         if (refreshUserData) {
-            console.log(`[ProfileSetup] Refreshing UserContext after immediate save of ${String(fieldName)}`);
+            console.log(`[ProfileSetup] Refreshing auth context after immediate save of ${String(fieldName)}`);
             await refreshUserData();
         }
       }
@@ -277,13 +283,16 @@ const ProfileSetup = () => {
   }, [clientId, toast, refreshUserData]);
 
   useEffect(() => {
+    // Memoize the fetchAndSetInitialData function to avoid recreating it on every render
     const fetchAndSetInitialData = async () => {
-      if (isUserContextLoading || !authInitialized) {
+      // Skip if still loading or not initialized
+      if (isLoading || !authInitialized) {
         console.log('[ProfileSetup] Initial data fetch: User context still loading or not initialized. Waiting.');
         setIsFormLoading(true);
         return;
       }
       
+      // Skip if no user ID
       if (!userId) {
         console.log('[ProfileSetup] Initial data fetch: No userId available after auth initialization.');
         setIsFormLoading(false);
@@ -295,135 +304,60 @@ const ProfileSetup = () => {
         });
         return;
       }
+      
+      // Skip if data already loaded for this user
       if (initialDataLoadedForUser.current === userId) {
         console.log(`[ProfileSetup] Initial data already loaded and form set for userId: ${userId}. Skipping fetch and reset.`);
         setIsFormLoading(false);
         return;
       }
+      
       console.log(`[ProfileSetup] Starting initial data fetch for userId: ${userId}. initialDataLoadedForUser.current: ${initialDataLoadedForUser.current}`);
       setIsFormLoading(true);
+      
       try {
         const userEmail = user?.email;
-        let { data: clientDataArray, error: clientError } = await supabase
-          .from('clients').select('*').eq('id', userId).limit(1);
-
-        if (clientError) {
-            console.error("[ProfileSetup] Error fetching client data by ID:", clientError);
-            toast({ title: "Profile Error", description: `Could not load your profile data. ${clientError.message}`, variant: "destructive" });
-            setIsFormLoading(false);
-            initialDataLoadedForUser.current = userId;
-            return;
-        }
         
-        let clientRecord = clientDataArray?.[0];
-
-        if (!clientRecord && userEmail) {
-          console.log("[ProfileSetup] No client found by ID, trying by email:", userEmail);
-          const { data: emailDataArray, error: emailFetchError } = await supabase
-            .from('clients').select('*').eq('client_email', userEmail).limit(1);
-          if (emailFetchError) {
-            console.error("[ProfileSetup] Error fetching client data by email:", emailFetchError);
-          } else if (emailDataArray && emailDataArray.length > 0) {
-            clientRecord = emailDataArray[0];
-            console.log("[ProfileSetup] Found client by email:", clientRecord);
-            if(clientRecord.id !== userId) clientRecord = undefined; 
-          }
-        }
-
-        if (!clientRecord) {
-          console.log("[ProfileSetup] No client record found for auth user ID, creating new one for user:", userId);
-          const { data: newClientArray, error: insertError } = await supabase
-            .from('clients').insert([{ id: userId, client_email: userEmail }]).select().limit(1);
-          if (insertError) {
-            console.error("[ProfileSetup] Error creating new client record:", insertError);
-            toast({ title: "Profile Error", description: `Failed to create your profile. ${insertError.message}`, variant: "destructive" });
-            setIsFormLoading(false);
-            initialDataLoadedForUser.current = userId; 
-            return;
-          }
-          clientRecord = newClientArray?.[0];
-          console.log("[ProfileSetup] Created new client record:", clientRecord);
-        }
-
+        // Use a single query with proper error handling
+        let clientRecord = await fetchClientRecord(userId, userEmail);
+        
         if (clientRecord) {
           setClientId(clientRecord.id);
           
-          // Parse date strings to Date objects using our utility function
-          const dob = parseDateString(clientRecord.client_date_of_birth);
-          console.log("[ProfileSetup] Parsed DOB:", dob, "from value:", clientRecord.client_date_of_birth);
-          
-          const calculatedClientAge = calculateAge(dob);
-          console.log("[ProfileSetup] Calculated age:", calculatedClientAge);
-          
-          // Parse client_recentdischarge as a Date
-          const recentDischarge = parseDateString(clientRecord.client_recentdischarge);
-          console.log("[ProfileSetup] Parsed recentDischarge:", recentDischarge, "from value:", clientRecord.client_recentdischarge);
-          
-          // Parse subscriber DOB dates
-          const subscriberDobPrimary = parseDateString(clientRecord.client_subscriber_dob_primary);
-          const subscriberDobSecondary = parseDateString(clientRecord.client_subscriber_dob_secondary);
-          console.log("[ProfileSetup] Parsed subscriberDobPrimary:", subscriberDobPrimary, "from value:", clientRecord.client_subscriber_dob_primary);
-          console.log("[ProfileSetup] Parsed subscriberDobSecondary:", subscriberDobSecondary, "from value:", clientRecord.client_subscriber_dob_secondary);
-
-          const formValues: ClientFormData = {
-            client_first_name: clientRecord.client_first_name || '',
-            client_preferred_name: clientRecord.client_preferred_name || '',
-            client_last_name: clientRecord.client_last_name || '',
-            client_email: clientRecord.client_email || userEmail || '',
-            client_phone: clientRecord.client_phone || '',
-            client_relationship: clientRecord.client_relationship || '',
-            client_date_of_birth: dob,
-            client_age: clientRecord.client_age ?? calculatedClientAge,
-            client_gender: clientRecord.client_gender || '',
-            client_gender_identity: clientRecord.client_gender_identity || '',
-            client_state: clientRecord.client_state || '',
-            client_time_zone: clientRecord.client_time_zone || '',
-            client_vacoverage: clientRecord.client_vacoverage || '',
-            client_champva: clientRecord.client_champva || '',
-            client_other_insurance: clientRecord.client_other_insurance || '',
-            client_champva_agreement: clientRecord.client_champva_agreement || false,
-            client_mental_health_referral: clientRecord.client_mental_health_referral || '',
-            client_branchOS: clientRecord.client_branchOS || '',
-            client_recentdischarge: recentDischarge, // Using our parsed date object
-            client_disabilityrating: clientRecord.client_disabilityrating || '',
-            client_tricare_beneficiary_category: clientRecord.client_tricare_beneficiary_category || '',
-            client_tricare_sponsor_name: clientRecord.client_tricare_sponsor_name || '',
-            client_tricare_sponsor_branch: clientRecord.client_tricare_sponsor_branch || '',
-            client_tricare_sponsor_id: clientRecord.client_tricare_sponsor_id || '',
-            client_tricare_plan: clientRecord.client_tricare_plan || '',
-            client_tricare_region: clientRecord.client_tricare_region || '',
-            client_tricare_policy_id: clientRecord.client_tricare_policy_id || '',
-            client_tricare_has_referral: clientRecord.client_tricare_has_referral || '',
-            client_tricare_referral_number: clientRecord.client_tricare_referral_number || '',
-            client_tricare_insurance_agreement: clientRecord.client_tricare_insurance_agreement || false,
-            client_veteran_relationship: clientRecord.client_veteran_relationship || '',
-            client_situation_explanation: clientRecord.client_situation_explanation || '',
-            client_insurance_company_primary: clientRecord.client_insurance_company_primary || '',
-            client_insurance_type_primary: clientRecord.client_insurance_type_primary || '',
-            client_subscriber_name_primary: clientRecord.client_subscriber_name_primary || '',
-            client_subscriber_relationship_primary: clientRecord.client_subscriber_relationship_primary || '',
-            client_subscriber_dob_primary: subscriberDobPrimary,
-            client_group_number_primary: clientRecord.client_group_number_primary || '',
-            client_policy_number_primary: clientRecord.client_policy_number_primary || '',
-            client_insurance_company_secondary: clientRecord.client_insurance_company_secondary || '',
-            client_insurance_type_secondary: clientRecord.client_insurance_type_secondary || '',
-            client_subscriber_name_secondary: clientRecord.client_subscriber_name_secondary || '',
-            client_subscriber_relationship_secondary: clientRecord.client_subscriber_relationship_secondary || '',
-            client_subscriber_dob_secondary: subscriberDobSecondary,
-            client_group_number_secondary: clientRecord.client_group_number_secondary || '',
-            client_policy_number_secondary: clientRecord.client_policy_number_secondary || '',
-            hasMoreInsurance: clientRecord.hasMoreInsurance || '',
-            client_has_even_more_insurance: clientRecord.client_has_even_more_insurance || '',
-            client_self_goal: clientRecord.client_self_goal || '',
-            client_referral_source: clientRecord.client_referral_source || '',
+          // Parse all date fields at once
+          const parsedDates = {
+            dob: parseDateString(clientRecord.client_date_of_birth),
+            recentDischarge: parseDateString(clientRecord.client_recentdischarge),
+            subscriberDobPrimary: parseDateString(clientRecord.client_subscriber_dob_primary),
+            subscriberDobSecondary: parseDateString(clientRecord.client_subscriber_dob_secondary)
           };
-          console.log("[ProfileSetup] Resetting form with values:", formValues);
+          
+          // Calculate age once
+          const calculatedClientAge = calculateAge(parsedDates.dob);
+          
+          // Only log in development environment
+          if (import.meta.env.DEV) {
+            console.log("[ProfileSetup] Parsed dates:", parsedDates);
+            console.log("[ProfileSetup] Calculated age:", calculatedClientAge);
+          }
+
+          // Create form values object
+          const formValues: ClientFormData = createFormValuesFromClientRecord(
+            clientRecord,
+            userEmail,
+            parsedDates,
+            calculatedClientAge
+          );
+          
+          // Reset form with values
           form.reset(formValues as ProfileFormValues);
         } else {
           console.warn("[ProfileSetup] No client data could be fetched or created. Form will use defaults.");
           form.reset({ client_email: userEmail || '', ...form.formState.defaultValues } as ProfileFormValues);
         }
-        initialDataLoadedForUser.current = userId; 
+        
+        // Mark as loaded for this user
+        initialDataLoadedForUser.current = userId;
       } catch (error: any) {
         console.error("[ProfileSetup] Exception in fetchAndSetInitialData:", error);
         toast({
@@ -431,13 +365,131 @@ const ProfileSetup = () => {
           description: error.message || "An unexpected error occurred loading your profile.",
           variant: "destructive"
         });
-        initialDataLoadedForUser.current = userId; 
+        initialDataLoadedForUser.current = userId;
       } finally {
         setIsFormLoading(false);
       }
     };
+    
+    // Helper function to fetch client record
+    const fetchClientRecord = async (userId: string, userEmail: string | undefined) => {
+      // Try to fetch by ID first
+      let { data: clientDataArray, error: clientError } = await supabase
+        .from('clients').select('*').eq('id', userId).limit(1);
+
+      if (clientError) {
+        console.error("[ProfileSetup] Error fetching client data by ID:", clientError);
+        toast({
+          title: "Profile Error",
+          description: `Could not load your profile data. ${clientError.message}`,
+          variant: "destructive"
+        });
+        throw clientError;
+      }
+      
+      let clientRecord = clientDataArray?.[0];
+
+      // If not found by ID, try by email
+      if (!clientRecord && userEmail) {
+        console.log("[ProfileSetup] No client found by ID, trying by email:", userEmail);
+        const { data: emailDataArray, error: emailFetchError } = await supabase
+          .from('clients').select('*').eq('client_email', userEmail).limit(1);
+          
+        if (emailFetchError) {
+          console.error("[ProfileSetup] Error fetching client data by email:", emailFetchError);
+        } else if (emailDataArray && emailDataArray.length > 0) {
+          clientRecord = emailDataArray[0];
+          console.log("[ProfileSetup] Found client by email:", clientRecord);
+          if(clientRecord.id !== userId) clientRecord = undefined;
+        }
+      }
+
+      // If still not found, create a new record
+      if (!clientRecord) {
+        console.log("[ProfileSetup] No client record found for auth user ID, creating new one for user:", userId);
+        const { data: newClientArray, error: insertError } = await supabase
+          .from('clients').insert([{ id: userId, client_email: userEmail }]).select().limit(1);
+          
+        if (insertError) {
+          console.error("[ProfileSetup] Error creating new client record:", insertError);
+          toast({
+            title: "Profile Error",
+            description: `Failed to create your profile. ${insertError.message}`,
+            variant: "destructive"
+          });
+          throw insertError;
+        }
+        
+        clientRecord = newClientArray?.[0];
+        console.log("[ProfileSetup] Created new client record:", clientRecord);
+      }
+      
+      return clientRecord;
+    };
+    
+    // Helper function to create form values from client record
+    const createFormValuesFromClientRecord = (
+      clientRecord: any,
+      userEmail: string | undefined,
+      parsedDates: any,
+      calculatedClientAge: number | null
+    ): ClientFormData => {
+      return {
+        client_first_name: clientRecord.client_first_name || '',
+        client_preferred_name: clientRecord.client_preferred_name || '',
+        client_last_name: clientRecord.client_last_name || '',
+        client_email: clientRecord.client_email || userEmail || '',
+        client_phone: clientRecord.client_phone || '',
+        client_relationship: clientRecord.client_relationship || '',
+        client_date_of_birth: parsedDates.dob,
+        client_age: clientRecord.client_age ?? calculatedClientAge,
+        client_gender: clientRecord.client_gender || '',
+        client_gender_identity: clientRecord.client_gender_identity || '',
+        client_state: clientRecord.client_state || '',
+        client_time_zone: clientRecord.client_time_zone || '',
+        client_vacoverage: clientRecord.client_vacoverage || '',
+        client_champva: clientRecord.client_champva || '',
+        client_other_insurance: clientRecord.client_other_insurance || '',
+        client_champva_agreement: clientRecord.client_champva_agreement || false,
+        client_mental_health_referral: clientRecord.client_mental_health_referral || '',
+        client_branchOS: clientRecord.client_branchOS || '',
+        client_recentdischarge: parsedDates.recentDischarge,
+        client_disabilityrating: clientRecord.client_disabilityrating || '',
+        client_tricare_beneficiary_category: clientRecord.client_tricare_beneficiary_category || '',
+        client_tricare_sponsor_name: clientRecord.client_tricare_sponsor_name || '',
+        client_tricare_sponsor_branch: clientRecord.client_tricare_sponsor_branch || '',
+        client_tricare_sponsor_id: clientRecord.client_tricare_sponsor_id || '',
+        client_tricare_plan: clientRecord.client_tricare_plan || '',
+        client_tricare_region: clientRecord.client_tricare_region || '',
+        client_tricare_policy_id: clientRecord.client_tricare_policy_id || '',
+        client_tricare_has_referral: clientRecord.client_tricare_has_referral || '',
+        client_tricare_referral_number: clientRecord.client_tricare_referral_number || '',
+        client_tricare_insurance_agreement: clientRecord.client_tricare_insurance_agreement || false,
+        client_veteran_relationship: clientRecord.client_veteran_relationship || '',
+        client_situation_explanation: clientRecord.client_situation_explanation || '',
+        client_insurance_company_primary: clientRecord.client_insurance_company_primary || '',
+        client_insurance_type_primary: clientRecord.client_insurance_type_primary || '',
+        client_subscriber_name_primary: clientRecord.client_subscriber_name_primary || '',
+        client_subscriber_relationship_primary: clientRecord.client_subscriber_relationship_primary || '',
+        client_subscriber_dob_primary: parsedDates.subscriberDobPrimary,
+        client_group_number_primary: clientRecord.client_group_number_primary || '',
+        client_policy_number_primary: clientRecord.client_policy_number_primary || '',
+        client_insurance_company_secondary: clientRecord.client_insurance_company_secondary || '',
+        client_insurance_type_secondary: clientRecord.client_insurance_type_secondary || '',
+        client_subscriber_name_secondary: clientRecord.client_subscriber_name_secondary || '',
+        client_subscriber_relationship_secondary: clientRecord.client_subscriber_relationship_secondary || '',
+        client_subscriber_dob_secondary: parsedDates.subscriberDobSecondary,
+        client_group_number_secondary: clientRecord.client_group_number_secondary || '',
+        client_policy_number_secondary: clientRecord.client_policy_number_secondary || '',
+        hasMoreInsurance: clientRecord.hasMoreInsurance || '',
+        client_has_even_more_insurance: clientRecord.client_has_even_more_insurance || '',
+        client_self_goal: clientRecord.client_self_goal || '',
+        client_referral_source: clientRecord.client_referral_source || '',
+      };
+    };
+    
     fetchAndSetInitialData();
-  }, [userId, isUserContextLoading, form.reset, toast, user?.email]);
+  }, [userId, isLoading, authInitialized, form.reset, toast, user?.email]);
 
   const navigateToStep = (nextStep: number) => { 
     setNavigationHistory(prev => [...prev, nextStep]);
@@ -655,7 +707,7 @@ const ProfileSetup = () => {
           client_is_profile_complete: true 
         }).eq('id', clientId);
       if (error) throw error; 
-      console.log("[ProfileSetup] Profile completed successfully in DB. Refreshing UserContext...");
+      console.log("[ProfileSetup] Profile completed successfully in DB. Refreshing auth context...");
       await refreshUserData(); 
       toast({ title: "Profile complete!", description: "Your information has been saved. Redirecting...", });
       console.log("[ProfileSetup] Navigating to /therapist-selection");
@@ -763,7 +815,7 @@ const ProfileSetup = () => {
                   <p className="text-valorwell-700 mb-2">
                     {!authInitialized
                       ? "Initializing authentication..."
-                      : isUserContextLoading
+                      : isLoading
                         ? "Loading user data..."
                         : "Loading your profile information..."}
                   </p>
