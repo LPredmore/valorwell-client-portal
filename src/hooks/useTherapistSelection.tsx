@@ -53,6 +53,34 @@ const CIRCUIT_BREAKER_OPEN_EVENT = 'therapist_selection_circuit_breaker_open';
 const CIRCUIT_BREAKER_CLEANUP_EVENT = 'therapist_selection_circuit_breaker_cleanup';
 
 /**
+ * Enhanced logging function with stack trace capability
+ */
+function logWithStack(message: string, data?: any, captureStack: boolean = false): void {
+  const timestamp = new Date().toISOString();
+  let stack: string | undefined;
+  
+  if (captureStack) {
+    try {
+      throw new Error('Stack trace capture');
+    } catch (e) {
+      stack = e.stack?.split('\n').slice(2).join('\n');
+    }
+  }
+  
+  const logMessage = `[useTherapistSelection] [${timestamp}] ${message}`;
+  
+  if (data) {
+    console.log(logMessage, data);
+  } else {
+    console.log(logMessage);
+  }
+  
+  if (stack) {
+    console.log(`[useTherapistSelection] Stack trace:\n${stack}`);
+  }
+}
+
+/**
  * A specialized hook for loading therapist data with enhanced error recovery
  * to handle network issues and prevent infinite retry loops
  */
@@ -78,16 +106,23 @@ export const useTherapistSelection = ({
   const abortControllerRef = useRef<AbortController | null>(null);
   const mountedRef = useRef<boolean>(true);
   const instanceIdRef = useRef<string>(`instance-${Math.random().toString(36).substring(2, 9)}`);
+  const operationStartTimeRef = useRef<number>(0);
   
   // Log initial hook parameters for debugging
-  console.log(`[useTherapistSelection] Hook initialized with clientState: ${clientState}, clientAge: ${clientAge}, enableFiltering: ${enableFiltering}`);
-  console.log(`[useTherapistSelection] Instance ID: ${instanceIdRef.current}`);
+  logWithStack(`Hook initialized with clientState: ${clientState}, clientAge: ${clientAge}, enableFiltering: ${enableFiltering}`);
+  logWithStack(`Instance ID: ${instanceIdRef.current}`);
   
   // Handle circuit breaker events from TherapistSelectionDebugger
   useEffect(() => {
     // Handler for reset events
-    const handleCircuitBreakerReset = () => {
-      console.log('[useTherapistSelection] Received circuit breaker reset event');
+    const handleCircuitBreakerReset = (event: Event) => {
+      const detail = (event as CustomEvent)?.detail || {};
+      logWithStack('Received circuit breaker reset event', {
+        source: detail.source || 'unknown',
+        reason: detail.reason || 'unknown',
+        timestamp: detail.timestamp ? new Date(detail.timestamp).toISOString() : 'unknown'
+      });
+      
       if (mountedRef.current) {
         setCircuitOpen(false);
         retryCountRef.current = 0;
@@ -101,8 +136,14 @@ export const useTherapistSelection = ({
     };
     
     // Handler for open events
-    const handleCircuitBreakerOpen = () => {
-      console.log('[useTherapistSelection] Received circuit breaker open event');
+    const handleCircuitBreakerOpen = (event: Event) => {
+      const detail = (event as CustomEvent)?.detail || {};
+      logWithStack('Received circuit breaker open event', {
+        source: detail.source || 'unknown',
+        reason: detail.reason || 'unknown',
+        timestamp: detail.timestamp ? new Date(detail.timestamp).toISOString() : 'unknown'
+      }, true);
+      
       if (mountedRef.current) {
         setCircuitOpen(true);
         resetCircuitBreaker(); // Start the reset timer
@@ -110,12 +151,17 @@ export const useTherapistSelection = ({
     };
     
     // Handler for cleanup events
-    const handleCircuitBreakerCleanup = () => {
-      console.log('[useTherapistSelection] Received circuit breaker cleanup event');
+    const handleCircuitBreakerCleanup = (event: Event) => {
+      const detail = (event as CustomEvent)?.detail || {};
+      logWithStack('Received circuit breaker cleanup event', {
+        source: detail.source || 'unknown',
+        timestamp: detail.timestamp ? new Date(detail.timestamp).toISOString() : 'unknown'
+      });
+      
       if (mountedRef.current) {
         // Only clear if we're in a good state
         if (!circuitOpen || attemptCount > 3) {
-          manualResetCircuitBreaker();
+          manualResetCircuitBreaker('cleanup-event');
         }
       }
     };
@@ -131,27 +177,38 @@ export const useTherapistSelection = ({
       window.removeEventListener(CIRCUIT_BREAKER_OPEN_EVENT, handleCircuitBreakerOpen);
       window.removeEventListener(CIRCUIT_BREAKER_CLEANUP_EVENT, handleCircuitBreakerCleanup);
     };
-  }, [attemptCount]);
+  }, [attemptCount, circuitOpen]);
   
   // Get circuit breaker state from storage on mount
   useEffect(() => {
     try {
       const storedState = sessionStorage.getItem(CIRCUIT_BREAKER_STORAGE_KEY);
       const timestamp = sessionStorage.getItem(`${CIRCUIT_BREAKER_STORAGE_KEY}_timestamp`);
+      const reason = sessionStorage.getItem(`${CIRCUIT_BREAKER_STORAGE_KEY}_reason`);
       
       if (storedState === 'open') {
         // Check if it's been too long since the circuit breaker was opened
         if (timestamp && (Date.now() - parseInt(timestamp)) > CIRCUIT_BREAKER_RESET_TIME * 1.5) {
-          console.log('[useTherapistSelection] Circuit breaker has been open for too long, resetting');
+          logWithStack('Circuit breaker has been open for too long, resetting', {
+            openSince: timestamp ? new Date(parseInt(timestamp)).toISOString() : 'unknown',
+            reason: reason || 'unknown',
+            openDuration: timestamp ? `${(Date.now() - parseInt(timestamp))/1000} seconds` : 'unknown'
+          }, true);
+          
           setCircuitOpen(false);
           try {
             sessionStorage.removeItem(CIRCUIT_BREAKER_STORAGE_KEY);
             sessionStorage.removeItem(`${CIRCUIT_BREAKER_STORAGE_KEY}_timestamp`);
+            sessionStorage.removeItem(`${CIRCUIT_BREAKER_STORAGE_KEY}_reason`);
           } catch (err) {
-            console.error('[useTherapistSelection] Error clearing stale circuit breaker state:', err);
+            logWithStack('Error clearing stale circuit breaker state', { error: err }, true);
           }
         } else {
-          console.log('[useTherapistSelection] Loading circuit breaker state from storage: open');
+          logWithStack('Loading circuit breaker state from storage: open', {
+            openSince: timestamp ? new Date(parseInt(timestamp)).toISOString() : 'unknown',
+            reason: reason || 'unknown'
+          });
+          
           setCircuitOpen(true);
           
           // Start reset timer
@@ -159,18 +216,20 @@ export const useTherapistSelection = ({
         }
       } else {
         // Reset circuit breaker on fresh component mount
-        console.log('[useTherapistSelection] Resetting circuit breaker state on component mount');
+        logWithStack('Resetting circuit breaker state on component mount');
         setCircuitOpen(false);
         
         // Ensure storage is clear
         sessionStorage.removeItem(CIRCUIT_BREAKER_STORAGE_KEY);
         sessionStorage.removeItem(`${CIRCUIT_BREAKER_STORAGE_KEY}_timestamp`);
+        sessionStorage.removeItem(`${CIRCUIT_BREAKER_STORAGE_KEY}_reason`);
         
         // Reset retry count
         retryCountRef.current = 0;
       }
     } catch (err) {
       // If storage access fails, just reset the circuit breaker
+      logWithStack('Error accessing sessionStorage', { error: err }, true);
       setCircuitOpen(false);
       retryCountRef.current = 0;
     }
@@ -178,7 +237,7 @@ export const useTherapistSelection = ({
     // Check if the debugger has any circuit breaker state
     const debuggerCircuitState = TherapistSelectionDebugger.getCircuitBreakerState();
     if (debuggerCircuitState === 'open') {
-      console.warn('[useTherapistSelection] Debugger reported circuit breaker in open state');
+      logWithStack('Debugger reported circuit breaker in open state', null, true);
       setCircuitOpen(true);
       resetCircuitBreaker(); // Start reset timer
     }
@@ -188,24 +247,31 @@ export const useTherapistSelection = ({
   useEffect(() => {
     try {
       if (circuitOpen) {
-        console.log('[useTherapistSelection] Saving circuit breaker state to storage: open');
+        logWithStack('Saving circuit breaker state to storage: open');
         sessionStorage.setItem(CIRCUIT_BREAKER_STORAGE_KEY, 'open');
         // Only set timestamp if it doesn't exist
         if (!sessionStorage.getItem(`${CIRCUIT_BREAKER_STORAGE_KEY}_timestamp`)) {
           sessionStorage.setItem(`${CIRCUIT_BREAKER_STORAGE_KEY}_timestamp`, Date.now().toString());
         }
+        
+        // Track reason if it doesn't exist
+        if (!sessionStorage.getItem(`${CIRCUIT_BREAKER_STORAGE_KEY}_reason`)) {
+          sessionStorage.setItem(`${CIRCUIT_BREAKER_STORAGE_KEY}_reason`, 'react-state-change');
+        }
       } else {
-        console.log('[useTherapistSelection] Removing circuit breaker state from storage');
+        logWithStack('Removing circuit breaker state from storage');
         sessionStorage.removeItem(CIRCUIT_BREAKER_STORAGE_KEY);
         sessionStorage.removeItem(`${CIRCUIT_BREAKER_STORAGE_KEY}_timestamp`);
+        sessionStorage.removeItem(`${CIRCUIT_BREAKER_STORAGE_KEY}_reason`);
       }
     } catch (err) {
-      console.error('[useTherapistSelection] Error handling circuit breaker storage:', err);
+      logWithStack('Error handling circuit breaker storage', { error: err }, true);
     }
   }, [circuitOpen]);
   
   // Check if network is connected
   const checkNetworkConnectivity = async (): Promise<boolean> => {
+    const startTime = Date.now();
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 5000);
@@ -217,10 +283,19 @@ export const useTherapistSelection = ({
       });
       
       clearTimeout(timeoutId);
-      console.log('[useTherapistSelection] Network connectivity check:', response.ok ? 'Online' : 'Offline');
+      const duration = Date.now() - startTime;
+      logWithStack('Network connectivity check', {
+        result: response.ok ? 'Online' : 'Offline',
+        duration: `${duration}ms`
+      });
       return true; // If we get here, network is connected (even if response is not ok due to CORS)
     } catch (error) {
-      console.log('[useTherapistSelection] Network connectivity check failed:', error);
+      const duration = Date.now() - startTime;
+      logWithStack('Network connectivity check failed', { 
+        error, 
+        navigatorOnline: navigator.onLine,
+        duration: `${duration}ms`
+      }, true);
       return navigator.onLine; // Fallback to navigator.onLine
     }
   };
@@ -231,40 +306,63 @@ export const useTherapistSelection = ({
       window.clearTimeout(circuitResetTimerRef.current);
     }
     
-    console.log('[useTherapistSelection] Setting circuit breaker reset timer');
+    logWithStack('Setting circuit breaker reset timer');
     // Reset after defined reset time
     circuitResetTimerRef.current = window.setTimeout(() => {
       if (mountedRef.current) {
-        console.log('[useTherapistSelection] Circuit breaker auto-reset after timeout');
+        logWithStack('Circuit breaker auto-reset after timeout', {
+          resetTime: `${CIRCUIT_BREAKER_RESET_TIME/1000} seconds`
+        }, true);
+        
         setCircuitOpen(false);
         retryCountRef.current = 0;
         try {
+          const reason = sessionStorage.getItem(`${CIRCUIT_BREAKER_STORAGE_KEY}_reason`);
+          const timestamp = sessionStorage.getItem(`${CIRCUIT_BREAKER_STORAGE_KEY}_timestamp`);
+          
+          logWithStack('Auto-resetting circuit breaker from timer', {
+            previousReason: reason || 'unknown',
+            openSince: timestamp ? new Date(parseInt(timestamp)).toISOString() : 'unknown',
+            openDuration: timestamp ? `${(Date.now() - parseInt(timestamp))/1000} seconds` : 'unknown'
+          });
+          
           sessionStorage.removeItem(CIRCUIT_BREAKER_STORAGE_KEY);
           sessionStorage.removeItem(`${CIRCUIT_BREAKER_STORAGE_KEY}_timestamp`);
+          sessionStorage.removeItem(`${CIRCUIT_BREAKER_STORAGE_KEY}_reason`);
           
           // Notify TherapistSelectionDebugger of reset
-          TherapistSelectionDebugger.resetCircuitBreaker();
+          TherapistSelectionDebugger.resetCircuitBreaker('hook-timer-expiry');
         } catch (err) {
-          console.error('[useTherapistSelection] Error during circuit breaker reset:', err);
+          logWithStack('Error during circuit breaker reset', { error: err }, true);
         }
       }
     }, CIRCUIT_BREAKER_RESET_TIME);
   }, []);
 
   // Function to manually reset the circuit breaker
-  const manualResetCircuitBreaker = useCallback(() => {
-    console.log('[useTherapistSelection] Manual circuit breaker reset');
+  const manualResetCircuitBreaker = useCallback((reason: string = 'manual-reset') => {
+    logWithStack(`Manual circuit breaker reset. Reason: ${reason}`, null, true);
     setCircuitOpen(false);
     retryCountRef.current = 0;
     
     // Also reset the debugger circuit breaker
-    TherapistSelectionDebugger.resetCircuitBreaker();
+    TherapistSelectionDebugger.resetCircuitBreaker(`hook-${reason}`);
     
     try {
+      const previousReason = sessionStorage.getItem(`${CIRCUIT_BREAKER_STORAGE_KEY}_reason`);
+      const timestamp = sessionStorage.getItem(`${CIRCUIT_BREAKER_STORAGE_KEY}_timestamp`);
+      
+      logWithStack('Removing circuit breaker from storage', {
+        previousReason: previousReason || 'unknown',
+        openSince: timestamp ? new Date(parseInt(timestamp)).toISOString() : 'unknown',
+        openDuration: timestamp ? `${(Date.now() - parseInt(timestamp))/1000} seconds` : 'unknown'
+      });
+      
       sessionStorage.removeItem(CIRCUIT_BREAKER_STORAGE_KEY);
       sessionStorage.removeItem(`${CIRCUIT_BREAKER_STORAGE_KEY}_timestamp`);
+      sessionStorage.removeItem(`${CIRCUIT_BREAKER_STORAGE_KEY}_reason`);
     } catch (err) {
-      console.error('[useTherapistSelection] Error removing circuit breaker from storage:', err);
+      logWithStack('Error removing circuit breaker from storage', { error: err }, true);
     }
     
     // Cancel any pending auto-reset
@@ -286,7 +384,7 @@ export const useTherapistSelection = ({
     
     // Check if circuit breaker is open
     if (circuitOpen) {
-      console.log('[useTherapistSelection] Circuit breaker is open, not attempting fetch');
+      logWithStack('Circuit breaker is open, not attempting fetch', null, true);
       setErrorMessage('Too many failed attempts. Please try again by clicking the refresh button.');
       setLoading(false);
       return;
@@ -294,7 +392,11 @@ export const useTherapistSelection = ({
     
     // Check retry count
     if (retryCountRef.current >= MAX_RETRY_ATTEMPTS) {
-      console.log(`[useTherapistSelection] Maximum retry attempts (${MAX_RETRY_ATTEMPTS}) reached`);
+      logWithStack(`Maximum retry attempts (${MAX_RETRY_ATTEMPTS}) reached`, { 
+        retryCount: retryCountRef.current,
+        maxRetries: MAX_RETRY_ATTEMPTS
+      }, true);
+      
       setCircuitOpen(true);
       resetCircuitBreaker();
       setErrorMessage('Maximum retry attempts reached. Please try again later by clicking the refresh button.');
@@ -314,7 +416,14 @@ export const useTherapistSelection = ({
       INITIAL_RETRY_DELAY * Math.pow(2, retryCountRef.current - 1) : 
       0;
     
-    console.log(`[useTherapistSelection] Fetching therapists (attempt ${retryCountRef.current}/${MAX_RETRY_ATTEMPTS}), backoff: ${backoffDelay}ms`);
+    logWithStack(`Fetching therapists (attempt ${retryCountRef.current}/${MAX_RETRY_ATTEMPTS})`, { 
+      backoffDelay: `${backoffDelay}ms`,
+      instanceId: instanceIdRef.current,
+      timestamp: new Date().toISOString()
+    });
+    
+    // Track operation start time
+    operationStartTimeRef.current = Date.now();
     
     // Apply backoff delay if this is a retry
     if (backoffDelay > 0) {
@@ -322,7 +431,7 @@ export const useTherapistSelection = ({
       
       // Check if component is still mounted after the delay
       if (!mountedRef.current) {
-        console.log('[useTherapistSelection] Component unmounted during backoff, aborting fetch');
+        logWithStack('Component unmounted during backoff, aborting fetch');
         return;
       }
     }
@@ -330,7 +439,7 @@ export const useTherapistSelection = ({
     // Check network connectivity before making request
     const isConnected = await checkNetworkConnectivity();
     if (!isConnected) {
-      console.log('[useTherapistSelection] Network connectivity check failed');
+      logWithStack('Network connectivity check failed', null, true);
       setErrorMessage('Network connectivity issue. Please check your internet connection and try again.');
       setLoading(false);
       return;
@@ -349,9 +458,10 @@ export const useTherapistSelection = ({
     
     try {
       // Strategy 1: Use case-insensitive comparison for clinician_status
-      console.log('[useTherapistSelection] Strategy 1: Using case-insensitive query for clinician_status');
+      logWithStack('Strategy 1: Using case-insensitive query for clinician_status');
       
       // Race between the actual query and the timeout
+      const strategyStartTime = Date.now();
       const result = await Promise.race([
         supabase
           .from('clinicians')
@@ -360,14 +470,27 @@ export const useTherapistSelection = ({
         timeoutPromise
       ]);
       
+      const strategyDuration = Date.now() - strategyStartTime;
+      
       therapistData = result.data || [];
       fetchError = result.error;
       
+      logWithStack('Strategy 1 result', { 
+        success: !result.error,
+        error: result.error,
+        resultCount: therapistData.length,
+        duration: `${strategyDuration}ms`
+      });
+      
       // If Strategy 1 fails, try Strategy 2
       if (fetchError || therapistData.length === 0) {
-        console.log('[useTherapistSelection] Strategy 1 failed or returned no results. Trying Strategy 2...');
+        logWithStack('Strategy 1 failed or returned no results. Trying Strategy 2...', {
+          error: fetchError,
+          resultCount: therapistData.length
+        }, true);
         
         // Strategy 2: Try without status filter (in case the enum is causing issues)
+        const strategy2StartTime = Date.now();
         const noStatusResult = await Promise.race([
           supabase
             .from('clinicians')
@@ -375,8 +498,13 @@ export const useTherapistSelection = ({
           timeoutPromise
         ]);
         
+        const strategy2Duration = Date.now() - strategy2StartTime;
+        
         if (!noStatusResult.error && noStatusResult.data && noStatusResult.data.length > 0) {
-          console.log('[useTherapistSelection] Strategy 2 succeeded (no status filter)');
+          logWithStack('Strategy 2 succeeded (no status filter)', {
+            rawResultCount: noStatusResult.data.length,
+            duration: `${strategy2Duration}ms`
+          });
           
           // Filter active status in-memory with case-insensitive comparison
           therapistData = noStatusResult.data.filter(t => {
@@ -388,14 +516,22 @@ export const useTherapistSelection = ({
           });
           
           if (therapistData.length > 0) {
-            console.log(`[useTherapistSelection] Found ${therapistData.length} active therapists after in-memory filtering`);
+            logWithStack(`Found ${therapistData.length} active therapists after in-memory filtering`, {
+              beforeFiltering: noStatusResult.data.length,
+              afterFiltering: therapistData.length
+            });
             fetchError = null;
           } else {
-            console.log('[useTherapistSelection] No active therapists found after in-memory filtering');
+            logWithStack('No active therapists found after in-memory filtering', {
+              totalTherapists: noStatusResult.data.length
+            }, true);
             fetchError = { message: 'No active therapists found' };
           }
         } else {
-          console.log('[useTherapistSelection] Strategy 2 also failed. Error:', noStatusResult.error);
+          logWithStack('Strategy 2 also failed', {
+            error: noStatusResult.error,
+            duration: `${strategy2Duration}ms`
+          }, true);
           fetchError = noStatusResult.error || { message: 'No therapists found' };
         }
       }
@@ -408,7 +544,7 @@ export const useTherapistSelection = ({
           therapistData[0].clinician_type === undefined;
         
         if (needsFieldMapping) {
-          console.log('[useTherapistSelection] Mapping clinician_title to clinician_type');
+          logWithStack('Mapping clinician_title to clinician_type');
           therapistData = therapistData.map(t => {
             const therapist = { ...t };
             therapist.clinician_type = (t as any).clinician_title;
@@ -423,7 +559,19 @@ export const useTherapistSelection = ({
           return therapist;
         });
         
-        console.log('[useTherapistSelection] Loaded', therapistData.length, 'therapists');
+        logWithStack('Loaded therapists', {
+          count: therapistData.length,
+          totalDuration: `${Date.now() - operationStartTimeRef.current}ms`
+        });
+        
+        // Snapshot of first therapist for debugging
+        if (therapistData.length > 0) {
+          logWithStack('First therapist data sample', {
+            id: therapistData[0].id,
+            name: therapistData[0].clinician_professional_name,
+            licensedStates: therapistData[0].clinician_licensed_states
+          });
+        }
         
         // Reset retry count on success
         retryCountRef.current = 0;
@@ -434,11 +582,16 @@ export const useTherapistSelection = ({
         // Apply filtering if enabled
         if (enableFiltering && (clientState || clientAge > 0)) {
           const filtered = filterTherapists(therapistData, clientState, clientAge);
-          console.log(`[useTherapistSelection] Filtering applied: ${filtered.length} therapists match criteria (from ${therapistData.length} total)`);
+          logWithStack(`Filtering applied`, {
+            before: therapistData.length,
+            after: filtered.length,
+            clientState,
+            clientAge
+          });
           setTherapists(filtered);
           setFilteringApplied(true);
         } else {
-          console.log('[useTherapistSelection] No filtering applied, showing all therapists');
+          logWithStack('No filtering applied, showing all therapists');
           setTherapists(therapistData);
           setFilteringApplied(false);
         }
@@ -446,9 +599,14 @@ export const useTherapistSelection = ({
         setErrorMessage(null);
         
         // Close the circuit breaker on successful fetch
-        manualResetCircuitBreaker();
+        manualResetCircuitBreaker('successful-data-fetch');
       } else if (fetchError) {
-        console.error('[useTherapistSelection] All fetch strategies failed:', fetchError);
+        logWithStack('All fetch strategies failed', { 
+          error: fetchError,
+          errorMessage: fetchError.message || 'Unknown error',
+          totalDuration: `${Date.now() - operationStartTimeRef.current}ms`
+        }, true);
+        
         setErrorMessage(`Error loading therapists: ${fetchError.message || 'Unknown error'}`);
         setTherapists([]);
         setAllTherapists([]);
@@ -459,18 +617,24 @@ export const useTherapistSelection = ({
           variant: "destructive"
         });
       } else {
-        console.log('[useTherapistSelection] No therapists found, but no error either');
+        logWithStack('No therapists found, but no error either', null, true);
         setTherapists([]);
         setAllTherapists([]);
         // Reset retry count since this is a valid empty result
         retryCountRef.current = 0;
       }
     } catch (error: any) {
-      console.error('[useTherapistSelection] Unexpected error:', error);
+      const totalDuration = Date.now() - operationStartTimeRef.current;
+      logWithStack('Unexpected error during fetch', { 
+        error,
+        errorMessage: error.message || 'Unknown error',
+        errorType: error.name,
+        totalDuration: `${totalDuration}ms`
+      }, true);
       
       // Check if this was an abort error (user navigated away)
       if (error.name === 'AbortError') {
-        console.log('[useTherapistSelection] Request was aborted');
+        logWithStack('Request was aborted');
         // Don't update state for aborted requests
         return;
       }
@@ -487,23 +651,35 @@ export const useTherapistSelection = ({
     } finally {
       // Only set loading to false if the component is still mounted
       if (mountedRef.current && !abortControllerRef.current?.signal.aborted) {
+        const totalDuration = Date.now() - operationStartTimeRef.current;
+        logWithStack('Fetch completed', { 
+          loading: false,
+          totalDuration: `${totalDuration}ms`,
+          therapistCount: therapistData.length,
+          hasError: !!fetchError
+        });
+        
         setLoading(false);
         setAttemptCount(prev => prev + 1);
-        console.log('[useTherapistSelection] Fetch completed, loading set to false');
       }
     }
   }, [clientState, clientAge, enableFiltering, resetCircuitBreaker, circuitOpen, toast, manualResetCircuitBreaker]);
   
   // Filter therapists based on client state and age
   const filterTherapists = (therapistList: Therapist[], state: string | null, age: number): Therapist[] => {
+    const startTime = Date.now();
+    
     // Add defensive check for null therapist list
     if (!therapistList || therapistList.length === 0) {
-      console.log('[useTherapistSelection] filterTherapists: Empty or null therapist list');
+      logWithStack('filterTherapists: Empty or null therapist list');
       return [];
     }
     
-    console.log('[useTherapistSelection] filterTherapists: Starting with', therapistList.length, 'therapists');
-    console.log('[useTherapistSelection] filterTherapists: Filtering by state:', state, 'and age:', age);
+    logWithStack('filterTherapists: Starting filter operation', {
+      therapistCount: therapistList.length,
+      clientState: state,
+      clientAge: age
+    });
     
     const filteredList = therapistList.filter(therapist => {
       // Skip null therapist entries
@@ -515,19 +691,23 @@ export const useTherapistSelection = ({
       // State Matching Logic
       if (state && therapist.clinician_licensed_states && therapist.clinician_licensed_states.length > 0) {
         const clientStateNormalized = state.toLowerCase().trim();
-        console.log(`[useTherapistSelection] Checking therapist ${therapist.id} licensed states:`, therapist.clinician_licensed_states);
         
         matchesState = therapist.clinician_licensed_states.some(s => {
           if (!s) return false;
           const stateNormalized = s.toLowerCase().trim();
           const matches = stateNormalized.includes(clientStateNormalized) || clientStateNormalized.includes(stateNormalized);
-          if (matches) {
-            console.log(`[useTherapistSelection] Therapist ${therapist.id} matches state ${state} with licensed state ${s}`);
-          }
           return matches;
         });
+        
+        if (!matchesState) {
+          logWithStack(`Therapist ${therapist.id} licensed states don't match client state`, {
+            clientState: state,
+            therapistStates: therapist.clinician_licensed_states,
+            therapistName: therapist.clinician_professional_name || `${therapist.clinician_first_name} ${therapist.clinician_last_name}`
+          });
+        }
       } else if (state && (!therapist.clinician_licensed_states || therapist.clinician_licensed_states.length === 0)) {
-        console.log(`[useTherapistSelection] Therapist ${therapist.id} has no licensed states but client state is ${state}`);
+        logWithStack(`Therapist ${therapist.id} has no licensed states but client state is ${state}`);
         matchesState = false;
       }
       
@@ -535,43 +715,45 @@ export const useTherapistSelection = ({
       if (age > 0 && therapist.clinician_min_client_age !== null) {
         matchesAge = age >= therapist.clinician_min_client_age;
         if (!matchesAge) {
-          console.log(`[useTherapistSelection] Therapist ${therapist.id} requires min age ${therapist.clinician_min_client_age} but client age is ${age}`);
+          logWithStack(`Therapist ${therapist.id} requires min age ${therapist.clinician_min_client_age} but client age is ${age}`);
         }
       }
       
-      const isMatch = matchesState && matchesAge;
-      if (!isMatch) {
-        console.log(`[useTherapistSelection] Therapist ${therapist.id} filtered out: matchesState=${matchesState}, matchesAge=${matchesAge}`);
-      }
-      
-      return isMatch;
+      return matchesState && matchesAge;
     });
     
-    console.log('[useTherapistSelection] filterTherapists: Filtered to', filteredList.length, 'therapists');
+    const duration = Date.now() - startTime;
+    logWithStack('filterTherapists: Filter operation completed', {
+      beforeCount: therapistList.length,
+      afterCount: filteredList.length,
+      duration: `${duration}ms`
+    });
+    
     return filteredList;
   };
   
   // Retry fetch function - increments attempt count to trigger the useEffect
   const retryFetch = useCallback(() => {
-    console.log('[useTherapistSelection] Manual retry triggered');
+    logWithStack('Manual retry triggered', null, true);
     // Reset circuit breaker on manual retry
-    manualResetCircuitBreaker();
+    manualResetCircuitBreaker('manual-retry');
     setAttemptCount(prev => prev + 1);
   }, [manualResetCircuitBreaker]);
   
   // Select therapist function
   const selectTherapist = useCallback(async (therapistId: string): Promise<boolean> => {
+    const startTime = Date.now();
     try {
       setSelectingTherapistId(therapistId);
-      console.log(`[useTherapistSelection] Selecting therapist with ID: ${therapistId}`);
+      logWithStack(`Selecting therapist with ID: ${therapistId}`);
       
       // Find the selected therapist to log details
       const selectedTherapist = therapists.find(t => t.id === therapistId);
-      console.log('[useTherapistSelection] Selected therapist details:', selectedTherapist);
+      logWithStack('Selected therapist details', selectedTherapist);
       
       const userId = await getUserId();
       if (!userId) {
-        console.error('[useTherapistSelection] Cannot select therapist - no authenticated user ID found');
+        logWithStack('Cannot select therapist - no authenticated user ID found', null, true);
         toast({
           title: "Authentication Required",
           description: "Please log in to select a therapist.",
@@ -580,11 +762,12 @@ export const useTherapistSelection = ({
         return false;
       }
       
-      console.log(`[useTherapistSelection] Updating client record for user ID: ${userId}`);
+      logWithStack(`Updating client record for user ID: ${userId}`);
       
       // Check network connectivity before operation
       const isConnected = await checkNetworkConnectivity();
       if (!isConnected) {
+        logWithStack('Network offline during therapist selection', null, true);
         toast({
           title: "Network Error",
           description: "You appear to be offline. Please check your internet connection and try again.",
@@ -597,6 +780,7 @@ export const useTherapistSelection = ({
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 8000);
       
+      const updateStartTime = Date.now();
       const { error } = await Promise.race([
         supabase
           .from('clients')
@@ -613,9 +797,14 @@ export const useTherapistSelection = ({
       ]);
       
       clearTimeout(timeoutId);
+      const updateDuration = Date.now() - updateStartTime;
         
       if (error) {
-        console.error("[useTherapistSelection] Error selecting therapist:", error);
+        logWithStack("Error selecting therapist", { 
+          error, 
+          duration: `${updateDuration}ms`
+        }, true);
+        
         toast({
           title: "Error",
           description: "Failed to select therapist. Please try again.",
@@ -626,7 +815,6 @@ export const useTherapistSelection = ({
       
       // Find the therapist object safely
       const therapist = therapists.find(t => t && t.id === therapistId);
-      console.log(`[useTherapistSelection] Therapist selected:`, therapist);
       
       // Handle display name with null safety
       let displayName = 'the selected therapist';
@@ -640,16 +828,28 @@ export const useTherapistSelection = ({
           if (fullName) displayName = fullName;
         }
       }
+      
+      logWithStack(`Therapist selection successful`, { 
+        therapistId, 
+        therapistName: displayName,
+        totalDuration: `${Date.now() - startTime}ms`
+      });
         
       toast({
         title: "Therapist Selected!",
         description: `You have selected ${displayName}.`,
       });
       
-      console.log(`[useTherapistSelection] Selection successful for ${displayName}`);
+      // Clean up circuit breaker on successful selection
+      manualResetCircuitBreaker('successful-therapist-selection');
+      
       return true;
     } catch (error: any) {
-      console.error("Exception in selectTherapist:", error);
+      logWithStack("Exception in selectTherapist", { 
+        error, 
+        duration: `${Date.now() - startTime}ms`
+      }, true);
+      
       toast({
         title: "Error",
         description: error.message || "An unexpected error occurred.",
@@ -659,15 +859,20 @@ export const useTherapistSelection = ({
     } finally {
       setSelectingTherapistId(null);
     }
-  }, [therapists, toast, checkNetworkConnectivity]);
+  }, [therapists, toast, checkNetworkConnectivity, manualResetCircuitBreaker]);
   
   // Helper function to get the authenticated user ID
   const getUserId = async (): Promise<string | null> => {
     try {
+      const startTime = Date.now();
       const { data: { user } } = await supabase.auth.getUser();
+      logWithStack("getUser completed", { 
+        userId: user?.id || null, 
+        duration: `${Date.now() - startTime}ms`
+      });
       return user?.id || null;
     } catch (error) {
-      console.error("Error getting authenticated user:", error);
+      logWithStack("Error getting authenticated user", { error }, true);
       return null;
     }
   };
@@ -676,10 +881,10 @@ export const useTherapistSelection = ({
   useEffect(() => {
     mountedRef.current = true;
     // Reset circuit breaker on component mount
-    manualResetCircuitBreaker();
+    manualResetCircuitBreaker('component-mount');
     
     return () => {
-      console.log(`[useTherapistSelection] Component unmounting (${instanceIdRef.current}), cleaning up resources`);
+      logWithStack(`Component unmounting (${instanceIdRef.current}), cleaning up resources`, null, true);
       mountedRef.current = false;
       
       // Abort any in-flight requests when component unmounts
@@ -696,24 +901,42 @@ export const useTherapistSelection = ({
       // Perform circuit breaker cleanup on successful operation or component unmount
       try {
         const storedState = sessionStorage.getItem(CIRCUIT_BREAKER_STORAGE_KEY);
+        const reason = sessionStorage.getItem(`${CIRCUIT_BREAKER_STORAGE_KEY}_reason`);
+        const timestamp = sessionStorage.getItem(`${CIRCUIT_BREAKER_STORAGE_KEY}_timestamp`);
+        
+        logWithStack('Component unmount circuit breaker cleanup check', {
+          storedState,
+          timestamp: timestamp ? new Date(parseInt(timestamp)).toISOString() : null,
+          reason,
+          therapistCount: therapists.length
+        });
+        
         if (!storedState || therapists.length > 0) {
           // If we have successful data or no circuit breaker state, clean up
           sessionStorage.removeItem(CIRCUIT_BREAKER_STORAGE_KEY);
           sessionStorage.removeItem(`${CIRCUIT_BREAKER_STORAGE_KEY}_timestamp`);
+          sessionStorage.removeItem(`${CIRCUIT_BREAKER_STORAGE_KEY}_reason`);
           
           // Dispatch cleanup event for other components
-          window.dispatchEvent(new CustomEvent(CIRCUIT_BREAKER_CLEANUP_EVENT));
-          console.log('[useTherapistSelection] Dispatched circuit breaker cleanup event on successful unmount');
+          window.dispatchEvent(
+            new CustomEvent(CIRCUIT_BREAKER_CLEANUP_EVENT, {
+              detail: {
+                source: 'useTherapistSelection-unmount',
+                timestamp: Date.now()
+              }
+            })
+          );
+          logWithStack('Dispatched circuit breaker cleanup event on successful unmount');
         }
       } catch (err) {
-        console.error('[useTherapistSelection] Error during unmount cleanup:', err);
+        logWithStack('Error during unmount cleanup', { error: err }, true);
       }
     };
   }, [manualResetCircuitBreaker, therapists.length]);
   
   // Fetch therapists when component mounts or when deps change
   useEffect(() => {
-    console.log('[useTherapistSelection] useEffect triggered - calling fetchTherapists()');
+    logWithStack('useEffect triggered - calling fetchTherapists()');
     
     if (mountedRef.current) {
       fetchTherapists();
@@ -731,4 +954,3 @@ export const useTherapistSelection = ({
     selectingTherapistId
   };
 };
-
