@@ -65,7 +65,6 @@ const isPastDate = (date: Date): boolean => {
 };
 
 export interface AppointmentBookingDialogProps {
-  // Update props to match how the component is used in MyPortal.tsx
   open: boolean;
   onOpenChange: (open: boolean) => void;
   clinicianId: string | null;
@@ -73,6 +72,7 @@ export interface AppointmentBookingDialogProps {
   clientId?: string | null; 
   onAppointmentBooked?: () => void;
   userTimeZone?: string;
+  viewOnly?: boolean; // New prop to indicate view-only mode
 }
 
 export const AppointmentBookingDialog: React.FC<AppointmentBookingDialogProps> = ({
@@ -82,7 +82,8 @@ export const AppointmentBookingDialog: React.FC<AppointmentBookingDialogProps> =
   clinicianName,
   clientId,
   onAppointmentBooked,
-  userTimeZone
+  userTimeZone,
+  viewOnly = false // Default to false for backward compatibility
 }) => {
   // Tomorrow as default
   const tomorrow = useMemo(() => addDays(new Date(), 1), []);
@@ -165,7 +166,7 @@ export const AppointmentBookingDialog: React.FC<AppointmentBookingDialogProps> =
     }
   }, [clinicianId]);
   
-  // Fetch clinician's availability blocks from the clinicians table (UPDATED FUNCTION)
+  // Fetch clinician's availability blocks from the clinicians table
   const fetchAvailabilityBlocks = useCallback(async () => {
     if (!clinicianId || !selectedDate) return;
     
@@ -515,23 +516,35 @@ export const AppointmentBookingDialog: React.FC<AppointmentBookingDialogProps> =
     return false;
   }, [availabilitySettings]);
 
+  // Update dialog title based on view mode
+  const dialogTitle = viewOnly 
+    ? `${clinicianName}'s Availability` 
+    : "Book an Appointment";
+
+  // Update dialog description based on view mode
+  const dialogDescription = viewOnly
+    ? "View the therapist's available appointment slots."
+    : "Select a date and time for your appointment.";
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Book an Appointment</DialogTitle>
+          <DialogTitle>{dialogTitle}</DialogTitle>
           <DialogDescription>
-            Select a date and time for your appointment.
+            {dialogDescription}
           </DialogDescription>
         </DialogHeader>
         
-        {/* Minimum days notice alert */}
-        <Alert className="mb-4">
-          <AlertTitle>Booking Notice Required</AlertTitle>
-          <AlertDescription>
-            Please note that appointments must be booked at least {availabilitySettings.min_days_ahead} day{availabilitySettings.min_days_ahead > 1 ? 's' : ''} in advance.
-          </AlertDescription>
-        </Alert>
+        {/* Minimum days notice alert - only show in booking mode */}
+        {!viewOnly && (
+          <Alert className="mb-4">
+            <AlertTitle>Booking Notice Required</AlertTitle>
+            <AlertDescription>
+              Please note that appointments must be booked at least {availabilitySettings.min_days_ahead} day{availabilitySettings.min_days_ahead > 1 ? 's' : ''} in advance.
+            </AlertDescription>
+          </Alert>
+        )}
         
         <div className="grid gap-6 md:grid-cols-2">
           {/* Calendar column */}
@@ -553,7 +566,7 @@ export const AppointmentBookingDialog: React.FC<AppointmentBookingDialogProps> =
           
           {/* Time slots column */}
           <div>
-            <h3 className="text-lg font-medium mb-2">Select a Time</h3>
+            <h3 className="text-lg font-medium mb-2">Available Times</h3>
             
             {/* Show loading spinner when loading */}
             {/* Show auth error if present */}
@@ -616,9 +629,10 @@ export const AppointmentBookingDialog: React.FC<AppointmentBookingDialogProps> =
                 {timeSlots.map((slot) => (
                   <Button
                     key={slot.time}
-                    variant={selectedTimeSlot === slot.time ? "default" : "outline"}
-                    onClick={() => setSelectedTimeSlot(slot.time)}
-                    className="justify-center"
+                    variant="outline"
+                    className={`justify-center ${viewOnly ? 'cursor-default' : ''}`}
+                    // In view-only mode, clicking time slots doesn't do anything
+                    onClick={viewOnly ? undefined : () => setSelectedTimeSlot(slot.time)}
                   >
                     {slot.formattedTime}
                   </Button>
@@ -628,8 +642,8 @@ export const AppointmentBookingDialog: React.FC<AppointmentBookingDialogProps> =
           </div>
         </div>
         
-        {/* Selected appointment summary */}
-        {selectedDate && selectedTimeSlot && (
+        {/* Selected appointment summary - only show in booking mode */}
+        {!viewOnly && selectedDate && selectedTimeSlot && (
           <div className="mt-4 p-4 border rounded-md bg-muted/50">
             <h3 className="font-medium mb-2">Appointment Summary</h3>
             <p>
@@ -667,15 +681,19 @@ export const AppointmentBookingDialog: React.FC<AppointmentBookingDialogProps> =
         )}
         
         <DialogFooter className="mt-6">
-          <Button variant="outline" onClick={handleClose} disabled={isBooking}>
-            Cancel
+          <Button variant="outline" onClick={handleClose}>
+            {viewOnly ? "Close" : "Cancel"}
           </Button>
-          <Button 
-            onClick={handleBookAppointment} 
-            disabled={!selectedDate || !selectedTimeSlot || isBooking}
-          >
-            {isBooking ? 'Booking...' : 'Book Appointment'}
-          </Button>
+          
+          {/* Only show Book button in booking mode */}
+          {!viewOnly && (
+            <Button 
+              onClick={handleBookAppointment} 
+              disabled={!selectedDate || !selectedTimeSlot || isBooking}
+            >
+              {isBooking ? 'Booking...' : 'Book Appointment'}
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>
