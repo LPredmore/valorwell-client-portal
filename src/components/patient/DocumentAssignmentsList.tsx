@@ -1,9 +1,9 @@
 
-import React, { useEffect } from 'react';
+import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { DocumentAssignment } from '@/integrations/supabase/client';
-import { ClipboardCheck, Loader2, Clock, CheckCircle2 } from 'lucide-react';
+import { ClipboardCheck, Loader2, Clock, CheckCircle2, RefreshCw } from 'lucide-react';
 
 interface DocumentAssignmentsListProps {
   assignments: DocumentAssignment[];
@@ -11,7 +11,8 @@ interface DocumentAssignmentsListProps {
   onStartForm: (assignment: DocumentAssignment) => void;
   onContinueForm: (assignment: DocumentAssignment) => void;
   onViewCompleted: (assignment: DocumentAssignment) => void;
-  onLoadComplete?: () => void;
+  onRefresh?: () => void;
+  error?: string | null;
 }
 
 const DocumentAssignmentsList: React.FC<DocumentAssignmentsListProps> = ({
@@ -20,14 +21,11 @@ const DocumentAssignmentsList: React.FC<DocumentAssignmentsListProps> = ({
   onStartForm,
   onContinueForm,
   onViewCompleted,
-  onLoadComplete
+  onRefresh,
+  error
 }) => {
-  useEffect(() => {
-    if (!isLoading && onLoadComplete) {
-      onLoadComplete();
-    }
-  }, [isLoading, onLoadComplete]);
-
+  // Removed useEffect that was causing infinite loop
+  
   const getStatusIcon = (status: string) => {
     switch(status) {
       case 'completed':
@@ -87,17 +85,44 @@ const DocumentAssignmentsList: React.FC<DocumentAssignmentsListProps> = ({
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <ClipboardCheck className="h-5 w-5 text-valorwell-600" />
-          Required Forms
-        </CardTitle>
-        <CardDescription>Please complete all assigned forms</CardDescription>
+      <CardHeader className="flex flex-row items-center justify-between">
+        <div>
+          <CardTitle className="flex items-center gap-2">
+            <ClipboardCheck className="h-5 w-5 text-valorwell-600" />
+            Required Forms
+          </CardTitle>
+          <CardDescription>Please complete all assigned forms</CardDescription>
+        </div>
+        {onRefresh && (
+          <Button 
+            variant="ghost" 
+            size="icon"
+            onClick={onRefresh}
+            disabled={isLoading}
+            title="Refresh assignments"
+          >
+            <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+          </Button>
+        )}
       </CardHeader>
       <CardContent>
         {isLoading ? (
           <div className="flex justify-center py-8">
             <Loader2 className="h-8 w-8 animate-spin text-valorwell-600" />
+          </div>
+        ) : error ? (
+          <div className="flex flex-col items-center justify-center py-8 text-center">
+            <ClipboardCheck className="h-12 w-12 text-amber-400 mb-4" />
+            <h3 className="text-lg font-medium">Error Loading Forms</h3>
+            <p className="text-sm text-gray-500 mt-1 mb-4">
+              {error}
+            </p>
+            {onRefresh && (
+              <Button onClick={onRefresh} variant="outline" className="mt-2">
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Retry
+              </Button>
+            )}
           </div>
         ) : assignments.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-8 text-center">

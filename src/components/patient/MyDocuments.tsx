@@ -3,19 +3,12 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
-import { Calendar, Eye, FileText, Loader2 } from 'lucide-react';
+import { Calendar, Eye, FileText, Loader2, RefreshCw } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
-import { getCurrentUser, fetchClinicalDocuments, getDocumentDownloadURL } from '@/integrations/supabase/client';
-
-interface ClinicalDocument {
-  id: string;
-  document_title: string;
-  document_type: string;
-  document_date: string;
-  file_path: string;
-  created_at: string;
-}
+import { getCurrentUser } from '@/integrations/supabase/client';
+import { useDocuments } from '@/hooks/useDocuments';
+import { getDocumentDownloadURLWithRetry } from '@/utils/enhancedFetching';
 
 type MyDocumentsProps = {
   clientId?: string;
@@ -23,84 +16,73 @@ type MyDocumentsProps = {
 };
 
 const MyDocuments: React.FC<MyDocumentsProps> = ({ clientId, excludedTypes = [] }) => {
-  const [documents, setDocuments] = useState<ClinicalDocument[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const [userId, setUserId] = useState<string | undefined>(clientId);
+  const [userLoading, setUserLoading] = useState<boolean>(!clientId);
+  const [userError, setUserError] = useState<string | null>(null);
+  
+  const { 
+    documents, 
+    isLoading: docsLoading, 
+    loadError: docsError, 
+    fetchDocuments, 
+    retryFetch 
+  } = useDocuments(userId);
 
+  // Filter documents based on excludedTypes
+  const filteredDocuments = excludedTypes.length > 0
+    ? documents.filter(doc => !excludedTypes.includes(doc.document_type))
+    : documents;
+
+  // Only fetch current user if no clientId is provided
   useEffect(() => {
-    const loadDocuments = async () => {
-      setIsLoading(true);
-      setLoadError(null);
-      
-      try {
-        // If clientId is passed as prop, use it; otherwise get current user
-        let userId = clientId;
+    if (!clientId) {
+      const fetchCurrentUser = async () => {
+        setUserLoading(true);
+        setUserError(null);
         
-        if (!userId) {
-          console.log('No client ID provided, fetching current user');
+        try {
           const { user, error } = await getCurrentUser();
+          
           if (error || !user) {
             console.error('Error getting current user:', error);
-            setLoadError('Could not verify your identity. Please try again.');
-            setIsLoading(false);
+            setUserError('Could not verify your identity. Please try again.');
             return;
           }
-          userId = user.id;
-          console.log('Using current user ID:', userId);
-        } else {
-          console.log('Using provided client ID:', userId);
+          
+          setUserId(user.id);
+        } catch (error) {
+          console.error('Exception getting current user:', error);
+          setUserError('Could not verify your identity. Please try again.');
+        } finally {
+          setUserLoading(false);
         }
-        
-        // Fetch all documents
-        console.log('Fetching clinical documents for client:', userId);
-        const allDocs = await fetchClinicalDocuments(userId);
-        
-        if (!allDocs || allDocs.length === 0) {
-          console.log('No documents found for client:', userId);
-          setDocuments([]);
-          setIsLoading(false);
-          return;
-        }
-        
-        console.log('Fetched clinical documents:', allDocs);
-        
-        // Validate document records to ensure they have proper paths
-        const validatedDocs = allDocs.filter(doc => {
-          if (!doc.file_path) {
-            console.warn('Document missing file_path:', doc.id);
-            return false;
-          }
-          return true;
-        });
-        
-        // Filter out excluded document types
-        const filteredDocs = excludedTypes.length > 0
-          ? validatedDocs.filter(doc => !excludedTypes.includes(doc.document_type))
-          : validatedDocs;
-        
-        console.log('Filtered clinical documents:', filteredDocs);
-        setDocuments(filteredDocs);
-      } catch (error) {
-        console.error('Error loading documents:', error);
-        setLoadError('Failed to load your documents. Please try again later.');
-        toast.error("Failed to load your documents");
-      } finally {
-        setIsLoading(false);
-      }
-    };
+      };
+      
+      fetchCurrentUser();
+    }
+  }, [clientId]);
 
-    loadDocuments();
-  }, [clientId, excludedTypes]);
+  // Fetch documents once we have a user ID
+  useEffect(() => {
+    if (userId && !docsLoading) {
+      fetchDocuments(false);
+    }
+  }, [userId, fetchDocuments, docsLoading]);
 
   const handleViewDocument = async (filePath: string) => {
     try {
+      if (!filePath) {
+        toast.error("Document path is missing");
+        return;
+      }
+      
       console.log('Getting document URL for file path:', filePath);
-      const url = await getDocumentDownloadURL(filePath);
+      const url = await getDocumentDownloadURLWithRetry(filePath);
+      
       if (url) {
-        console.log('Opening document URL:', url);
+        console.log('Opening document URL');
         window.open(url, '_blank');
       } else {
-        console.error('Could not retrieve document URL');
         toast.error("Could not retrieve document URL");
       }
     } catch (error) {
@@ -109,24 +91,61 @@ const MyDocuments: React.FC<MyDocumentsProps> = ({ clientId, excludedTypes = [] 
     }
   };
 
+  const handleRefresh = () => {
+    if (userId) {
+      retryFetch();
+    } else if (!clientId) {
+      setUserLoading(true);
+      setUserError(null);
+      // Re-fetch current user and documents
+      getCurrentUser().then(({ user, error }) => {
+        if (error || !user) {
+          setUserError('Could not verify your identity. Please try again.');
+          setUserLoading(false);
+          return;
+        }
+        setUserId(user.id);
+        setUserLoading(false);
+      });
+    }
+  };
+
+  const isLoading = userLoading || docsLoading;
+  const errorMessage = userError || docsError;
+
   return (
     <Card>
-      <CardHeader>
-        <CardTitle>Completed Documents</CardTitle>
-        <CardDescription>View and download your completed documents</CardDescription>
+      <CardHeader className="flex flex-row items-center justify-between">
+        <div>
+          <CardTitle>Completed Documents</CardTitle>
+          <CardDescription>View and download your completed documents</CardDescription>
+        </div>
+        <Button 
+          variant="ghost" 
+          size="icon"
+          onClick={handleRefresh}
+          disabled={isLoading}
+          title="Refresh documents"
+        >
+          <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+        </Button>
       </CardHeader>
       <CardContent className="space-y-4">
         {isLoading ? (
           <div className="flex justify-center py-8">
             <Loader2 className="h-8 w-8 animate-spin text-valorwell-600" />
           </div>
-        ) : loadError ? (
+        ) : errorMessage ? (
           <div className="flex flex-col items-center justify-center py-8 text-center">
             <FileText className="h-12 w-12 text-amber-400 mb-3" />
             <h3 className="text-lg font-medium text-amber-700">Error loading documents</h3>
-            <p className="text-sm text-gray-500 mt-1">{loadError}</p>
+            <p className="text-sm text-gray-500 mt-1 mb-4">{errorMessage}</p>
+            <Button onClick={handleRefresh} variant="outline">
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Retry
+            </Button>
           </div>
-        ) : documents.length === 0 ? (
+        ) : filteredDocuments.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-8 text-center">
             <FileText className="h-12 w-12 text-gray-300 mb-3" />
             <h3 className="text-lg font-medium">No documents available</h3>
@@ -148,7 +167,7 @@ const MyDocuments: React.FC<MyDocumentsProps> = ({ clientId, excludedTypes = [] 
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {documents.map((doc) => (
+                {filteredDocuments.map((doc) => (
                   <TableRow key={doc.id}>
                     <TableCell className="font-medium">{doc.document_title}</TableCell>
                     <TableCell>{formatDocumentType(doc.document_type)}</TableCell>

@@ -2,72 +2,36 @@
 import React, { useState, useEffect } from 'react';
 import Layout from '@/components/layout/Layout';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { FileText, ClipboardCheck } from 'lucide-react';
-import { fetchDocumentAssignments, DocumentAssignment } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
+import { FileText, ClipboardCheck, AlertCircle } from 'lucide-react';
+import { toast } from 'sonner';
 import DocumentAssignmentsList from '@/components/patient/DocumentAssignmentsList';
 import DocumentFormRenderer from '@/components/patient/DocumentFormRenderer';
 import MyDocuments from '@/components/patient/MyDocuments';
 import { useAuth } from '@/context/NewAuthContext';
+import { useDocumentAssignments } from '@/hooks/useDocumentAssignments';
+import { DocumentAssignment } from '@/integrations/supabase/client';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 const PatientDocuments: React.FC = () => {
-  const [loading, setLoading] = useState(true);
-  const [assignments, setAssignments] = useState<DocumentAssignment[]>([]);
   const [selectedAssignment, setSelectedAssignment] = useState<DocumentAssignment | null>(null);
   const [isFormMode, setIsFormMode] = useState(false);
   const [activeTab, setActiveTab] = useState('assignments');
-  const { toast } = useToast();
   const { userId } = useAuth();
+  
+  const {
+    assignments,
+    isLoading: assignmentsLoading,
+    loadError: assignmentsError,
+    fetchAssignments,
+    retryFetch: retryAssignmentsFetch
+  } = useDocumentAssignments(userId || undefined);
 
+  // Initial load of assignments
   useEffect(() => {
-    const loadAssignments = async () => {
-      setLoading(true);
-      try {
-        if (!userId) {
-          console.error('No user ID available - cannot load documents');
-          toast({
-            title: "Authentication required",
-            description: "Please log in to view your documents",
-            variant: "destructive"
-          });
-          return;
-        }
-        
-        console.log('Loading document assignments for user ID:', userId);
-        
-        // Fetch the document assignments for this user
-        const { data, error: assignmentsError } = await fetchDocumentAssignments(userId);
-        if (assignmentsError) {
-          console.error('Error loading document assignments:', assignmentsError);
-          toast({
-            title: "Error",
-            description: "Failed to load document assignments",
-            variant: "destructive"
-          });
-          return;
-        }
-        
-        if (data) {
-          console.log('Loaded document assignments:', data);
-          setAssignments(data);
-        } else {
-          console.log('No document assignments found');
-          setAssignments([]);
-        }
-      } catch (error) {
-        console.error('Exception while loading assignments:', error);
-        toast({
-          title: "Error",
-          description: "Failed to load document assignments",
-          variant: "destructive"
-        });
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadAssignments();
-  }, [toast, userId]);
+    if (userId) {
+      fetchAssignments();
+    }
+  }, [userId, fetchAssignments]);
 
   const handleStartForm = (assignment: DocumentAssignment) => {
     console.log('Starting form:', assignment);
@@ -84,10 +48,7 @@ const PatientDocuments: React.FC = () => {
   const handleViewCompleted = (assignment: DocumentAssignment) => {
     // In a real application, this would open the completed form
     console.log('Viewing completed form:', assignment);
-    toast({
-      title: "View Completed Form",
-      description: `Viewing ${assignment.document_name}`,
-    });
+    toast("Viewing " + assignment.document_name);
   };
 
   const handleCancelForm = () => {
@@ -97,51 +58,52 @@ const PatientDocuments: React.FC = () => {
   };
 
   const handleSaveForm = () => {
-    console.log('Form saved, refreshing assignments');
-    // Refresh the assignments list after saving
-    if (userId) {
-      fetchDocumentAssignments(userId).then(({ data }) => {
-        if (data) {
-          setAssignments(data);
-        }
-      });
-    }
-    
+    console.log('Form saved');
     setIsFormMode(false);
     setSelectedAssignment(null);
+    
+    // Refresh the assignments list after saving
+    if (userId) {
+      fetchAssignments(true);
+    }
   };
 
   const handleCompleteForm = () => {
-    console.log('Form completed, refreshing assignments');
-    // Refresh the assignments list after completing
-    if (userId) {
-      fetchDocumentAssignments(userId).then(({ data }) => {
-        if (data) {
-          setAssignments(data);
-        }
-      });
-    }
-    
-    toast({
-      title: "Form Completed",
-      description: "Thank you for submitting your form.",
-    });
+    console.log('Form completed');
+    toast("Thank you for submitting your form.");
     
     setIsFormMode(false);
     setSelectedAssignment(null);
+    
+    // Refresh the assignments list after completing
+    if (userId) {
+      fetchAssignments(true);
+    }
   };
 
   const handleRefreshAssignments = () => {
-    console.log('Refreshing document assignments');
+    console.log('Manually refreshing document assignments');
     if (userId) {
-      fetchDocumentAssignments(userId).then(({ data }) => {
-        if (data) {
-          console.log('Refreshed assignments:', data);
-          setAssignments(data);
-        }
-      });
+      retryAssignmentsFetch();
     }
   };
+
+  if (!userId) {
+    return (
+      <Layout>
+        <div className="flex flex-col gap-6">
+          <h1 className="text-3xl font-bold tracking-tight">Patient Documents</h1>
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Authentication Required</AlertTitle>
+            <AlertDescription>
+              Please log in to view your documents.
+            </AlertDescription>
+          </Alert>
+        </div>
+      </Layout>
+    );
+  }
 
   return (
     <Layout>
@@ -178,16 +140,17 @@ const PatientDocuments: React.FC = () => {
             <TabsContent value="assignments" className="mt-0">
               <DocumentAssignmentsList
                 assignments={assignments}
-                isLoading={loading}
+                isLoading={assignmentsLoading}
                 onStartForm={handleStartForm}
                 onContinueForm={handleContinueForm}
                 onViewCompleted={handleViewCompleted}
-                onLoadComplete={handleRefreshAssignments}
+                onRefresh={handleRefreshAssignments}
+                error={assignmentsError}
               />
             </TabsContent>
             
             <TabsContent value="documents" className="mt-0">
-              <MyDocuments clientId={userId || undefined} excludedTypes={['session_note', 'treatment_plan']} />
+              <MyDocuments clientId={userId} excludedTypes={['session_note', 'treatment_plan']} />
             </TabsContent>
           </Tabs>
         )}
