@@ -3,10 +3,11 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
-import { Calendar, Eye, FileText, Loader2 } from 'lucide-react';
+import { Calendar, Eye, FileText, Loader2, AlertCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { getCurrentUser, fetchClinicalDocuments, getDocumentDownloadURL } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 interface ClinicalDocument {
   id: string;
@@ -25,6 +26,8 @@ type MyDocumentsProps = {
 const MyDocuments: React.FC<MyDocumentsProps> = ({ clientId, excludedTypes = [] }) => {
   const [documents, setDocuments] = useState<ClinicalDocument[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadingDocuments, setLoadingDocuments] = useState<Record<string, boolean>>({});
+  const [erroredDocuments, setErroredDocuments] = useState<Record<string, boolean>>({});
   const { toast } = useToast();
 
   useEffect(() => {
@@ -75,14 +78,22 @@ const MyDocuments: React.FC<MyDocumentsProps> = ({ clientId, excludedTypes = [] 
     loadDocuments();
   }, [clientId, excludedTypes, toast]);
 
-  const handleViewDocument = async (filePath: string) => {
+  const handleViewDocument = async (doc: ClinicalDocument) => {
     try {
-      console.log('Getting document URL for file path:', filePath);
-      const url = await getDocumentDownloadURL(filePath);
+      // Mark document as loading
+      setLoadingDocuments(prev => ({ ...prev, [doc.id]: true }));
+      setErroredDocuments(prev => ({ ...prev, [doc.id]: false }));
+      
+      console.log('Getting document URL for file path:', doc.file_path);
+      const url = await getDocumentDownloadURL(doc.file_path);
+      
+      setLoadingDocuments(prev => ({ ...prev, [doc.id]: false }));
+      
       if (url) {
         console.log('Opening document URL:', url);
         window.open(url, '_blank');
       } else {
+        setErroredDocuments(prev => ({ ...prev, [doc.id]: true }));
         console.error('Could not retrieve document URL');
         toast({
           title: "Error",
@@ -91,6 +102,8 @@ const MyDocuments: React.FC<MyDocumentsProps> = ({ clientId, excludedTypes = [] 
         });
       }
     } catch (error) {
+      setLoadingDocuments(prev => ({ ...prev, [doc.id]: false }));
+      setErroredDocuments(prev => ({ ...prev, [doc.id]: true }));
       console.error('Error viewing document:', error);
       toast({
         title: "Error",
@@ -98,6 +111,14 @@ const MyDocuments: React.FC<MyDocumentsProps> = ({ clientId, excludedTypes = [] 
         variant: "destructive"
       });
     }
+  };
+
+  const handleRetryDocument = async (doc: ClinicalDocument) => {
+    toast({
+      title: "Retrying Document",
+      description: "Attempting to retrieve document again...",
+    });
+    await handleViewDocument(doc);
   };
 
   return (
@@ -134,7 +155,7 @@ const MyDocuments: React.FC<MyDocumentsProps> = ({ clientId, excludedTypes = [] 
               </TableHeader>
               <TableBody>
                 {documents.map((doc) => (
-                  <TableRow key={doc.id}>
+                  <TableRow key={doc.id} className={erroredDocuments[doc.id] ? "bg-red-50" : ""}>
                     <TableCell className="font-medium">{doc.document_title}</TableCell>
                     <TableCell>{formatDocumentType(doc.document_type)}</TableCell>
                     <TableCell>
@@ -144,14 +165,31 @@ const MyDocuments: React.FC<MyDocumentsProps> = ({ clientId, excludedTypes = [] 
                       </div>
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleViewDocument(doc.file_path)}
-                      >
-                        <Eye className="h-4 w-4 mr-1" />
-                        View
-                      </Button>
+                      {erroredDocuments[doc.id] ? (
+                        <div className="flex items-center justify-end gap-2">
+                          <AlertCircle className="h-4 w-4 text-red-500" />
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleRetryDocument(doc)}
+                          >
+                            Retry
+                          </Button>
+                        </div>
+                      ) : (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleViewDocument(doc)}
+                          disabled={loadingDocuments[doc.id]}
+                        >
+                          {loadingDocuments[doc.id] ? (
+                            <><Loader2 className="h-4 w-4 mr-1 animate-spin" /> Loading</>
+                          ) : (
+                            <><Eye className="h-4 w-4 mr-1" /> View</>
+                          )}
+                        </Button>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}

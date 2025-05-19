@@ -1,3 +1,4 @@
+
 import React, { useState, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
@@ -12,7 +13,6 @@ import { useAuth } from '@/context/NewAuthContext';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { handleFormSubmission } from '@/utils/formSubmissionUtils';
-import { supabase } from '@/integrations/supabase/client';
 
 // Form validation schema
 const formSchema = z.object({
@@ -75,7 +75,7 @@ const InformedConsentTemplate: React.FC<InformedConsentTemplateProps> = ({
         signatureDate: format(new Date(), 'MMMM d, yyyy')
       };
 
-      // Create document info for PDF generation
+      // Create document info for PDF generation - using standardized document type
       const documentInfo = {
         clientId: userId,
         documentType: 'informed_consent',

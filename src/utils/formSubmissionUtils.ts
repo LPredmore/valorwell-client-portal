@@ -5,6 +5,9 @@ import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import { v4 as uuidv4 } from 'uuid';
 
+// Standardize on BUCKET_NAME constant to ensure consistency across the application
+const BUCKET_NAME = 'clinical_documents';
+
 /**
  * Handles document form submission by generating a PDF and updating related database records
  * 
@@ -63,32 +66,48 @@ export const handleFormSubmission = async (
       imgHeight
     );
     
-    // Generate a unique filename with timestamp to prevent caching issues
+    // Generate a unique filename with proper structure: {clientId}/{documentType}/{uuid}_{timestamp}.pdf
     const timestamp = new Date().getTime();
-    const filename = `${documentInfo.documentType}_${uuidv4()}_${timestamp}.pdf`;
+    const uniqueId = uuidv4();
+    const filename = `${uniqueId}_${timestamp}.pdf`;
+    const filePath = `${documentInfo.clientId}/${documentInfo.documentType}/${filename}`;
     
     // Convert PDF to blob
     const pdfBlob = pdf.output('blob');
     
-    console.log(`[formSubmissionUtils] PDF generated successfully, uploading to documents bucket path: ${documentInfo.clientId}/${filename}`);
+    console.log(`[formSubmissionUtils] PDF generated successfully, uploading to ${BUCKET_NAME} bucket path: ${filePath}`);
     
-    // Step 2: Upload PDF to Supabase storage - using the correct bucket
+    // Step 2: Upload PDF to Supabase storage - using the standardized bucket name
     const { data: uploadData, error: uploadError } = await supabase.storage
-      .from('documents')
-      .upload(`${documentInfo.clientId}/${filename}`, pdfBlob, {
+      .from(BUCKET_NAME)
+      .upload(filePath, pdfBlob, {
         contentType: 'application/pdf',
         upsert: false
       });
     
     if (uploadError) {
-      console.error('[formSubmissionUtils] Error uploading document:', uploadError);
-      throw new Error(`Error uploading document: ${uploadError.message}`);
+      console.error(`[formSubmissionUtils] Error uploading document to ${BUCKET_NAME} bucket:`, uploadError);
+      
+      // Try again with alternate bucket as a fallback (in case we're dealing with legacy data)
+      const fallbackBucket = 'documents';
+      console.warn(`[formSubmissionUtils] Attempting fallback upload to '${fallbackBucket}' bucket`);
+      
+      const { data: fallbackData, error: fallbackError } = await supabase.storage
+        .from(fallbackBucket)
+        .upload(filePath, pdfBlob, {
+          contentType: 'application/pdf',
+          upsert: false
+        });
+        
+      if (fallbackError) {
+        console.error('[formSubmissionUtils] Fallback upload also failed:', fallbackError);
+        throw new Error(`Error uploading document: ${uploadError.message}`);
+      } else {
+        console.log('[formSubmissionUtils] Fallback upload succeeded:', fallbackData);
+      }
+    } else {
+      console.log('[formSubmissionUtils] Document uploaded successfully:', uploadData);
     }
-    
-    console.log('[formSubmissionUtils] Document uploaded successfully:', uploadData);
-    
-    // The file path should be relative to the bucket
-    const filePath = `${documentInfo.clientId}/${filename}`;
     
     // Step 3: Create document record in database
     const { data: docData, error: docError } = await supabase
