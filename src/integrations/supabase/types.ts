@@ -2256,6 +2256,7 @@ export type Database = {
         | "Discharged"
         | "Blacklist"
         | "Do Not Contact"
+        | "Scheduled"
       client_va_coverage_type:
         | "CHAMPVA"
         | "VA Community Care"
@@ -2466,6 +2467,7 @@ export const Constants = {
         "Discharged",
         "Blacklist",
         "Do Not Contact",
+        "Scheduled",
       ],
       client_va_coverage_type: [
         "CHAMPVA",

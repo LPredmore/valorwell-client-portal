@@ -1,4 +1,3 @@
-
 import { createClient } from '@supabase/supabase-js';
 
 // Get Supabase URL and anon key from environment
@@ -47,6 +46,8 @@ export const updateDocumentStatus = async (id: string, status: string): Promise<
 // Function to fetch document assignments for a client
 export const fetchDocumentAssignments = async (clientId: string): Promise<{ data: DocumentAssignment[] | null; error: any }> => {
   try {
+    console.log('Fetching document assignments for client:', clientId);
+    
     const { data, error } = await supabase
       .from('document_assignments')
       .select('*')
@@ -58,6 +59,7 @@ export const fetchDocumentAssignments = async (clientId: string): Promise<{ data
       return { data: null, error };
     }
 
+    console.log('Fetched document assignments:', data);
     return { data: data as DocumentAssignment[], error: null };
   } catch (error) {
     console.error('Exception while fetching document assignments:', error);
@@ -103,6 +105,8 @@ export const getOrCreateVideoRoom = async (appointmentId: string): Promise<{ suc
 // Function to fetch clinical documents for a client
 export const fetchClinicalDocuments = async (clientId: string): Promise<any[]> => {
   try {
+    console.log('Fetching clinical documents for client:', clientId);
+    
     const { data, error } = await supabase
       .from('clinical_documents')
       .select('*')
@@ -114,6 +118,7 @@ export const fetchClinicalDocuments = async (clientId: string): Promise<any[]> =
       return [];
     }
 
+    console.log('Fetched clinical documents:', data);
     return data || [];
   } catch (error) {
     console.error('Error fetching clinical documents:', error);
@@ -386,4 +391,26 @@ export const createUser = async (userData: any): Promise<{ success: boolean; dat
   // This would typically call a Supabase Edge Function to create a user
   console.warn('createUser is not fully implemented - would call an Edge Function');
   return { success: false, error: 'Not implemented' };
+};
+
+// Function to save document submission
+export const saveDocumentSubmission = async (documentData: any): Promise<{ success: boolean; data?: any; error?: any }> => {
+  try {
+    console.log('Saving document submission:', documentData);
+    
+    const { data, error } = await supabase
+      .from('clinical_documents')
+      .insert(documentData)
+      .select();
+
+    if (error) {
+      console.error('Error saving document submission:', error);
+      return { success: false, error };
+    }
+
+    return { success: true, data: data[0] };
+  } catch (error) {
+    console.error('Exception while saving document submission:', error);
+    return { success: false, error };
+  }
 };

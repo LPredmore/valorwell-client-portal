@@ -17,13 +17,14 @@ const PatientDocuments: React.FC = () => {
   const [isFormMode, setIsFormMode] = useState(false);
   const [activeTab, setActiveTab] = useState('assignments');
   const { toast } = useToast();
-  const { userId } = useAuth(); // Changed from getCurrentUser to useAuth
+  const { userId } = useAuth();
 
   useEffect(() => {
     const loadAssignments = async () => {
       setLoading(true);
       try {
         if (!userId) {
+          console.error('No user ID available - cannot load documents');
           toast({
             title: "Authentication required",
             description: "Please log in to view your documents",
@@ -32,9 +33,12 @@ const PatientDocuments: React.FC = () => {
           return;
         }
         
+        console.log('Loading document assignments for user ID:', userId);
+        
         // Fetch the document assignments for this user
         const { data, error: assignmentsError } = await fetchDocumentAssignments(userId);
         if (assignmentsError) {
+          console.error('Error loading document assignments:', assignmentsError);
           toast({
             title: "Error",
             description: "Failed to load document assignments",
@@ -44,10 +48,14 @@ const PatientDocuments: React.FC = () => {
         }
         
         if (data) {
+          console.log('Loaded document assignments:', data);
           setAssignments(data);
+        } else {
+          console.log('No document assignments found');
+          setAssignments([]);
         }
       } catch (error) {
-        console.error('Error loading assignments:', error);
+        console.error('Exception while loading assignments:', error);
         toast({
           title: "Error",
           description: "Failed to load document assignments",
@@ -62,17 +70,20 @@ const PatientDocuments: React.FC = () => {
   }, [toast, userId]);
 
   const handleStartForm = (assignment: DocumentAssignment) => {
+    console.log('Starting form:', assignment);
     setSelectedAssignment(assignment);
     setIsFormMode(true);
   };
 
   const handleContinueForm = (assignment: DocumentAssignment) => {
+    console.log('Continuing form:', assignment);
     setSelectedAssignment(assignment);
     setIsFormMode(true);
   };
 
   const handleViewCompleted = (assignment: DocumentAssignment) => {
     // In a real application, this would open the completed form
+    console.log('Viewing completed form:', assignment);
     toast({
       title: "View Completed Form",
       description: `Viewing ${assignment.document_name}`,
@@ -80,11 +91,13 @@ const PatientDocuments: React.FC = () => {
   };
 
   const handleCancelForm = () => {
+    console.log('Canceling form editing');
     setIsFormMode(false);
     setSelectedAssignment(null);
   };
 
   const handleSaveForm = () => {
+    console.log('Form saved, refreshing assignments');
     // Refresh the assignments list after saving
     if (userId) {
       fetchDocumentAssignments(userId).then(({ data }) => {
@@ -99,6 +112,7 @@ const PatientDocuments: React.FC = () => {
   };
 
   const handleCompleteForm = () => {
+    console.log('Form completed, refreshing assignments');
     // Refresh the assignments list after completing
     if (userId) {
       fetchDocumentAssignments(userId).then(({ data }) => {
@@ -118,9 +132,11 @@ const PatientDocuments: React.FC = () => {
   };
 
   const handleRefreshAssignments = () => {
+    console.log('Refreshing document assignments');
     if (userId) {
       fetchDocumentAssignments(userId).then(({ data }) => {
         if (data) {
+          console.log('Refreshed assignments:', data);
           setAssignments(data);
         }
       });

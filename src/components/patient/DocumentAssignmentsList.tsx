@@ -1,21 +1,18 @@
 
-import React from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import React, { useEffect } from 'react';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
-import { FileCheck, FileText, ClipboardCheck } from 'lucide-react';
-import { format } from 'date-fns';
-import { useToast } from '@/hooks/use-toast';
 import { DocumentAssignment } from '@/integrations/supabase/client';
+import { ClipboardCheck, Loader2, Clock, CheckCircle2 } from 'lucide-react';
 
-type DocumentAssignmentsListProps = {
+interface DocumentAssignmentsListProps {
   assignments: DocumentAssignment[];
   isLoading: boolean;
   onStartForm: (assignment: DocumentAssignment) => void;
   onContinueForm: (assignment: DocumentAssignment) => void;
   onViewCompleted: (assignment: DocumentAssignment) => void;
-  onLoadComplete: () => void;
-};
+  onLoadComplete?: () => void;
+}
 
 const DocumentAssignmentsList: React.FC<DocumentAssignmentsListProps> = ({
   assignments,
@@ -25,119 +22,109 @@ const DocumentAssignmentsList: React.FC<DocumentAssignmentsListProps> = ({
   onViewCompleted,
   onLoadComplete
 }) => {
-  const { toast } = useToast();
-  
-  React.useEffect(() => {
-    onLoadComplete();
-  }, [assignments, onLoadComplete]);
+  useEffect(() => {
+    if (!isLoading && onLoadComplete) {
+      onLoadComplete();
+    }
+  }, [isLoading, onLoadComplete]);
 
-  // Group documents by status for better organization
-  const pendingAssignments = assignments.filter(doc => doc.status === 'not_started');
-  const inProgressAssignments = assignments.filter(doc => doc.status === 'in_progress');
-  const completedAssignments = assignments.filter(doc => doc.status === 'completed');
-  
-  if (isLoading) {
-    return (
-      <div className="flex justify-center py-8">
-        <p>Loading document assignments...</p>
-      </div>
-    );
-  }
-  
-  if (assignments.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center py-8 text-center">
-        <ClipboardCheck className="h-12 w-12 text-gray-300 mb-3" />
-        <h3 className="text-lg font-medium">No document assignments</h3>
-        <p className="text-sm text-gray-500 mt-1">
-          You have no pending document assignments at this time
-        </p>
-      </div>
-    );
-  }
-
-  const renderAssignmentTable = (docs: DocumentAssignment[], type: 'pending' | 'in-progress' | 'completed') => {
-    if (docs.length === 0) return null;
-    
-    return (
-      <div className="mb-6">
-        <h3 className="text-lg font-medium mb-2">
-          {type === 'pending' && 'Documents To Complete'}
-          {type === 'in-progress' && 'Documents In Progress'}
-          {type === 'completed' && 'Recently Completed Documents'}
-        </h3>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Document</TableHead>
-              <TableHead>Assigned</TableHead>
-              <TableHead className="text-right">Action</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {docs.map((doc) => (
-              <TableRow key={doc.id}>
-                <TableCell className="font-medium">{doc.document_name}</TableCell>
-                <TableCell>{format(new Date(doc.created_at), 'MMM d, yyyy')}</TableCell>
-                <TableCell className="text-right">
-                  {doc.status === 'not_started' && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => onStartForm(doc)}
-                    >
-                      <FileText className="h-4 w-4 mr-1" />
-                      Start
-                    </Button>
-                  )}
-                  
-                  {doc.status === 'in_progress' && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => onContinueForm(doc)}
-                    >
-                      <FileText className="h-4 w-4 mr-1" />
-                      Continue
-                    </Button>
-                  )}
-                  
-                  {doc.status === 'completed' && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => onViewCompleted(doc)}
-                    >
-                      <FileCheck className="h-4 w-4 mr-1" />
-                      View
-                    </Button>
-                  )}
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
-    );
+  const getStatusIcon = (status: string) => {
+    switch(status) {
+      case 'completed':
+        return <CheckCircle2 className="h-5 w-5 text-green-500" />;
+      case 'in_progress':
+        return <Clock className="h-5 w-5 text-amber-500" />;
+      default:
+        return <ClipboardCheck className="h-5 w-5 text-blue-500" />;
+    }
   };
+
+  const getStatusText = (status: string) => {
+    switch(status) {
+      case 'completed':
+        return 'Completed';
+      case 'in_progress':
+        return 'In Progress';
+      case 'not_started':
+        return 'Not Started';
+      default:
+        return 'Pending';
+    }
+  };
+
+  const renderActionButton = (assignment: DocumentAssignment) => {
+    switch(assignment.status) {
+      case 'completed':
+        return (
+          <Button 
+            variant="outline"
+            onClick={() => onViewCompleted(assignment)}
+          >
+            View
+          </Button>
+        );
+      case 'in_progress':
+        return (
+          <Button 
+            variant="outline"
+            onClick={() => onContinueForm(assignment)}
+          >
+            Continue
+          </Button>
+        );
+      default:
+        return (
+          <Button 
+            onClick={() => onStartForm(assignment)}
+          >
+            Start
+          </Button>
+        );
+    }
+  };
+  
+  console.log('Rendering document assignments:', assignments);
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Assigned Documents</CardTitle>
-        <CardDescription>
-          Forms and documents assigned to you by your therapist
-        </CardDescription>
+        <CardTitle className="flex items-center gap-2">
+          <ClipboardCheck className="h-5 w-5 text-valorwell-600" />
+          Required Forms
+        </CardTitle>
+        <CardDescription>Please complete all assigned forms</CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4">
-        {/* Pending Documents Section */}
-        {renderAssignmentTable(pendingAssignments, 'pending')}
-        
-        {/* In Progress Documents Section */}
-        {renderAssignmentTable(inProgressAssignments, 'in-progress')}
-        
-        {/* Completed Documents Section */}
-        {renderAssignmentTable(completedAssignments, 'completed')}
+      <CardContent>
+        {isLoading ? (
+          <div className="flex justify-center py-8">
+            <Loader2 className="h-8 w-8 animate-spin text-valorwell-600" />
+          </div>
+        ) : assignments.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-8 text-center">
+            <ClipboardCheck className="h-12 w-12 text-gray-300 mb-4" />
+            <h3 className="text-lg font-medium">No forms assigned</h3>
+            <p className="text-sm text-gray-500 mt-1">
+              Your therapist will assign forms for you to complete
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {assignments.map(assignment => (
+              <div key={assignment.id} className="flex items-center justify-between p-4 border rounded-md">
+                <div className="flex items-center gap-3">
+                  {getStatusIcon(assignment.status)}
+                  <div>
+                    <h4 className="font-medium">{assignment.document_name}</h4>
+                    <p className="text-sm text-gray-500">{getStatusText(assignment.status)}</p>
+                  </div>
+                </div>
+                <div>
+                  {renderActionButton(assignment)}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </CardContent>
     </Card>
   );

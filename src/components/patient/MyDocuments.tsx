@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
-import { Calendar, Eye, FileText } from 'lucide-react';
+import { Calendar, Eye, FileText, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { getCurrentUser, fetchClinicalDocuments, getDocumentDownloadURL } from '@/integrations/supabase/client';
@@ -35,22 +35,30 @@ const MyDocuments: React.FC<MyDocumentsProps> = ({ clientId, excludedTypes = [] 
         let userId = clientId;
         
         if (!userId) {
+          console.log('No client ID provided, fetching current user');
           const { user, error } = await getCurrentUser();
           if (error || !user) {
+            console.error('Error getting current user:', error);
             setIsLoading(false);
             return;
           }
           userId = user.id;
+          console.log('Using current user ID:', userId);
+        } else {
+          console.log('Using provided client ID:', userId);
         }
         
         // Fetch all documents
+        console.log('Fetching clinical documents for client:', userId);
         const allDocs = await fetchClinicalDocuments(userId);
+        console.log('Fetched clinical documents:', allDocs);
         
         // Filter out excluded document types
         const filteredDocs = excludedTypes.length > 0
           ? allDocs.filter(doc => !excludedTypes.includes(doc.document_type))
           : allDocs;
         
+        console.log('Filtered clinical documents:', filteredDocs);
         setDocuments(filteredDocs);
       } catch (error) {
         console.error('Error loading documents:', error);
@@ -69,10 +77,13 @@ const MyDocuments: React.FC<MyDocumentsProps> = ({ clientId, excludedTypes = [] 
 
   const handleViewDocument = async (filePath: string) => {
     try {
+      console.log('Getting document URL for file path:', filePath);
       const url = await getDocumentDownloadURL(filePath);
       if (url) {
+        console.log('Opening document URL:', url);
         window.open(url, '_blank');
       } else {
+        console.error('Could not retrieve document URL');
         toast({
           title: "Error",
           description: "Could not retrieve document URL",
@@ -98,7 +109,7 @@ const MyDocuments: React.FC<MyDocumentsProps> = ({ clientId, excludedTypes = [] 
       <CardContent className="space-y-4">
         {isLoading ? (
           <div className="flex justify-center py-8">
-            <p>Loading documents...</p>
+            <Loader2 className="h-8 w-8 animate-spin text-valorwell-600" />
           </div>
         ) : documents.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-8 text-center">

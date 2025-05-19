@@ -1,12 +1,11 @@
 
 import React, { useState } from 'react';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { FileText, Save, Check } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
-import { DocumentAssignment, updateDocumentStatus } from '@/integrations/supabase/client';
-import InformedConsentTemplate from '@/components/templates/InformedConsentTemplate';
+import { toast } from 'sonner';
+import { DocumentAssignment, updateDocumentStatus, saveDocumentSubmission } from '@/integrations/supabase/client';
 import ClientHistoryTemplate from '@/components/templates/ClientHistoryTemplate';
+import InformedConsentTemplate from '@/components/templates/InformedConsentTemplate';
 
 interface DocumentFormRendererProps {
   assignment: DocumentAssignment;
@@ -23,81 +22,113 @@ const DocumentFormRenderer: React.FC<DocumentFormRendererProps> = ({
   onCancel,
   onComplete
 }) => {
-  const [isSaving, setIsSaving] = useState(false);
-  const { toast } = useToast();
+  const [isSubmitting, setIsSubmitting] = useState(false);
   
-  // Handle saving draft (mark as in_progress)
-  const handleSaveDraft = async () => {
-    setIsSaving(true);
+  const handleSave = async (formData: any, isDraft = true) => {
+    setIsSubmitting(true);
+    
     try {
-      // Update the document status to in_progress
-      const result = await updateDocumentStatus(assignment.id, 'in_progress');
+      console.log('Saving form data:', formData);
       
-      if (result.success) {
-        toast({
-          title: "Progress saved",
-          description: "Your information has been saved as a draft.",
-        });
-        
-        onSave();
-      } else {
-        throw new Error("Failed to update document status");
+      // Update the assignment status
+      const newStatus = isDraft ? 'in_progress' : 'completed';
+      const { success: statusUpdateSuccess, error: statusUpdateError } = await updateDocumentStatus(assignment.id, newStatus);
+      
+      if (!statusUpdateSuccess) {
+        throw new Error(`Failed to update document status: ${statusUpdateError?.message || 'Unknown error'}`);
       }
-    } catch (error) {
-      console.error('Error saving draft:', error);
-      toast({
-        title: "Error",
-        description: "Failed to save your progress",
-        variant: "destructive"
-      });
+      
+      // If completed, save to clinical_documents
+      if (!isDraft) {
+        // Save the PDF path and document data
+        const documentData = {
+          client_id: clientId,
+          document_type: getDocumentType(assignment.document_name),
+          document_title: assignment.document_name,
+          document_date: new Date().toISOString().split('T')[0],
+          file_path: formData.pdf_path || `documents/${clientId}/${getDocumentType(assignment.document_name)}_${Date.now()}.pdf`,
+          created_by: 'client' // Indicates this was filled out by the client
+        };
+        
+        const { success: documentSaveSuccess, error: documentSaveError } = await saveDocumentSubmission(documentData);
+        
+        if (!documentSaveSuccess) {
+          throw new Error(`Failed to save document data: ${documentSaveError?.message || 'Unknown error'}`);
+        }
+        
+        toast.success("Document successfully completed!");
+        onComplete();
+      } else {
+        toast.success("Progress saved successfully");
+        onSave();
+      }
+    } catch (error: any) {
+      console.error('Error saving document:', error);
+      toast.error(`Error: ${error.message || 'Failed to save document'}`);
     } finally {
-      setIsSaving(false);
+      setIsSubmitting(false);
     }
   };
   
-  // Render different forms based on document_name
-  const renderFormContent = () => {
-    switch (assignment.document_name) {
-      case "Client History Form":
+  const getDocumentType = (documentName: string): string => {
+    // Map document names to types
+    const typeMap: Record<string, string> = {
+      'Client History Form': 'client_history',
+      'Informed Consent': 'informed_consent',
+    };
+    
+    return typeMap[documentName] || documentName.toLowerCase().replace(/\s+/g, '_');
+  };
+  
+  const renderForm = () => {
+    switch(assignment.document_name) {
+      case 'Client History Form':
         return (
-          <ClientHistoryTemplate
-            onClose={onComplete}
-            onSubmit={() => {
-              // Mark the document as completed
-              updateDocumentStatus(assignment.id, 'completed');
-            }}
+          <ClientHistoryTemplate 
+            clientId={clientId} 
+            onSave={(data) => handleSave(data, true)} 
+            onComplete={(data) => handleSave(data, false)}
+            mode="client"
           />
         );
-      case "Informed Consent":
+      case 'Informed Consent':
         return (
-          <InformedConsentTemplate
-            onClose={onComplete}
+          <InformedConsentTemplate 
+            clientId={clientId}
+            onSave={(data) => handleSave(data, true)}
+            onComplete={(data) => handleSave(data, false)}
+            mode="client"
           />
         );
       default:
         return (
-          <div className="p-6 text-center">
-            <p className="text-lg font-medium text-red-500 mb-2">Unsupported Document Type</p>
-            <p>The document type "{assignment.document_name}" is not currently supported.</p>
+          <div className="p-8 text-center">
+            <p>This document type is not yet supported for online completion.</p>
           </div>
         );
     }
   };
   
   return (
-    <div>
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="text-2xl font-bold flex items-center gap-2">
-          <FileText className="h-6 w-6" />
-          {assignment.document_name}
-        </h2>
-        <Button variant="outline" onClick={onCancel}>
-          Back to Documents
-        </Button>
-      </div>
+    <Card className="border-2 border-blue-100">
+      <CardHeader className="bg-blue-50/50">
+        <CardTitle>{assignment.document_name}</CardTitle>
+      </CardHeader>
       
-      {renderFormContent()}
-    </div>
+      <CardContent className="p-0">
+        {renderForm()}
+      </CardContent>
+      
+      <CardFooter className="flex justify-between bg-blue-50/50 p-4">
+        <Button 
+          variant="outline" 
+          onClick={onCancel} 
+          disabled={isSubmitting}
+        >
+          Cancel
+        </Button>
+      </CardFooter>
+    </Card>
   );
 };
 
