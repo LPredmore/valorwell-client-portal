@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import html2canvas from 'html2canvas';
@@ -157,7 +158,9 @@ export const handleFormSubmission = async (
  */
 const saveClientHistory = async (clientId: string, formData: any, pdfPath: string) => {
   try {
-    // Extract relevant data from the form
+    console.log('[saveClientHistory] Starting to save client history data', formData);
+
+    // Extract relevant data from the form for main history record
     const historyData = {
       client_id: clientId,
       personal_strengths: formData.personalStrengths || null,
@@ -175,22 +178,180 @@ const saveClientHistory = async (clientId: string, formData: any, pdfPath: strin
       signature: formData.signature || null,
       pdf_path: pdfPath,
       submission_date: new Date().toISOString().split('T')[0],
-      selected_medical_conditions: formData.selectedConditions ? JSON.stringify(formData.selectedConditions) : '[]'
+      // JSON data fields
+      selected_medical_conditions: formData.selectedConditions ? JSON.stringify(formData.selectedConditions) : '[]',
+      selected_symptoms: formData.selectedSymptoms ? JSON.stringify(formData.selectedSymptoms) : '[]',
+      selected_childhood_experiences: formData.selectedChildhoodExperiences ? JSON.stringify(formData.selectedChildhoodExperiences) : '[]',
+      // Additional fields
+      is_married: formData.isMarried || false,
+      has_past_spouses: formData.hasPastSpouses || false,
+      takes_medications: formData.takesMedications || false,
+      has_received_mental_health_treatment: formData.hasReceivedMentalHealthTreatment || false,
+      hospitalized_psychiatric: formData.hospitalizedPsychiatric || false,
+      psych_hold: formData.psychHold || false,
+      attempted_suicide: formData.attemptedSuicide || false,
+      is_family_same_as_household: formData.isFamilySameAsHousehold || false,
+      alcohol_use: formData.alcoholUse || null,
+      tobacco_use: formData.tobaccoUse || null,
+      drug_use: formData.drugUse || null,
+      chronic_health_problems: formData.chronicHealthProblems || null,
+      additional_info: formData.additionalInfo || null,
+      childhood_elaboration: formData.childhoodElaboration || null,
+      life_changes: formData.lifeChanges || null
     };
     
+    console.log('[saveClientHistory] Main history data prepared:', historyData);
+    
     // Save to client_history table
-    const { data, error } = await supabase
+    const { data: historyRecord, error: historyError } = await supabase
       .from('client_history')
       .insert(historyData)
       .select()
       .single();
     
-    if (error) {
-      console.error('[saveClientHistory] Error saving client history:', error);
-      return { success: false, message: `Error saving client history: ${error.message}` };
+    if (historyError) {
+      console.error('[saveClientHistory] Error saving client history:', historyError);
+      return { success: false, message: `Error saving client history: ${historyError.message}` };
     }
     
-    console.log('[saveClientHistory] Client history saved successfully:', data);
+    console.log('[saveClientHistory] Client history main record saved successfully:', historyRecord);
+    
+    // Save related data if the main record was saved successfully
+    const historyId = historyRecord.id;
+    
+    // Save family members if provided
+    if (formData.familyMembers && Array.isArray(formData.familyMembers) && formData.familyMembers.length > 0) {
+      const familyData = formData.familyMembers.map((member: any) => ({
+        history_id: historyId,
+        relationship_type: member.relationshipType || null,
+        name: member.name || null,
+        personality: member.personality || null,
+        relationship_growing: member.relationshipGrowing || null,
+        relationship_now: member.relationshipNow || null
+      }));
+      
+      const { error: familyError } = await supabase
+        .from('client_history_family')
+        .insert(familyData);
+      
+      if (familyError) {
+        console.error('[saveClientHistory] Error saving family members:', familyError);
+        // Continue despite error - not critical
+      } else {
+        console.log(`[saveClientHistory] Successfully saved ${familyData.length} family members`);
+      }
+    }
+    
+    // Save household members if provided
+    if (formData.householdMembers && Array.isArray(formData.householdMembers) && formData.householdMembers.length > 0) {
+      const householdData = formData.householdMembers.map((member: any) => ({
+        history_id: historyId,
+        relationship_type: member.relationshipType || null,
+        name: member.name || null,
+        personality: member.personality || null,
+        relationship_now: member.relationshipNow || null
+      }));
+      
+      const { error: householdError } = await supabase
+        .from('client_history_household')
+        .insert(householdData);
+      
+      if (householdError) {
+        console.error('[saveClientHistory] Error saving household members:', householdError);
+        // Continue despite error - not critical
+      } else {
+        console.log(`[saveClientHistory] Successfully saved ${householdData.length} household members`);
+      }
+    }
+    
+    // Save current spouse if married
+    if (formData.isMarried && formData.currentSpouse) {
+      const spouseData = {
+        history_id: historyId,
+        name: formData.currentSpouse.name || null,
+        personality: formData.currentSpouse.personality || null,
+        relationship: formData.currentSpouse.relationship || null
+      };
+      
+      const { error: spouseError } = await supabase
+        .from('client_history_current_spouse')
+        .insert(spouseData);
+      
+      if (spouseError) {
+        console.error('[saveClientHistory] Error saving current spouse:', spouseError);
+        // Continue despite error - not critical
+      } else {
+        console.log('[saveClientHistory] Successfully saved current spouse');
+      }
+    }
+    
+    // Save previous spouses if provided
+    if (formData.hasPastSpouses && formData.previousSpouses && 
+        Array.isArray(formData.previousSpouses) && formData.previousSpouses.length > 0) {
+      const spousesData = formData.previousSpouses.map((spouse: any) => ({
+        history_id: historyId,
+        name: spouse.name || null,
+        personality: spouse.personality || null,
+        relationship: spouse.relationship || null
+      }));
+      
+      const { error: spousesError } = await supabase
+        .from('client_history_spouses')
+        .insert(spousesData);
+      
+      if (spousesError) {
+        console.error('[saveClientHistory] Error saving previous spouses:', spousesError);
+        // Continue despite error - not critical
+      } else {
+        console.log(`[saveClientHistory] Successfully saved ${spousesData.length} previous spouses`);
+      }
+    }
+    
+    // Save medications if provided
+    if (formData.takesMedications && formData.medications && 
+        Array.isArray(formData.medications) && formData.medications.length > 0) {
+      const medicationsData = formData.medications.map((med: any) => ({
+        history_id: historyId,
+        name: med.name || null,
+        purpose: med.purpose || null,
+        duration: med.duration || null
+      }));
+      
+      const { error: medsError } = await supabase
+        .from('client_history_medications')
+        .insert(medicationsData);
+      
+      if (medsError) {
+        console.error('[saveClientHistory] Error saving medications:', medsError);
+        // Continue despite error - not critical
+      } else {
+        console.log(`[saveClientHistory] Successfully saved ${medicationsData.length} medications`);
+      }
+    }
+    
+    // Save mental health treatments if provided
+    if (formData.hasReceivedMentalHealthTreatment && formData.treatments && 
+        Array.isArray(formData.treatments) && formData.treatments.length > 0) {
+      const treatmentsData = formData.treatments.map((treatment: any) => ({
+        history_id: historyId,
+        provider: treatment.provider || null,
+        year: treatment.year || null,
+        reason: treatment.reason || null,
+        length: treatment.length || null
+      }));
+      
+      const { error: treatmentsError } = await supabase
+        .from('client_history_treatments')
+        .insert(treatmentsData);
+      
+      if (treatmentsError) {
+        console.error('[saveClientHistory] Error saving treatments:', treatmentsError);
+        // Continue despite error - not critical
+      } else {
+        console.log(`[saveClientHistory] Successfully saved ${treatmentsData.length} treatments`);
+      }
+    }
+    
     return { success: true, message: 'Client history saved successfully' };
     
   } catch (error) {

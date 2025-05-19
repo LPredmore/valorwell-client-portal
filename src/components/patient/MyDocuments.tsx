@@ -110,6 +110,7 @@ const MyDocuments: React.FC<MyDocumentsProps> = ({ clientId, excludedTypes = [] 
       const { success, data, error } = await fetchClientHistoryData(clientId);
       
       if (success && data) {
+        console.log('Fetched client history data:', data);
         setHistoryData(data);
         setIsHistoryDialogOpen(true);
       } else {

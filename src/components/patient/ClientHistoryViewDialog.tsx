@@ -61,26 +61,25 @@ const ClientHistoryViewDialog: React.FC<ClientHistoryViewDialogProps> = ({
     );
   }
   
+  // Process JSON fields safely
+  const safeParseJson = (jsonString: string | null | undefined, defaultValue: any[] = []) => {
+    if (!jsonString) return defaultValue;
+    try {
+      return typeof jsonString === 'string' ? JSON.parse(jsonString) : jsonString;
+    } catch (e) {
+      console.error('Error parsing JSON:', e);
+      return defaultValue;
+    }
+  };
+    
   // Process symptoms
-  const selectedSymptoms = data.main.selected_symptoms 
-    ? (typeof data.main.selected_symptoms === 'string' 
-        ? JSON.parse(data.main.selected_symptoms) 
-        : data.main.selected_symptoms)
-    : [];
+  const selectedSymptoms = safeParseJson(data.main.selected_symptoms, []);
     
   // Process childhood experiences
-  const selectedChildhoodExperiences = data.main.selected_childhood_experiences 
-    ? (typeof data.main.selected_childhood_experiences === 'string' 
-        ? JSON.parse(data.main.selected_childhood_experiences) 
-        : data.main.selected_childhood_experiences)
-    : [];
+  const selectedChildhoodExperiences = safeParseJson(data.main.selected_childhood_experiences, []);
     
   // Process medical conditions
-  const selectedMedicalConditions = data.main.selected_medical_conditions 
-    ? (typeof data.main.selected_medical_conditions === 'string' 
-        ? JSON.parse(data.main.selected_medical_conditions) 
-        : data.main.selected_medical_conditions)
-    : [];
+  const selectedMedicalConditions = safeParseJson(data.main.selected_medical_conditions, []);
   
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
