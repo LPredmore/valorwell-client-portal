@@ -1,7 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
 import { migrateStoredAuthData, diagnoseAuthIssues, resetAuthState } from '@/utils/authMigration';
-import { useAuth, AuthState } from '@/context/NewAuthContext';
 import { toast } from 'sonner';
 
 interface AuthMigrationHandlerProps {
@@ -9,7 +8,6 @@ interface AuthMigrationHandlerProps {
 }
 
 const AuthMigrationHandler: React.FC<AuthMigrationHandlerProps> = ({ children }) => {
-  const { authState, authInitialized } = useAuth();
   const [migrationComplete, setMigrationComplete] = useState(false);
   const [migrationAttempted, setMigrationAttempted] = useState(false);
   const [issues, setIssues] = useState<string[]>([]);
@@ -32,8 +30,8 @@ const AuthMigrationHandler: React.FC<AuthMigrationHandlerProps> = ({ children })
     
     try {
       // Run migration logic
-      const didMigrate = migrateStoredAuthData();
-      console.log("[AuthMigrationHandler] Migration completed:", didMigrate);
+      const migrationResult = migrateStoredAuthData();
+      console.log("[AuthMigrationHandler] Migration completed:", migrationResult);
       
       // Store migration result in localStorage to prevent future attempts
       localStorage.setItem('auth_migration_completed', 'true');
@@ -47,12 +45,12 @@ const AuthMigrationHandler: React.FC<AuthMigrationHandlerProps> = ({ children })
     }
   }, []);
   
-  // Only run diagnostics when auth is fully initialized or in error state
+  // Only run diagnostics when loaded or in error state
   useEffect(() => {
-    if ((authInitialized || authState === AuthState.ERROR) && !diagnosticRun) {
+    if (!diagnosticRun) {
       runDiagnostics();
     }
-  }, [authInitialized, authState, diagnosticRun]);
+  }, [diagnosticRun]);
 
   // Improved diagnostics with timeout and retry
   const runDiagnostics = async () => {
@@ -176,8 +174,6 @@ const AuthMigrationHandler: React.FC<AuthMigrationHandlerProps> = ({ children })
                       {`Environment: ${process.env.NODE_ENV}
 Current URL: ${window.location.href}
 Browser: ${navigator.userAgent}
-Auth State: ${authState}
-Auth Initialized: ${authInitialized}
 Issues: ${issues.join('\n')}`}
                     </pre>
                   </div>
