@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { DocumentAssignment, updateDocumentStatus, saveDocumentSubmission } from '@/integrations/supabase/client';
 import ClientHistoryTemplate from '@/components/templates/ClientHistoryTemplate';
 import InformedConsentTemplate from '@/components/templates/InformedConsentTemplate';
+import { handleFormSubmission } from '@/utils/formSubmissionUtils';
 
 interface DocumentFormRendererProps {
   assignment: DocumentAssignment;
@@ -42,13 +43,42 @@ const DocumentFormRenderer: React.FC<DocumentFormRendererProps> = ({
       
       // If completed, save to clinical_documents
       if (!isDraft) {
-        // Save the PDF path and document data
+        // Generate the file path relative to the clinical_documents bucket
+        const documentType = getDocumentType(assignment.document_name);
+        const timestamp = Date.now();
+        const filePath = `${clientId}/${documentType}_${timestamp}.pdf`;
+        
+        // Generate and save PDF using formSubmissionUtils helper
+        const documentInfo = {
+          clientId: clientId,
+          documentType: documentType,
+          documentDate: new Date(),
+          documentTitle: assignment.document_name,
+          createdBy: 'client'
+        };
+        
+        if (formData.formElementId) {
+          const result = await handleFormSubmission(
+            formData.formElementId,
+            documentInfo,
+            assignment.document_name,
+            formData
+          );
+          
+          if (!result.success) {
+            throw new Error(`Failed to generate PDF: ${result.message}`);
+          }
+          
+          formData.pdf_path = result.filePath;
+        }
+        
+        // Save the document record
         const documentData = {
           client_id: clientId,
-          document_type: getDocumentType(assignment.document_name),
+          document_type: documentType,
           document_title: assignment.document_name,
           document_date: new Date().toISOString().split('T')[0],
-          file_path: formData.pdf_path || `${clientId}/${getDocumentType(assignment.document_name)}_${Date.now()}.pdf`,
+          file_path: formData.pdf_path || filePath,
           created_by: 'client' // Indicates this was filled out by the client
         };
         

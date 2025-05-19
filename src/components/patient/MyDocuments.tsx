@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
 import { Calendar, Eye, FileText, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 import { getCurrentUser, fetchClinicalDocuments, getDocumentDownloadURL } from '@/integrations/supabase/client';
 
 interface ClinicalDocument {
@@ -25,11 +25,13 @@ type MyDocumentsProps = {
 const MyDocuments: React.FC<MyDocumentsProps> = ({ clientId, excludedTypes = [] }) => {
   const [documents, setDocuments] = useState<ClinicalDocument[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const { toast } = useToast();
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     const loadDocuments = async () => {
       setIsLoading(true);
+      setLoadError(null);
+      
       try {
         // If clientId is passed as prop, use it; otherwise get current user
         let userId = clientId;
@@ -39,6 +41,7 @@ const MyDocuments: React.FC<MyDocumentsProps> = ({ clientId, excludedTypes = [] 
           const { user, error } = await getCurrentUser();
           if (error || !user) {
             console.error('Error getting current user:', error);
+            setLoadError('Could not verify your identity. Please try again.');
             setIsLoading(false);
             return;
           }
@@ -51,17 +54,35 @@ const MyDocuments: React.FC<MyDocumentsProps> = ({ clientId, excludedTypes = [] 
         // Fetch all documents
         console.log('Fetching clinical documents for client:', userId);
         const allDocs = await fetchClinicalDocuments(userId);
+        
+        if (!allDocs || allDocs.length === 0) {
+          console.log('No documents found for client:', userId);
+          setDocuments([]);
+          setIsLoading(false);
+          return;
+        }
+        
         console.log('Fetched clinical documents:', allDocs);
+        
+        // Validate document records to ensure they have proper paths
+        const validatedDocs = allDocs.filter(doc => {
+          if (!doc.file_path) {
+            console.warn('Document missing file_path:', doc.id);
+            return false;
+          }
+          return true;
+        });
         
         // Filter out excluded document types
         const filteredDocs = excludedTypes.length > 0
-          ? allDocs.filter(doc => !excludedTypes.includes(doc.document_type))
-          : allDocs;
+          ? validatedDocs.filter(doc => !excludedTypes.includes(doc.document_type))
+          : validatedDocs;
         
         console.log('Filtered clinical documents:', filteredDocs);
         setDocuments(filteredDocs);
       } catch (error) {
         console.error('Error loading documents:', error);
+        setLoadError('Failed to load your documents. Please try again later.');
         toast({
           title: "Error",
           description: "Failed to load your documents",
@@ -73,7 +94,7 @@ const MyDocuments: React.FC<MyDocumentsProps> = ({ clientId, excludedTypes = [] 
     };
 
     loadDocuments();
-  }, [clientId, excludedTypes, toast]);
+  }, [clientId, excludedTypes]);
 
   const handleViewDocument = async (filePath: string) => {
     try {
@@ -110,6 +131,12 @@ const MyDocuments: React.FC<MyDocumentsProps> = ({ clientId, excludedTypes = [] 
         {isLoading ? (
           <div className="flex justify-center py-8">
             <Loader2 className="h-8 w-8 animate-spin text-valorwell-600" />
+          </div>
+        ) : loadError ? (
+          <div className="flex flex-col items-center justify-center py-8 text-center">
+            <FileText className="h-12 w-12 text-amber-400 mb-3" />
+            <h3 className="text-lg font-medium text-amber-700">Error loading documents</h3>
+            <p className="text-sm text-gray-500 mt-1">{loadError}</p>
           </div>
         ) : documents.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-8 text-center">

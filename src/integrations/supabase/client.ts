@@ -130,14 +130,30 @@ export const fetchClinicalDocuments = async (clientId: string): Promise<any[]> =
 export const getDocumentDownloadURL = async (filePath: string): Promise<string | null> => {
   try {
     console.log('Getting download URL for file path:', filePath);
-    // Use the documents bucket
+    
+    // Determine which bucket to use based on the file path or other hints
+    const bucketName = 'clinical_documents';
+    
     const { data, error } = await supabase.storage
-      .from('documents')
+      .from(bucketName)
       .createSignedUrl(filePath, 60 * 60); // URL valid for 1 hour
 
     if (error) {
       console.error('Error getting document URL:', error);
-      return null;
+      
+      // Fallback attempt with alternative bucket if needed
+      console.log('Attempting fallback with alternative bucket');
+      const fallbackBucket = 'documents';
+      const fallbackResult = await supabase.storage
+        .from(fallbackBucket)
+        .createSignedUrl(filePath, 60 * 60);
+        
+      if (fallbackResult.error) {
+        console.error('Error with fallback bucket attempt:', fallbackResult.error);
+        return null;
+      }
+      
+      return fallbackResult.data?.signedUrl || null;
     }
 
     return data?.signedUrl || null;

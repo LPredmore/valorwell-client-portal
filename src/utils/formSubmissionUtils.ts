@@ -21,7 +21,7 @@ export const handleFormSubmission = async (
     documentType: string;
     documentDate: Date;
     documentTitle: string;
-    createdBy: string;
+    createdBy?: string;
   },
   documentName: string,
   documentData: any
@@ -70,12 +70,15 @@ export const handleFormSubmission = async (
     // Convert PDF to blob
     const pdfBlob = pdf.output('blob');
     
-    console.log(`[formSubmissionUtils] PDF generated successfully, uploading to documents bucket path: ${documentInfo.clientId}/${filename}`);
+    // Define the file path within the clinical_documents bucket
+    const filePath = `${documentInfo.clientId}/${filename}`;
     
-    // Step 2: Upload PDF to Supabase storage - using the correct bucket
+    console.log(`[formSubmissionUtils] PDF generated successfully, uploading to clinical_documents bucket path: ${filePath}`);
+    
+    // Step 2: Upload PDF to Supabase storage - using the clinical_documents bucket
     const { data: uploadData, error: uploadError } = await supabase.storage
-      .from('documents')
-      .upload(`${documentInfo.clientId}/${filename}`, pdfBlob, {
+      .from('clinical_documents')
+      .upload(filePath, pdfBlob, {
         contentType: 'application/pdf',
         upsert: false
       });
@@ -87,50 +90,9 @@ export const handleFormSubmission = async (
     
     console.log('[formSubmissionUtils] Document uploaded successfully:', uploadData);
     
-    // The file path should be relative to the bucket
-    const filePath = `${documentInfo.clientId}/${filename}`;
-    
-    // Step 3: Create document record in database
-    const { data: docData, error: docError } = await supabase
-      .from('clinical_documents')
-      .insert({
-        client_id: documentInfo.clientId,
-        document_type: documentInfo.documentType,
-        document_title: documentInfo.documentTitle,
-        document_date: documentInfo.documentDate.toISOString().split('T')[0],
-        file_path: filePath,
-        created_by: documentInfo.createdBy
-      })
-      .select()
-      .single();
-    
-    if (docError) {
-      console.error('[formSubmissionUtils] Error creating document record:', docError);
-      throw new Error(`Error creating document record: ${docError.message}`);
-    }
-    
-    console.log('[formSubmissionUtils] Document record created:', docData);
-    
-    // Step 4: Update document assignments if needed
-    const { data: assignmentData, error: assignmentError } = await supabase
-      .from('document_assignments')
-      .update({ 
-        status: 'completed',
-        updated_at: new Date().toISOString()
-      })
-      .eq('client_id', documentInfo.clientId)
-      .eq('document_name', documentName)
-      .eq('status', 'not_started');
-    
-    if (assignmentError) {
-      console.error('[formSubmissionUtils] Error updating document assignment:', assignmentError);
-      // This is not a critical error as the document was created successfully
-      console.warn('Could not update document assignment status');
-    }
-    
+    // Return the file path for database reference
     return {
       success: true,
-      documentId: docData.id,
       filePath: filePath,
       message: 'Document submitted successfully'
     };
@@ -142,4 +104,50 @@ export const handleFormSubmission = async (
       message: error instanceof Error ? error.message : 'Unknown error occurred'
     };
   }
+};
+
+/**
+ * Process form elements to ensure their values are properly displayed in the PDF
+ */
+const processFormElementsForPDF = (element: HTMLElement) => {
+  // Process all inputs
+  const inputs = element.querySelectorAll('input');
+  inputs.forEach(input => {
+    if (input.type === 'text' || input.type === 'date') {
+      // Create a visible text representation of the input value
+      const valueSpan = document.createElement('div');
+      valueSpan.className = 'pdf-value-display';
+      valueSpan.textContent = input.value || '';
+      
+      // Replace the input with the span
+      if (input.parentNode) {
+        input.parentNode.replaceChild(valueSpan, input);
+      }
+    }
+  });
+  
+  // Process textareas - replace with div to maintain line breaks and content size
+  const textareas = element.querySelectorAll('textarea');
+  textareas.forEach(textarea => {
+    // Create a div to represent the textarea content
+    const contentDiv = document.createElement('div');
+    contentDiv.className = 'pdf-value-display';
+    
+    // Preserve content and line breaks
+    contentDiv.textContent = textarea.value || '';
+    contentDiv.style.whiteSpace = 'pre-wrap';
+    
+    // Add more height for textareas with substantial content
+    const lineCount = (textarea.value.match(/\n/g) || []).length + 1;
+    if (lineCount > 2 || textarea.value.length > 100) {
+      contentDiv.style.minHeight = Math.min(Math.max(lineCount * 20, 60), 300) + 'px';
+    }
+    
+    // Replace the textarea with the content div
+    if (textarea.parentNode) {
+      textarea.parentNode.replaceChild(contentDiv, textarea);
+    }
+  });
+  
+  return element;
 };
