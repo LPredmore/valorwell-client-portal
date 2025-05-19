@@ -23,6 +23,9 @@ export const convertToClientDetails = (clientProfile: any): ClientDetails => {
     client_gender: clientProfile.client_gender,
     client_gender_identity: clientProfile.client_gender_identity,
     client_state: clientProfile.client_state,
+    client_address: clientProfile.client_address, // Add the address field
+    client_city: clientProfile.client_city, // Add the city field
+    client_zip_code: clientProfile.client_zip_code, // Add the zip code field
     client_time_zone: clientProfile.client_time_zone,
     client_minor: clientProfile.client_minor,
     client_status: clientProfile.client_status,
@@ -110,6 +113,5 @@ export const convertToClientDetails = (clientProfile: any): ClientDetails => {
     client_tricare_insurance_agreement: clientProfile.client_tricare_insurance_agreement,
     hasMoreInsurance: clientProfile.hasMoreInsurance,
     client_has_even_more_insurance: clientProfile.client_has_even_more_insurance,
-    // Removed the problematic property that doesn't exist in ClientDetails type
   };
 };

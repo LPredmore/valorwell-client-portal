@@ -273,7 +273,13 @@ const ProfileSetup = () => {
           console.log(`[ProfileSetup] Converted time zone label to IANA value:`, valueToSave);
         }
       }
-    } else if (value === null || value === undefined) {
+    } 
+    // Special handling for address fields - make sure they're properly formatted
+    else if (fieldName === 'client_address' || fieldName === 'client_city' || fieldName === 'client_zip_code') {
+      console.log(`[ProfileSetup] Processing address field ${String(fieldName)}:`, value);
+      valueToSave = value?.trim() || null; // Trim whitespace and convert empty strings to null
+    }
+    else if (value === null || value === undefined) {
       valueToSave = null;
     }
     

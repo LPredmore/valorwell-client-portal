@@ -662,6 +662,7 @@ export type Database = {
       }
       clients: {
         Row: {
+          client_address: string | null
           client_affect: string | null
           client_age: number | null
           client_appearance: string | null
@@ -758,6 +759,7 @@ export type Database = {
           client_tricare_sponsor_id: string | null
           client_tricare_sponsor_name: string | null
           client_vacoverage: string | null
+          client_zip_code: string | null
           client_zipcode: string | null
           created_at: string
           eligibility_claimmd_id_primary: string | null
@@ -773,6 +775,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          client_address?: string | null
           client_affect?: string | null
           client_age?: number | null
           client_appearance?: string | null
@@ -869,6 +872,7 @@ export type Database = {
           client_tricare_sponsor_id?: string | null
           client_tricare_sponsor_name?: string | null
           client_vacoverage?: string | null
+          client_zip_code?: string | null
           client_zipcode?: string | null
           created_at?: string
           eligibility_claimmd_id_primary?: string | null
@@ -884,6 +888,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          client_address?: string | null
           client_affect?: string | null
           client_age?: number | null
           client_appearance?: string | null
@@ -980,6 +985,7 @@ export type Database = {
           client_tricare_sponsor_id?: string | null
           client_tricare_sponsor_name?: string | null
           client_vacoverage?: string | null
+          client_zip_code?: string | null
           client_zipcode?: string | null
           created_at?: string
           eligibility_claimmd_id_primary?: string | null
