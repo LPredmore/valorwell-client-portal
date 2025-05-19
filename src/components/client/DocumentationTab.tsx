@@ -57,10 +57,7 @@ const DocumentationTab: React.FC<DocumentationTabProps> = ({
         .catch(err => {
           console.error('Error fetching documents:', err);
           setLoadError('Failed to load client documents. Please try again.');
-          toast({
-            description: "Failed to load client documents",
-            variant: "destructive"
-          });
+          toast.error("Failed to load client documents");
         })
         .finally(() => {
           setIsLoading(false);
@@ -118,10 +115,7 @@ const DocumentationTab: React.FC<DocumentationTabProps> = ({
       console.log(`Attempting to view document with path ${filePath} from bucket ${CLINICAL_DOCUMENTS_BUCKET}`);
       
       if (!filePath) {
-        toast({
-          description: "Document path is missing",
-          variant: "destructive"
-        });
+        toast.error("Document path is missing");
         return;
       }
       
@@ -131,17 +125,11 @@ const DocumentationTab: React.FC<DocumentationTabProps> = ({
         window.open(url, '_blank');
       } else {
         console.error(`Failed to get URL for document path: ${filePath}`);
-        toast({
-          description: "Could not retrieve document URL",
-          variant: "destructive"
-        });
+        toast.error("Could not retrieve document URL");
       }
     } catch (error) {
       console.error('Error viewing document:', error);
-      toast({
-        description: "Failed to open document",
-        variant: "destructive"
-      });
+      toast.error("Failed to open document");
     }
   };
 

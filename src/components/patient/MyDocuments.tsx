@@ -83,10 +83,7 @@ const MyDocuments: React.FC<MyDocumentsProps> = ({ clientId, excludedTypes = [] 
       } catch (error) {
         console.error('Error loading documents:', error);
         setLoadError('Failed to load your documents. Please try again later.');
-        toast({
-          description: "Failed to load your documents",
-          variant: "destructive"
-        });
+        toast.error("Failed to load your documents");
       } finally {
         setIsLoading(false);
       }
@@ -104,17 +101,11 @@ const MyDocuments: React.FC<MyDocumentsProps> = ({ clientId, excludedTypes = [] 
         window.open(url, '_blank');
       } else {
         console.error('Could not retrieve document URL');
-        toast({
-          description: "Could not retrieve document URL",
-          variant: "destructive"
-        });
+        toast.error("Could not retrieve document URL");
       }
     } catch (error) {
       console.error('Error viewing document:', error);
-      toast({
-        description: "Failed to open document",
-        variant: "destructive"
-      });
+      toast.error("Failed to open document");
     }
   };
 
