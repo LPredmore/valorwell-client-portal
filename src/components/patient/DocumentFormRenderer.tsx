@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
@@ -7,6 +7,7 @@ import { DocumentAssignment, updateDocumentStatus, saveDocumentSubmission } from
 import ClientHistoryTemplate from '@/components/templates/ClientHistoryTemplate';
 import InformedConsentTemplate from '@/components/templates/InformedConsentTemplate';
 import { handleFormSubmission, CLINICAL_DOCUMENTS_BUCKET } from '@/utils/formSubmissionUtils';
+import { useAuth } from '@/context/NewAuthContext';
 
 interface DocumentFormRendererProps {
   assignment: DocumentAssignment;
@@ -24,6 +25,7 @@ const DocumentFormRenderer: React.FC<DocumentFormRendererProps> = ({
   onComplete
 }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { clientProfile } = useAuth();
   
   const handleSave = async (formData: any, isDraft = true) => {
     setIsSubmitting(true);
@@ -129,6 +131,7 @@ const DocumentFormRenderer: React.FC<DocumentFormRendererProps> = ({
           <ClientHistoryTemplate 
             onClose={onCancel}
             onSubmit={(data) => handleSave(data, false)}
+            clientData={clientProfile}
           />
         );
       case 'Informed Consent':

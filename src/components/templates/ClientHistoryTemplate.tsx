@@ -8,51 +8,18 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Checkbox } from '@/components/ui/checkbox';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
-import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useForm } from 'react-hook-form';
 import { FileText, X, ChevronLeft, Save, Plus } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { ClientDetails } from '@/types/client';
 
-interface FamilyMember {
-  id: string;
-  relationshipType: string;
-  name: string;
-  personality: string;
-  relationshipGrowing?: string;
-  relationshipNow: string;
+interface ClientHistoryTemplateProps {
+  onClose: () => void;
+  onSubmit: (data: any) => void;
+  clientData?: ClientDetails | null;
 }
 
-interface PastTreatment {
-  id: string;
-  year: string;
-  reason: string;
-  length: string;
-  provider: string;
-}
-
-interface Medication {
-  id: string;
-  name: string;
-  purpose: string;
-  duration: string;
-}
-
-interface PastSpouse {
-  id: string;
-  name: string;
-  personality: string;
-  relationship: string;
-}
-
-interface SymptomCategories {
-  mood: string[];
-  physical: string[];
-  behavioral: string[];
-  cognitive: string[];
-  lifeStressors: string[];
-}
-
-const ClientHistoryTemplate: React.FC = () => {
+const ClientHistoryTemplate: React.FC<ClientHistoryTemplateProps> = ({ onClose, onSubmit, clientData }) => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [family, setFamily] = useState<FamilyMember[]>([
@@ -82,249 +49,60 @@ const ClientHistoryTemplate: React.FC = () => {
 
   const form = useForm();
 
-  const symptoms: SymptomCategories = {
-    mood: [
-      "Depressed Mood", 
-      "Anxiety/Worry", 
-      "Fear", 
-      "Hopelessness", 
-      "Mood Swings", 
-      "Irritability", 
-      "Shyness", 
-      "Tearful/Crying Spells", 
-      "Low Self-Esteem", 
-      "Low Motivation", 
-      "Feelings of Guilt", 
-      "Feeling Lonely", 
-      "Feeling Unfairly Treated", 
-      "Feeling Misunderstood", 
-      "Feeling Inferior", 
-      "Disappointed", 
-      "Perfectionism"
-    ],
-    physical: [
-      "Increased Appetite", 
-      "Decreased Appetite", 
-      "Changes in Weight", 
-      "Difficulty Sleeping", 
-      "Excessive Sleeping", 
-      "Low Energy", 
-      "Frequent Pain", 
-      "Nausea", 
-      "Sexual Problems", 
-      "Eating Disorder", 
-      "Alcohol Dependency", 
-      "Recreational Drug Use", 
-      "Physical Illness"
-    ],
-    behavioral: [
-      "Angry Outbursts", 
-      "Isolation from Others", 
-      "Social Withdrawal", 
-      "Impulsive Behavior", 
-      "Relationship Difficulties", 
-      "Feeling Abandoned", 
-      "Boredom", 
-      "Unusual/Increased Sensitivity", 
-      "Suspicion", 
-      "Thoughts of Harming Yourself", 
-      "Thoughts of Harming Others"
-    ],
-    cognitive: [
-      "Trouble Concentrating", 
-      "Concentration Problems", 
-      "Difficulty Making Decisions", 
-      "Memory Problems", 
-      "Feeling Confused", 
-      "Unusual Thoughts", 
-      "Irrational Thoughts", 
-      "Hearing Strange Voices"
-    ],
-    lifeStressors: [
-      "Legal Difficulties", 
-      "Work/School Problems", 
-      "Money Problems", 
-      "Mourning", 
-      "Boredom", 
-      "Religious Concerns", 
-      "Specific Fear"
-    ]
-  };
-
-  const educationOptions = [
-    "Less than High School",
-    "High School / GED",
-    "Some College",
-    "Associate's Degree",
-    "Bachelor's Degree",
-    "Master's Degree",
-    "Doctoral Degree",
-    "Professional Degree (MD, JD, etc.)",
-    "Trade School / Vocational Training",
-    "Other"
-  ];
-
-  const relationshipTypes = [
-    "Mother",
-    "Father",
-    "Stepmother",
-    "Stepfather",
-    "Sister",
-    "Brother",
-    "Grandmother",
-    "Grandfather",
-    "Aunt",
-    "Uncle",
-    "Cousin",
-    "Foster Parent",
-    "Adopted Parent",
-    "Other"
-  ];
-
-  const childhoodExperiences = [
-    "Happy Childhood",
-    "Neglected",
-    "Family Moved Frequently",
-    "Physically Abused",
-    "Sexually Abused",
-    "Few Friends",
-    "Over/Underweight",
-    "Popular",
-    "Parents Divorced",
-    "Family Fights",
-    "Poor Grades",
-    "Conflict with Teachers",
-    "Drug or Alcohol Abuse",
-    "Good Grades",
-    "Sexual Problems",
-    "Depressed",
-    "Spoiled",
-    "Anxious",
-    "Not Allowed to Grow Up",
-    "Attention Problems",
-    "Anger Problems"
-  ];
-
-  const medicalConditions = [
-    "Recent Surgery",
-    "Thyroid Issues",
-    "Chronic Pain",
-    "Hormone Problems",
-    "Head Injury",
-    "Treatment for Drug/Alcohol Abuse",
-    "Headaches",
-    "Infertility",
-    "Seizures",
-    "Neurological Problems",
-    "Miscarriage",
-    "High blood pressure",
-    "Gastritis or esophagitis",
-    "Angina or chest pain",
-    "Irritable bowel",
-    "Heart attack",
-    "Bone or joint problems",
-    "Kidney-related issues",
-    "Chronic fatigue",
-    "Heart Conditions",
-    "Diabetes",
-    "Cancer",
-    "Dizziness",
-    "Faintness",
-    "Urinary Tract Problems",
-    "Fibromyalgia",
-    "Numbness & Tingling",
-    "Shortness of Breath/Asthma",
-    "Hepatitis",
-    "Arthritis",
-    "HIV/AIDS",
-    "Other"
-  ];
-
-  const handleAddFamily = () => {
-    setFamily([
-      ...family,
-      { id: Date.now().toString(), relationshipType: '', name: '', personality: '', relationshipGrowing: '', relationshipNow: '' }
-    ]);
-  };
-
-  const handleAddHousehold = () => {
-    setCurrentHousehold([
-      ...currentHousehold,
-      { id: Date.now().toString(), relationshipType: '', name: '', personality: '', relationshipNow: '' }
-    ]);
-  };
-
-  const handleAddTreatment = () => {
-    setTreatments([
-      ...treatments,
-      { id: Date.now().toString(), year: '', reason: '', length: '', provider: '' }
-    ]);
-  };
-
-  const handleAddMedication = () => {
-    setMedications([
-      ...medications,
-      { id: Date.now().toString(), name: '', purpose: '', duration: '' }
-    ]);
-  };
-
-  const handleAddSpouse = () => {
-    setPastSpouses([
-      ...pastSpouses,
-      { id: Date.now().toString(), name: '', personality: '', relationship: '' }
-    ]);
-  };
-
-  const handleSymptomChange = (symptom: string, isChecked: boolean) => {
-    if (isChecked) {
-      setSelectedSymptoms([...selectedSymptoms, symptom]);
-    } else {
-      setSelectedSymptoms(selectedSymptoms.filter(s => s !== symptom));
-    }
-  };
-
-  const handleChildhoodExperienceChange = (experience: string, isChecked: boolean) => {
-    if (isChecked) {
-      setSelectedChildhoodExperiences([...selectedChildhoodExperiences, experience]);
-    } else {
-      setSelectedChildhoodExperiences(selectedChildhoodExperiences.filter(exp => exp !== experience));
-    }
-  };
-
-  const handleMedicalConditionChange = (condition: string, isChecked: boolean) => {
-    if (isChecked) {
-      setSelectedMedicalConditions([...selectedMedicalConditions, condition]);
-    } else {
-      setSelectedMedicalConditions(selectedMedicalConditions.filter(c => c !== condition));
-    }
-  };
-
-  const handleSubmit = () => {
-    toast({
-      title: "Form Submitted",
-      description: "Your client history has been saved successfully.",
-    });
-    navigate('/patient-dashboard');
-  };
-
-  const handleCancel = () => {
-    if (confirm('Are you sure you want to cancel? Your progress will be lost.')) {
-      navigate('/patient-dashboard');
-    }
+  const fullName = clientData 
+    ? `${clientData.client_first_name || ''} ${clientData.client_last_name || ''}`.trim() 
+    : '';
+  
+  const formattedDOB = clientData?.client_date_of_birth || '';
+  
+  const handleSubmit = (formData: any) => {
+    const submissionData = {
+      ...formData,
+      formElementId: 'client-history-form-content',
+      fullName: fullName,
+      dateOfBirth: formattedDOB,
+      age: clientData?.client_age?.toString() || '',
+      state: clientData?.client_state || '',
+      phoneNumber: clientData?.client_phone || '',
+      email: clientData?.client_email || '',
+    };
+    
+    onSubmit(submissionData);
   };
 
   return (
     <div className="flex flex-col min-h-screen bg-gray-50 p-4 md:p-8">
       <div className="mb-6 flex items-center">
-        <Button variant="ghost" onClick={handleCancel} className="mr-2">
+        <Button variant="ghost" onClick={onClose} className="mr-2">
           <ChevronLeft className="h-5 w-5 mr-1" />
           Back
         </Button>
         <h1 className="text-2xl font-bold">Client History Form</h1>
       </div>
 
-      <form onSubmit={(e) => { e.preventDefault(); handleSubmit(); }} className="space-y-8 mb-8">
-        {/* SECTION: Client Information */}
+      <form 
+        id="client-history-form-content"
+        onSubmit={(e) => { 
+          e.preventDefault(); 
+          handleSubmit({
+            personalStrengths: (document.getElementById('strengths') as HTMLTextAreaElement)?.value,
+            hobbies: (document.getElementById('hobbies') as HTMLTextAreaElement)?.value,
+            educationLevel: (document.getElementById('education') as HTMLSelectElement)?.value,
+            occupationDetails: (document.getElementById('occupation') as HTMLTextAreaElement)?.value,
+            sleepHours: (document.getElementById('sleepHours') as HTMLInputElement)?.value,
+            currentIssues: (document.getElementById('currentIssues') as HTMLTextAreaElement)?.value,
+            progressionOfIssues: (document.getElementById('progressionOfIssues') as HTMLTextAreaElement)?.value,
+            relationshipProblems: (document.getElementById('relationshipProblems') as HTMLTextAreaElement)?.value,
+            counselingGoals: (document.getElementById('counselingGoals') as HTMLTextAreaElement)?.value,
+            emergencyName: (document.getElementById('emergencyName') as HTMLInputElement)?.value,
+            emergencyPhone: (document.getElementById('emergencyPhone') as HTMLInputElement)?.value,
+            emergencyRelationship: (document.getElementById('emergencyRelationship') as HTMLInputElement)?.value,
+            signature: (document.getElementById('signature') as HTMLInputElement)?.value,
+            selectedConditions: selectedMedicalConditions
+          }); 
+        }} 
+        className="space-y-8 mb-8"
+      >
         <Card>
           <CardHeader>
             <CardTitle>Client Information</CardTitle>
@@ -334,33 +112,32 @@ const ClientHistoryTemplate: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="fullName">Full Name</Label>
-                <Input id="fullName" placeholder="Auto-populated" disabled />
+                <Input id="fullName" value={fullName} readOnly className="bg-gray-100" />
               </div>
               <div>
                 <Label htmlFor="dateOfBirth">Date of Birth</Label>
-                <Input id="dateOfBirth" placeholder="Auto-populated" disabled />
+                <Input id="dateOfBirth" value={formattedDOB} readOnly className="bg-gray-100" />
               </div>
               <div>
                 <Label htmlFor="age">Age</Label>
-                <Input id="age" placeholder="Auto-populated" disabled />
+                <Input id="age" value={clientData?.client_age || ''} readOnly className="bg-gray-100" />
               </div>
               <div>
                 <Label htmlFor="state">State</Label>
-                <Input id="state" placeholder="Auto-populated" disabled />
+                <Input id="state" value={clientData?.client_state || ''} readOnly className="bg-gray-100" />
               </div>
               <div>
                 <Label htmlFor="phoneNumber">Phone Number</Label>
-                <Input id="phoneNumber" placeholder="Auto-populated" disabled />
+                <Input id="phoneNumber" value={clientData?.client_phone || ''} readOnly className="bg-gray-100" />
               </div>
               <div>
                 <Label htmlFor="email">Email Address</Label>
-                <Input id="email" placeholder="Auto-populated" disabled />
+                <Input id="email" value={clientData?.client_email || ''} readOnly className="bg-gray-100" />
               </div>
             </div>
           </CardContent>
         </Card>
 
-        {/* SECTION: Emergency Contact */}
         <Card>
           <CardHeader>
             <CardTitle>Emergency Contact</CardTitle>
@@ -384,7 +161,6 @@ const ClientHistoryTemplate: React.FC = () => {
           </CardContent>
         </Card>
 
-        {/* SECTION: Current Status */}
         <Card>
           <CardHeader>
             <CardTitle>Current Status</CardTitle>
@@ -404,7 +180,6 @@ const ClientHistoryTemplate: React.FC = () => {
             <div>
               <Label className="mb-2 block">Please check any of the following you have experienced in the past six months</Label>
               
-              {/* Mood/Emotions Section */}
               <div className="mb-6">
                 <h4 className="text-md font-medium mb-2">Mood/Emotions</h4>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
@@ -422,7 +197,6 @@ const ClientHistoryTemplate: React.FC = () => {
                 </div>
               </div>
               
-              {/* Physical Section */}
               <div className="mb-6">
                 <h4 className="text-md font-medium mb-2">Physical</h4>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
@@ -440,7 +214,6 @@ const ClientHistoryTemplate: React.FC = () => {
                 </div>
               </div>
               
-              {/* Behavioral/Social Section */}
               <div className="mb-6">
                 <h4 className="text-md font-medium mb-2">Behavioral/Social</h4>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
@@ -458,7 +231,6 @@ const ClientHistoryTemplate: React.FC = () => {
                 </div>
               </div>
               
-              {/* Cognitive Section */}
               <div className="mb-6">
                 <h4 className="text-md font-medium mb-2">Cognitive</h4>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
@@ -476,7 +248,6 @@ const ClientHistoryTemplate: React.FC = () => {
                 </div>
               </div>
               
-              {/* Life Stressors Section */}
               <div>
                 <h4 className="text-md font-medium mb-2">Life Stressors</h4>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
@@ -554,7 +325,6 @@ const ClientHistoryTemplate: React.FC = () => {
           </CardContent>
         </Card>
 
-        {/* SECTION: Family History */}
         <Card>
           <CardHeader>
             <CardTitle>Family History</CardTitle>
@@ -648,7 +418,6 @@ const ClientHistoryTemplate: React.FC = () => {
           </CardContent>
         </Card>
 
-        {/* SECTION: Current Information */}
         <Card>
           <CardHeader>
             <CardTitle>Current Information</CardTitle>
@@ -749,7 +518,6 @@ const ClientHistoryTemplate: React.FC = () => {
           </CardContent>
         </Card>
 
-        {/* SECTION: Relationship History */}
         <Card>
           <CardHeader>
             <CardTitle>Relationship History</CardTitle>
@@ -861,7 +629,6 @@ const ClientHistoryTemplate: React.FC = () => {
           </CardContent>
         </Card>
 
-        {/* SECTION: Medical and Mental Health History */}
         <Card>
           <CardHeader>
             <CardTitle>Medical and Mental Health History</CardTitle>
@@ -1057,7 +824,7 @@ const ClientHistoryTemplate: React.FC = () => {
         </Card>
 
         <div className="flex justify-end gap-4">
-          <Button type="button" variant="outline" onClick={handleCancel}>
+          <Button type="button" variant="outline" onClick={onClose}>
             Cancel
           </Button>
           <Button type="submit">
@@ -1069,5 +836,44 @@ const ClientHistoryTemplate: React.FC = () => {
     </div>
   );
 };
+
+interface FamilyMember {
+  id: string;
+  relationshipType: string;
+  name: string;
+  personality: string;
+  relationshipGrowing?: string;
+  relationshipNow: string;
+}
+
+interface PastTreatment {
+  id: string;
+  year: string;
+  reason: string;
+  length: string;
+  provider: string;
+}
+
+interface Medication {
+  id: string;
+  name: string;
+  purpose: string;
+  duration: string;
+}
+
+interface PastSpouse {
+  id: string;
+  name: string;
+  personality: string;
+  relationship: string;
+}
+
+interface SymptomCategories {
+  mood: string[];
+  physical: string[];
+  behavioral: string[];
+  cognitive: string[];
+  lifeStressors: string[];
+}
 
 export default ClientHistoryTemplate;
