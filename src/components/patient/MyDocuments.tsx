@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -5,9 +6,10 @@ import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@
 import { Calendar, Eye, FileText, Loader2, RefreshCw } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
-import { getCurrentUser } from '@/integrations/supabase/client';
+import { getCurrentUser, fetchClientHistoryData } from '@/integrations/supabase/client';
 import { useDocuments } from '@/hooks/useDocuments';
 import { getDocumentDownloadURLWithRetry } from '@/utils/enhancedFetching';
+import ClientHistoryViewDialog from './ClientHistoryViewDialog';
 
 type MyDocumentsProps = {
   clientId?: string;
@@ -18,6 +20,9 @@ const MyDocuments: React.FC<MyDocumentsProps> = ({ clientId, excludedTypes = [] 
   const [userId, setUserId] = useState<string | undefined>(clientId);
   const [userLoading, setUserLoading] = useState<boolean>(!clientId);
   const [userError, setUserError] = useState<string | null>(null);
+  const [isHistoryDialogOpen, setIsHistoryDialogOpen] = useState(false);
+  const [historyData, setHistoryData] = useState<any>(null);
+  const [isHistoryLoading, setIsHistoryLoading] = useState(false);
   
   const { 
     documents, 
@@ -69,15 +74,22 @@ const MyDocuments: React.FC<MyDocumentsProps> = ({ clientId, excludedTypes = [] 
     }
   }, [userId]); // Only depend on userId, NOT fetchDocuments
 
-  const handleViewDocument = async (filePath: string) => {
+  const handleViewDocument = async (document: any) => {
     try {
-      if (!filePath) {
+      // For Client History documents, use the special dialog instead of PDF
+      if (document.document_type === 'client_history') {
+        await fetchClientHistoryForm(document.client_id);
+        return;
+      }
+      
+      // For other document types, use the regular PDF viewer
+      if (!document.file_path) {
         toast.error("Document path is missing");
         return;
       }
       
-      console.log('Getting document URL for file path:', filePath);
-      const url = await getDocumentDownloadURLWithRetry(filePath);
+      console.log('Getting document URL for file path:', document.file_path);
+      const url = await getDocumentDownloadURLWithRetry(document.file_path);
       
       if (url) {
         console.log('Opening document URL');
@@ -88,6 +100,27 @@ const MyDocuments: React.FC<MyDocumentsProps> = ({ clientId, excludedTypes = [] 
     } catch (error) {
       console.error('Error viewing document:', error);
       toast.error("Failed to open document");
+    }
+  };
+  
+  const fetchClientHistoryForm = async (clientId: string) => {
+    try {
+      setIsHistoryLoading(true);
+      
+      const { success, data, error } = await fetchClientHistoryData(clientId);
+      
+      if (success && data) {
+        setHistoryData(data);
+        setIsHistoryDialogOpen(true);
+      } else {
+        console.error('Error fetching client history:', error);
+        toast.error("Could not load client history data");
+      }
+    } catch (error) {
+      console.error('Exception fetching client history:', error);
+      toast.error("Failed to load client history");
+    } finally {
+      setIsHistoryLoading(false);
     }
   };
 
@@ -115,87 +148,96 @@ const MyDocuments: React.FC<MyDocumentsProps> = ({ clientId, excludedTypes = [] 
   const errorMessage = userError || docsError;
 
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
-        <div>
-          <CardTitle>Completed Documents</CardTitle>
-          <CardDescription>View and download your completed documents</CardDescription>
-        </div>
-        <Button 
-          variant="ghost" 
-          size="icon"
-          onClick={handleRefresh}
-          disabled={isLoading}
-          title="Refresh documents"
-        >
-          <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
-        </Button>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {isLoading ? (
-          <div className="flex justify-center py-8">
-            <Loader2 className="h-8 w-8 animate-spin text-valorwell-600" />
+    <>
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div>
+            <CardTitle>Completed Documents</CardTitle>
+            <CardDescription>View and download your completed documents</CardDescription>
           </div>
-        ) : errorMessage ? (
-          <div className="flex flex-col items-center justify-center py-8 text-center">
-            <FileText className="h-12 w-12 text-amber-400 mb-3" />
-            <h3 className="text-lg font-medium text-amber-700">Error loading documents</h3>
-            <p className="text-sm text-gray-500 mt-1 mb-4">{errorMessage}</p>
-            <Button onClick={handleRefresh} variant="outline">
-              <RefreshCw className="h-4 w-4 mr-2" />
-              Retry
-            </Button>
-          </div>
-        ) : filteredDocuments.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-8 text-center">
-            <FileText className="h-12 w-12 text-gray-300 mb-3" />
-            <h3 className="text-lg font-medium">No documents available</h3>
-            <p className="text-sm text-gray-500 mt-1">
-              {excludedTypes.length > 0 
-                ? "You haven't completed any documents yet" 
-                : "Your therapist will add documents here"}
-            </p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Title</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Date</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredDocuments.map((doc) => (
-                  <TableRow key={doc.id}>
-                    <TableCell className="font-medium">{doc.document_title}</TableCell>
-                    <TableCell>{formatDocumentType(doc.document_type)}</TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1">
-                        <Calendar className="h-4 w-4 text-gray-500" />
-                        {format(new Date(doc.document_date), 'MMM d, yyyy')}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleViewDocument(doc.file_path)}
-                      >
-                        <Eye className="h-4 w-4 mr-1" />
-                        View
-                      </Button>
-                    </TableCell>
+          <Button 
+            variant="ghost" 
+            size="icon"
+            onClick={handleRefresh}
+            disabled={isLoading}
+            title="Refresh documents"
+          >
+            <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+          </Button>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {isLoading ? (
+            <div className="flex justify-center py-8">
+              <Loader2 className="h-8 w-8 animate-spin text-valorwell-600" />
+            </div>
+          ) : errorMessage ? (
+            <div className="flex flex-col items-center justify-center py-8 text-center">
+              <FileText className="h-12 w-12 text-amber-400 mb-3" />
+              <h3 className="text-lg font-medium text-amber-700">Error loading documents</h3>
+              <p className="text-sm text-gray-500 mt-1 mb-4">{errorMessage}</p>
+              <Button onClick={handleRefresh} variant="outline">
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Retry
+              </Button>
+            </div>
+          ) : filteredDocuments.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-8 text-center">
+              <FileText className="h-12 w-12 text-gray-300 mb-3" />
+              <h3 className="text-lg font-medium">No documents available</h3>
+              <p className="text-sm text-gray-500 mt-1">
+                {excludedTypes.length > 0 
+                  ? "You haven't completed any documents yet" 
+                  : "Your therapist will add documents here"}
+              </p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Title</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        )}
-      </CardContent>
-    </Card>
+                </TableHeader>
+                <TableBody>
+                  {filteredDocuments.map((doc) => (
+                    <TableRow key={doc.id}>
+                      <TableCell className="font-medium">{doc.document_title}</TableCell>
+                      <TableCell>{formatDocumentType(doc.document_type)}</TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-1">
+                          <Calendar className="h-4 w-4 text-gray-500" />
+                          {format(new Date(doc.document_date), 'MMM d, yyyy')}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleViewDocument(doc)}
+                        >
+                          <Eye className="h-4 w-4 mr-1" />
+                          View
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+      
+      <ClientHistoryViewDialog 
+        isOpen={isHistoryDialogOpen}
+        onClose={() => setIsHistoryDialogOpen(false)}
+        data={historyData}
+        isLoading={isHistoryLoading}
+      />
+    </>
   );
 };
 

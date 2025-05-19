@@ -445,3 +445,103 @@ export const saveDocumentSubmission = async (documentData: any): Promise<{ succe
     return { success: false, error };
   }
 };
+
+// New function to fetch client history with related data
+export async function fetchClientHistoryData(clientId: string) {
+  try {
+    // Fetch the main client history record
+    const { data: historyData, error: historyError } = await supabase
+      .from('client_history')
+      .select('*')
+      .eq('client_id', clientId)
+      .single();
+    
+    if (historyError) {
+      console.error('Error fetching client history:', historyError);
+      return { success: false, error: historyError, data: null };
+    }
+    
+    if (!historyData) {
+      return { success: false, error: { message: 'No client history found' }, data: null };
+    }
+    
+    // Fetch related data
+    const historyId = historyData.id;
+    
+    // Fetch family members
+    const { data: familyData, error: familyError } = await supabase
+      .from('client_history_family')
+      .select('*')
+      .eq('history_id', historyId);
+      
+    if (familyError) {
+      console.error('Error fetching family data:', familyError);
+    }
+    
+    // Fetch household members
+    const { data: householdData, error: householdError } = await supabase
+      .from('client_history_household')
+      .select('*')
+      .eq('history_id', historyId);
+      
+    if (householdError) {
+      console.error('Error fetching household data:', householdError);
+    }
+    
+    // Fetch spouse info
+    const { data: spouseData, error: spouseError } = await supabase
+      .from('client_history_spouses')
+      .select('*')
+      .eq('history_id', historyId);
+      
+    if (spouseError) {
+      console.error('Error fetching spouse data:', spouseError);
+    }
+    
+    // Fetch treatments
+    const { data: treatmentsData, error: treatmentsError } = await supabase
+      .from('client_history_treatments')
+      .select('*')
+      .eq('history_id', historyId);
+      
+    if (treatmentsError) {
+      console.error('Error fetching treatments data:', treatmentsError);
+    }
+    
+    // Fetch medications
+    const { data: medicationsData, error: medicationsError } = await supabase
+      .from('client_history_medications')
+      .select('*')
+      .eq('history_id', historyId);
+      
+    if (medicationsError) {
+      console.error('Error fetching medications data:', medicationsError);
+    }
+    
+    // Also fetch current spouse if available
+    const { data: currentSpouseData, error: currentSpouseError } = await supabase
+      .from('client_history_current_spouse')
+      .select('*')
+      .eq('history_id', historyId);
+      
+    if (currentSpouseError) {
+      console.error('Error fetching current spouse data:', currentSpouseError);
+    }
+    
+    // Create a complete data object with all related information
+    const completeData = {
+      main: historyData,
+      family: familyData || [],
+      household: householdData || [],
+      spouses: spouseData || [],
+      treatments: treatmentsData || [],
+      medications: medicationsData || [],
+      currentSpouse: currentSpouseData && currentSpouseData.length > 0 ? currentSpouseData[0] : null
+    };
+    
+    return { success: true, data: completeData, error: null };
+  } catch (error: any) {
+    console.error('Exception fetching client history data:', error);
+    return { success: false, error, data: null };
+  }
+}
