@@ -1,6 +1,6 @@
-
 /**
  * Standard IANA timezone options for the application
+ * These options must match the values in the time_zones enum in the database
  * Each timezone includes both the IANA identifier and a user-friendly label
  */
 export const timezoneOptions = [
@@ -80,7 +80,11 @@ export function formatTimezoneForDisplay(timezone: string): string {
  */
 export function getBrowserTimezone(): string {
   try {
-    return Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    // Ensure it's in our allowed list, otherwise default to America/New_York
+    return timezoneOptions.some(tz => tz.value === browserTimezone) 
+      ? browserTimezone 
+      : 'America/New_York';
   } catch (error) {
     console.error('Error getting browser timezone:', error);
     return 'America/New_York';

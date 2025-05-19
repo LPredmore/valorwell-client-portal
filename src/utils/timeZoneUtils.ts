@@ -1,4 +1,5 @@
 import { TimeZoneService } from './timeZoneService';
+import { timezoneOptions } from './timezoneOptions';
 
 /**
  * Get the user's timezone from the browser
@@ -6,7 +7,15 @@ import { TimeZoneService } from './timeZoneService';
 export function getUserTimeZone(): string {
   try {
     const browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    return TimeZoneService.ensureIANATimeZone(browserTimezone);
+    // Make sure the timezone is in our allowed list (from the enum)
+    const isValidTimezone = timezoneOptions.some(tz => tz.value === browserTimezone);
+    
+    if (isValidTimezone) {
+      return TimeZoneService.ensureIANATimeZone(browserTimezone);
+    } else {
+      // Default to Eastern Time if not in allowed list
+      return TimeZoneService.DEFAULT_TIMEZONE;
+    }
   } catch (error) {
     console.error('Error getting user timezone:', error);
     return TimeZoneService.DEFAULT_TIMEZONE;
@@ -139,10 +148,15 @@ export function formatWithTimeZone(date: Date, timezone: string, formatStr: stri
 }
 
 /**
- * Ensures a timezone string is a valid IANA timezone
+ * Ensures a timezone string is a valid IANA timezone from our allowed enum values
  */
 export function ensureIANATimeZone(timezone: string | null | undefined): string {
-  return TimeZoneService.ensureIANATimeZone(timezone);
+  if (!timezone) return TimeZoneService.DEFAULT_TIMEZONE;
+  
+  // Check if timezone is in our allowed list from the enum
+  const isValidTimezone = timezoneOptions.some(tz => tz.value === timezone);
+  
+  return isValidTimezone ? timezone : TimeZoneService.DEFAULT_TIMEZONE;
 }
 
 /**
