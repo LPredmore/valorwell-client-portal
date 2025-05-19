@@ -23,6 +23,9 @@ export type DocumentAssignment = {
   updated_at: string;
 };
 
+// Constants for storage management
+export const CLINICAL_DOCUMENTS_BUCKET = 'clinical_documents';
+
 // Function to update document status
 export const updateDocumentStatus = async (id: string, status: string): Promise<{ success: boolean; error?: any }> => {
   try {
@@ -117,9 +120,14 @@ export const fetchClinicalDocuments = async (clientId: string): Promise<any[]> =
       console.error('Error fetching clinical documents:', error);
       return [];
     }
+    
+    if (!data || data.length === 0) {
+      console.log('No clinical documents found for client:', clientId);
+      return [];
+    }
 
-    console.log('Fetched clinical documents:', data);
-    return data || [];
+    console.log(`Fetched ${data.length} clinical documents:`, data);
+    return data;
   } catch (error) {
     console.error('Error fetching clinical documents:', error);
     return [];
@@ -129,34 +137,30 @@ export const fetchClinicalDocuments = async (clientId: string): Promise<any[]> =
 // Function to get document download URL
 export const getDocumentDownloadURL = async (filePath: string): Promise<string | null> => {
   try {
-    console.log('Getting download URL for file path:', filePath);
+    if (!filePath) {
+      console.error('Invalid file path provided to getDocumentDownloadURL:', filePath);
+      return null;
+    }
     
-    // Determine which bucket to use based on the file path or other hints
-    const bucketName = 'clinical_documents';
+    console.log(`Getting download URL for file path: ${filePath} from bucket: ${CLINICAL_DOCUMENTS_BUCKET}`);
     
+    // Use the constant bucket name
     const { data, error } = await supabase.storage
-      .from(bucketName)
+      .from(CLINICAL_DOCUMENTS_BUCKET)
       .createSignedUrl(filePath, 60 * 60); // URL valid for 1 hour
 
     if (error) {
-      console.error('Error getting document URL:', error);
-      
-      // Fallback attempt with alternative bucket if needed
-      console.log('Attempting fallback with alternative bucket');
-      const fallbackBucket = 'documents';
-      const fallbackResult = await supabase.storage
-        .from(fallbackBucket)
-        .createSignedUrl(filePath, 60 * 60);
-        
-      if (fallbackResult.error) {
-        console.error('Error with fallback bucket attempt:', fallbackResult.error);
-        return null;
-      }
-      
-      return fallbackResult.data?.signedUrl || null;
+      console.error(`Error getting document URL from ${CLINICAL_DOCUMENTS_BUCKET}:`, error);
+      return null;
     }
 
-    return data?.signedUrl || null;
+    if (!data?.signedUrl) {
+      console.error('No signed URL returned from Storage API');
+      return null;
+    }
+
+    console.log('Successfully generated signed URL for document');
+    return data.signedUrl;
   } catch (error) {
     console.error('Error generating document URL:', error);
     return null;
@@ -415,6 +419,15 @@ export const createUser = async (userData: any): Promise<{ success: boolean; dat
 export const saveDocumentSubmission = async (documentData: any): Promise<{ success: boolean; data?: any; error?: any }> => {
   try {
     console.log('Saving document submission:', documentData);
+    
+    // Validate document data to ensure it has the required fields
+    if (!documentData.client_id || !documentData.document_type || !documentData.file_path) {
+      console.error('Document submission missing required fields:', documentData);
+      return { 
+        success: false, 
+        error: 'Missing required document data (client_id, document_type, or file_path)' 
+      };
+    }
     
     const { data, error } = await supabase
       .from('clinical_documents')

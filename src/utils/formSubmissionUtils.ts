@@ -5,6 +5,9 @@ import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import { v4 as uuidv4 } from 'uuid';
 
+// Constant for the storage bucket name to ensure consistency
+const CLINICAL_DOCUMENTS_BUCKET = 'clinical_documents';
+
 /**
  * Handles document form submission by generating a PDF and updating related database records
  * 
@@ -73,22 +76,22 @@ export const handleFormSubmission = async (
     // Define the file path within the clinical_documents bucket
     const filePath = `${documentInfo.clientId}/${filename}`;
     
-    console.log(`[formSubmissionUtils] PDF generated successfully, uploading to clinical_documents bucket path: ${filePath}`);
+    console.log(`[formSubmissionUtils] PDF generated successfully, uploading to ${CLINICAL_DOCUMENTS_BUCKET} bucket path: ${filePath}`);
     
     // Step 2: Upload PDF to Supabase storage - using the clinical_documents bucket
     const { data: uploadData, error: uploadError } = await supabase.storage
-      .from('clinical_documents')
+      .from(CLINICAL_DOCUMENTS_BUCKET)
       .upload(filePath, pdfBlob, {
         contentType: 'application/pdf',
         upsert: false
       });
     
     if (uploadError) {
-      console.error('[formSubmissionUtils] Error uploading document:', uploadError);
+      console.error(`[formSubmissionUtils] Error uploading document to ${CLINICAL_DOCUMENTS_BUCKET}:`, uploadError);
       throw new Error(`Error uploading document: ${uploadError.message}`);
     }
     
-    console.log('[formSubmissionUtils] Document uploaded successfully:', uploadData);
+    console.log(`[formSubmissionUtils] Document uploaded successfully to ${CLINICAL_DOCUMENTS_BUCKET}:`, uploadData);
     
     // Return the file path for database reference
     return {
@@ -151,3 +154,5 @@ const processFormElementsForPDF = (element: HTMLElement) => {
   
   return element;
 };
+
+export { CLINICAL_DOCUMENTS_BUCKET };

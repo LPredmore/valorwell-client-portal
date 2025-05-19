@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 import { DocumentAssignment, updateDocumentStatus, saveDocumentSubmission } from '@/integrations/supabase/client';
 import ClientHistoryTemplate from '@/components/templates/ClientHistoryTemplate';
 import InformedConsentTemplate from '@/components/templates/InformedConsentTemplate';
-import { handleFormSubmission } from '@/utils/formSubmissionUtils';
+import { handleFormSubmission, CLINICAL_DOCUMENTS_BUCKET } from '@/utils/formSubmissionUtils';
 
 interface DocumentFormRendererProps {
   assignment: DocumentAssignment;
@@ -43,12 +43,10 @@ const DocumentFormRenderer: React.FC<DocumentFormRendererProps> = ({
       
       // If completed, save to clinical_documents
       if (!isDraft) {
-        // Generate the file path relative to the clinical_documents bucket
+        // Generate the proper document type based on the assignment name
         const documentType = getDocumentType(assignment.document_name);
-        const timestamp = Date.now();
-        const filePath = `${clientId}/${documentType}_${timestamp}.pdf`;
         
-        // Generate and save PDF using formSubmissionUtils helper
+        // Create the document info object with proper client ID
         const documentInfo = {
           clientId: clientId,
           documentType: documentType,
@@ -58,6 +56,7 @@ const DocumentFormRenderer: React.FC<DocumentFormRendererProps> = ({
         };
         
         if (formData.formElementId) {
+          // Use the formSubmissionUtils helper to generate and upload PDF
           const result = await handleFormSubmission(
             formData.formElementId,
             documentInfo,
@@ -70,6 +69,11 @@ const DocumentFormRenderer: React.FC<DocumentFormRendererProps> = ({
           }
           
           formData.pdf_path = result.filePath;
+          
+          // Log the file path for debugging
+          console.log(`[DocumentFormRenderer] Document PDF generated at path: ${result.filePath} in bucket: ${CLINICAL_DOCUMENTS_BUCKET}`);
+        } else {
+          console.warn('[DocumentFormRenderer] Form has no formElementId to capture');
         }
         
         // Save the document record
@@ -78,9 +82,15 @@ const DocumentFormRenderer: React.FC<DocumentFormRendererProps> = ({
           document_type: documentType,
           document_title: assignment.document_name,
           document_date: new Date().toISOString().split('T')[0],
-          file_path: formData.pdf_path || filePath,
+          file_path: formData.pdf_path || '', // Use the file path from PDF generation
           created_by: 'client' // Indicates this was filled out by the client
         };
+        
+        // Validate document data before saving
+        if (!documentData.file_path) {
+          console.error('[DocumentFormRenderer] Missing file_path in document data');
+          throw new Error('Document file path is missing');
+        }
         
         const { success: documentSaveSuccess, error: documentSaveError } = await saveDocumentSubmission(documentData);
         
