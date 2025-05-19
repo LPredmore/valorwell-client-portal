@@ -93,6 +93,50 @@ export const handleFormSubmission = async (
     
     console.log(`[formSubmissionUtils] Document uploaded successfully to ${CLINICAL_DOCUMENTS_BUCKET}:`, uploadData);
     
+    // Step 3: Save document record to clinical_documents table
+    const { data: documentRecord, error: documentError } = await supabase
+      .from('clinical_documents')
+      .insert({
+        client_id: documentInfo.clientId,
+        document_type: documentInfo.documentType,
+        document_title: documentInfo.documentTitle,
+        document_date: documentInfo.documentDate.toISOString().split('T')[0],
+        file_path: filePath,
+        created_by: documentInfo.createdBy || documentInfo.clientId // Set to client ID if no creator specified
+      })
+      .select()
+      .single();
+    
+    if (documentError) {
+      console.error('[formSubmissionUtils] Error saving document record:', documentError);
+      throw new Error(`Error saving document record: ${documentError.message}`);
+    }
+    
+    console.log('[formSubmissionUtils] Document record saved successfully:', documentRecord);
+    
+    // Step 4: Update the document assignment status to completed
+    const { error: assignmentError } = await supabase
+      .from('document_assignments')
+      .update({ status: 'completed' })
+      .eq('client_id', documentInfo.clientId)
+      .eq('document_name', documentName);
+    
+    if (assignmentError) {
+      console.error('[formSubmissionUtils] Error updating assignment status:', assignmentError);
+      // Not throwing here as this is not critical - the document is already saved
+      console.warn('Document saved but assignment status update failed');
+    } else {
+      console.log('[formSubmissionUtils] Document assignment status updated to completed');
+    }
+    
+    // Step 5: If this is a client history form, save the form data to the client_history table
+    if (documentInfo.documentType === 'client_history' && documentData) {
+      const result = await saveClientHistory(documentInfo.clientId, documentData, filePath);
+      if (!result.success) {
+        console.warn('[formSubmissionUtils] Client history data save warning:', result.message);
+      }
+    }
+    
     // Return the file path for database reference
     return {
       success: true,
@@ -106,6 +150,53 @@ export const handleFormSubmission = async (
       success: false,
       message: error instanceof Error ? error.message : 'Unknown error occurred'
     };
+  }
+};
+
+/**
+ * Save client history form data to the client_history table
+ */
+const saveClientHistory = async (clientId: string, formData: any, pdfPath: string) => {
+  try {
+    // Extract relevant data from the form
+    const historyData = {
+      client_id: clientId,
+      personal_strengths: formData.personalStrengths || null,
+      hobbies: formData.hobbies || null,
+      education_level: formData.educationLevel || null,
+      occupation_details: formData.occupationDetails || null,
+      sleep_hours: formData.sleepHours || null,
+      current_issues: formData.currentIssues || null,
+      progression_of_issues: formData.progressionOfIssues || null,
+      relationship_problems: formData.relationshipProblems || null,
+      counseling_goals: formData.counselingGoals || null,
+      emergency_name: formData.emergencyName || null,
+      emergency_phone: formData.emergencyPhone || null,
+      emergency_relationship: formData.emergencyRelationship || null,
+      signature: formData.signature || null,
+      pdf_path: pdfPath,
+      submission_date: new Date().toISOString().split('T')[0],
+      selected_medical_conditions: formData.selectedConditions ? JSON.stringify(formData.selectedConditions) : '[]'
+    };
+    
+    // Save to client_history table
+    const { data, error } = await supabase
+      .from('client_history')
+      .insert(historyData)
+      .select()
+      .single();
+    
+    if (error) {
+      console.error('[saveClientHistory] Error saving client history:', error);
+      return { success: false, message: `Error saving client history: ${error.message}` };
+    }
+    
+    console.log('[saveClientHistory] Client history saved successfully:', data);
+    return { success: true, message: 'Client history saved successfully' };
+    
+  } catch (error) {
+    console.error('[saveClientHistory] Error:', error);
+    return { success: false, message: error instanceof Error ? error.message : 'Unknown error occurred' };
   }
 };
 

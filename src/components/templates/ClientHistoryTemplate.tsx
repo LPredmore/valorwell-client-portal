@@ -66,6 +66,22 @@ const ClientHistoryTemplate: React.FC<ClientHistoryTemplateProps> = ({ clientDat
     }
   });
   
+  // Medical conditions that could be selected
+  const medicalConditions = [
+    "Anxiety", "Depression", "ADHD", "Insomnia", "Chronic Pain", 
+    "High Blood Pressure", "Diabetes", "Thyroid Issues"
+  ];
+  
+  const [selectedConditions, setSelectedConditions] = useState<string[]>([]);
+  
+  const toggleCondition = (condition: string) => {
+    setSelectedConditions(current => 
+      current.includes(condition)
+        ? current.filter(c => c !== condition)
+        : [...current, condition]
+    );
+  };
+  
   const handleSubmit = async (data: FormData) => {
     if (!userId) {
       toast({
@@ -79,6 +95,20 @@ const ClientHistoryTemplate: React.FC<ClientHistoryTemplateProps> = ({ clientDat
     setIsSubmitting(true);
     
     try {
+      // Add selected conditions to the form data
+      const enrichedData = {
+        ...data,
+        selectedConditions,
+        formElementId: 'client-history-form'
+      };
+      
+      // If the parent component provides onSubmit, use it
+      if (onSubmit) {
+        onSubmit(enrichedData);
+        setIsSubmitting(false);
+        return;
+      }
+      
       // Document info for PDF generation
       const documentInfo = {
         clientId: userId,
@@ -93,7 +123,7 @@ const ClientHistoryTemplate: React.FC<ClientHistoryTemplateProps> = ({ clientDat
         'client-history-form',
         documentInfo,
         'Client History Form',
-        data
+        enrichedData
       );
       
       if (result.success) {
@@ -101,11 +131,6 @@ const ClientHistoryTemplate: React.FC<ClientHistoryTemplateProps> = ({ clientDat
           title: "Success",
           description: "Your client history has been submitted successfully.",
         });
-
-        // Call the onSubmit callback if provided
-        if (onSubmit) {
-          onSubmit(data);
-        }
         
         // Call onClose if provided
         if (onClose) {

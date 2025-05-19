@@ -1,3 +1,4 @@
+
 import React, { useState, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
@@ -58,7 +59,10 @@ const InformedConsentTemplate: React.FC<InformedConsentTemplateProps> = ({
       // If the parent component provided an onSubmit handler, use it
       if (onSubmit) {
         console.log("[InformedConsentTemplate] Using provided onSubmit handler");
-        await onSubmit(data);
+        await onSubmit({
+          ...data,
+          formElementId: 'informed-consent-form' // Pass the form element ID for PDF generation
+        });
         setIsSubmitting(false);
         return;
       }
