@@ -3,6 +3,10 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App.tsx';
 import './index.css';
+import { cleanupOldAuthKeys } from './utils/authCleanup'; 
+
+// Clean up any old auth keys in localStorage on application startup
+cleanupOldAuthKeys();
 
 const rootElement = document.getElementById("root");
 

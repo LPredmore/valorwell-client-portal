@@ -1,9 +1,8 @@
-
-import React from "react";
+import React, { Suspense } from "react";
 import { Toaster } from "sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/context/NewAuthContext";
 
 // Auth Components
@@ -42,6 +41,14 @@ const queryClient = new QueryClient({
   }
 });
 
+// Loading component for suspense fallback
+const LoadingFallback = () => (
+  <div className="flex h-screen w-full items-center justify-center flex-col">
+    <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-valorwell-600 mb-4"></div>
+    <p className="text-valorwell-600">Loading application...</p>
+  </div>
+);
+
 function App() {
   // EXTENDED DEBUG: Log which routes are being rendered on app start
   React.useEffect(() => {
@@ -56,56 +63,58 @@ function App() {
     <React.StrictMode>
       <BrowserRouter>
         <QueryClientProvider client={queryClient}>
-          <AuthProvider>
-            <AuthMigrationHandler>
-              <TooltipProvider>
-                {/* Sonner Toaster - the only toast component we need */}
-                <Toaster richColors position="top-right" />
-                <Routes>
-                  {/* Public routes */}
-                  <Route path="/" element={<Index />} />
-                  <Route path="/login" element={<Login />} />
-                  <Route path="/signup" element={<Signup />} />
-                  <Route path="/reset-password" element={<ResetPassword />} />
-                  <Route path="/update-password" element={<UpdatePassword />} />
-                  
-                  {/* Profile setup - accessible for all client roles including New */}
-                  <Route path="/profile-setup" element={
-                    <AuthProtectedRoute allowedRoles={["client"]} blockNewClients={false}>
-                      <ProfileSetup />
-                    </AuthProtectedRoute>
-                  } />
-                  
-                  {/* Protected routes - Block New clients */}
-                  <Route path="/patient-dashboard" element={
-                    <AuthProtectedRoute allowedRoles={["client"]} blockNewClients={true}>
-                      <PatientDashboard />
-                    </AuthProtectedRoute>
-                  } />
-                  <Route path="/patient-documents" element={
-                    <AuthProtectedRoute allowedRoles={["client"]} blockNewClients={true}>
-                      <PatientDocuments />
-                    </AuthProtectedRoute>
-                  } />
-                  <Route path="/patient-profile" element={
-                    <AuthProtectedRoute allowedRoles={["client"]} blockNewClients={true}>
-                      <PatientProfile />
-                    </AuthProtectedRoute>
-                  } />
-                  <Route path="/therapist-selection" element={
-                    <AuthProtectedRoute allowedRoles={["client"]}>
-                      <TherapistSelection />
-                    </AuthProtectedRoute>
-                  } />
-                  
-                  {/* Debug routes - keep minimal diagnostic route */}
-                  <Route path="/debug/auth-public" element={<AuthDebugPage />} />
-                  
-                  <Route path="*" element={<NotFound />} />
-                </Routes>
-              </TooltipProvider>
-            </AuthMigrationHandler>
-          </AuthProvider>
+          <Suspense fallback={<LoadingFallback />}>
+            <AuthProvider>
+              <AuthMigrationHandler>
+                <TooltipProvider>
+                  {/* Sonner Toaster - the only toast component we need */}
+                  <Toaster richColors position="top-right" />
+                  <Routes>
+                    {/* Public routes - No auth required */}
+                    <Route path="/" element={<Index />} />
+                    <Route path="/login" element={<Login />} />
+                    <Route path="/signup" element={<Signup />} />
+                    <Route path="/reset-password" element={<ResetPassword />} />
+                    <Route path="/update-password" element={<UpdatePassword />} />
+                    
+                    {/* Profile setup - accessible for all client roles including New */}
+                    <Route path="/profile-setup" element={
+                      <AuthProtectedRoute allowedRoles={["client"]} blockNewClients={false}>
+                        <ProfileSetup />
+                      </AuthProtectedRoute>
+                    } />
+                    
+                    {/* Protected routes - Block New clients */}
+                    <Route path="/patient-dashboard" element={
+                      <AuthProtectedRoute allowedRoles={["client"]} blockNewClients={true}>
+                        <PatientDashboard />
+                      </AuthProtectedRoute>
+                    } />
+                    <Route path="/patient-documents" element={
+                      <AuthProtectedRoute allowedRoles={["client"]} blockNewClients={true}>
+                        <PatientDocuments />
+                      </AuthProtectedRoute>
+                    } />
+                    <Route path="/patient-profile" element={
+                      <AuthProtectedRoute allowedRoles={["client"]} blockNewClients={true}>
+                        <PatientProfile />
+                      </AuthProtectedRoute>
+                    } />
+                    <Route path="/therapist-selection" element={
+                      <AuthProtectedRoute allowedRoles={["client"]}>
+                        <TherapistSelection />
+                      </AuthProtectedRoute>
+                    } />
+                    
+                    {/* Debug routes - keep minimal diagnostic route */}
+                    <Route path="/debug/auth-public" element={<AuthDebugPage />} />
+                    
+                    <Route path="*" element={<NotFound />} />
+                  </Routes>
+                </TooltipProvider>
+              </AuthMigrationHandler>
+            </AuthProvider>
+          </Suspense>
         </QueryClientProvider>
       </BrowserRouter>
     </React.StrictMode>

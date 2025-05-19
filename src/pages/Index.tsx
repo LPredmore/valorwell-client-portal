@@ -2,9 +2,19 @@
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
+import { useAuth, AuthState } from '@/context/NewAuthContext';
+import { useEffect } from 'react';
 
 const Index = () => {
   const navigate = useNavigate();
+  const { authState } = useAuth();
+
+  // Auto-redirect authenticated users
+  useEffect(() => {
+    if (authState === AuthState.AUTHENTICATED) {
+      navigate('/patient-dashboard');
+    }
+  }, [authState, navigate]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100">
