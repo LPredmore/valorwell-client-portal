@@ -110,6 +110,6 @@ export const convertToClientDetails = (clientProfile: any): ClientDetails => {
     client_tricare_insurance_agreement: clientProfile.client_tricare_insurance_agreement,
     hasMoreInsurance: clientProfile.hasMoreInsurance,
     client_has_even_more_insurance: clientProfile.client_has_even_more_insurance,
-    client_is_profile_complete: clientProfile.client_is_profile_complete,
+    // Removed the problematic property that doesn't exist in ClientDetails type
   };
 };

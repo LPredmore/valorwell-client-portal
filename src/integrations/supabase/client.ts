@@ -279,6 +279,36 @@ export const savePHQ9Assessment = async (assessmentData: any) => {
   }
 };
 
+// New function to check if an assessment already exists for an appointment
+export const checkPHQ9AssessmentExists = async (appointmentId: string): Promise<{ exists: boolean; error: any }> => {
+  try {
+    if (!appointmentId) {
+      return { exists: false, error: 'No appointment ID provided' };
+    }
+    
+    console.log('Checking if PHQ9 assessment exists for appointment:', appointmentId);
+    
+    const { data, error } = await supabase
+      .from('phq9_assessments')
+      .select('id')
+      .eq('appointment_id', appointmentId)
+      .single();
+
+    if (error && error.code !== 'PGRST116') { // PGRST116 is "No rows returned" error
+      console.error('Error checking PHQ9 assessment:', error);
+      return { exists: false, error };
+    }
+
+    const exists = !!data;
+    console.log('PHQ9 assessment exists:', exists);
+    
+    return { exists, error: null };
+  } catch (error) {
+    console.error('Exception while checking PHQ9 assessment:', error);
+    return { exists: false, error };
+  }
+};
+
 // CPT Code type definition
 export type CPTCode = {
   id?: string;

@@ -243,7 +243,31 @@ const PatientDashboard = () => {
   const handleStartSession = async (appointmentId: string | number) => {
     console.log(`Starting session for appointment ${appointmentId}`);
     setPendingAppointmentId(appointmentId);
-    setShowPHQ9(true);
+    
+    try {
+      // Check if PHQ9 assessment already exists for this appointment
+      const { checkPHQ9AssessmentExists } = await import('@/integrations/supabase/client');
+      const { exists, error } = await checkPHQ9AssessmentExists(appointmentId.toString());
+      
+      if (error) {
+        console.error('Error checking for PHQ9 assessment:', error);
+        // Show the PHQ9 form on error to be safe
+        setShowPHQ9(true);
+      } else if (exists) {
+        // Assessment already exists, skip directly to video session
+        console.log('PHQ9 assessment already exists, skipping directly to video session');
+        handlePHQ9Complete();
+      } else {
+        // No assessment exists, show the form
+        console.log('No PHQ9 assessment exists, showing form');
+        setShowPHQ9(true);
+      }
+    } catch (error) {
+      console.error('Exception in handleStartSession:', error);
+      // Show PHQ9 form on error to be safe
+      setShowPHQ9(true);
+    }
+    
     // Reset any previous errors
     setVideoError(null);
   };
@@ -547,7 +571,8 @@ const PatientDashboard = () => {
           onClose={() => setShowPHQ9(false)} 
           clinicianName={clinicianData ? `${clinicianData.clinician_first_name} ${clinicianData.clinician_last_name}` : "Your Therapist"} 
           clientData={clientDetailsForPHQ9} 
-          onComplete={handlePHQ9Complete} 
+          onComplete={handlePHQ9Complete}
+          appointmentId={pendingAppointmentId}
         />
       )}
 

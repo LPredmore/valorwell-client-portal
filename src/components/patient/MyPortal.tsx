@@ -201,7 +201,30 @@ const MyPortal: React.FC<MyPortalProps> = ({
 
   const handleStartSession = async (appointmentId: string | number) => {
     setPendingAppointmentId(appointmentId);
-    setShowPHQ9(true);
+    
+    try {
+      // Check if PHQ9 assessment already exists for this appointment
+      const { checkPHQ9AssessmentExists } = await import('@/integrations/supabase/client');
+      const { exists, error } = await checkPHQ9AssessmentExists(appointmentId.toString());
+      
+      if (error) {
+        console.error('Error checking for PHQ9 assessment:', error);
+        // Show the PHQ9 form on error to be safe
+        setShowPHQ9(true);
+      } else if (exists) {
+        // Assessment already exists, skip directly to video session
+        console.log('PHQ9 assessment already exists, skipping directly to video session');
+        handlePHQ9Complete();
+      } else {
+        // No assessment exists, show the form
+        console.log('No PHQ9 assessment exists, showing form');
+        setShowPHQ9(true);
+      }
+    } catch (error) {
+      console.error('Exception in handleStartSession:', error);
+      // Show PHQ9 form on error to be safe
+      setShowPHQ9(true);
+    }
   };
 
   const handlePHQ9Complete = async () => {
@@ -406,6 +429,7 @@ const MyPortal: React.FC<MyPortalProps> = ({
           clinicianName={clinicianName || "Your Therapist"} 
           clientData={clientData} 
           onComplete={handlePHQ9Complete} 
+          appointmentId={pendingAppointmentId}
         />
       )}
 
