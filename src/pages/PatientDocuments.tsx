@@ -91,6 +91,9 @@ const PatientDocuments: React.FC = () => {
     }
   };
 
+  // Get completed assignments for MyDocuments component
+  const completedAssignments = assignments.filter(assignment => assignment.status === 'completed');
+
   if (!userId) {
     return (
       <Layout>
@@ -149,12 +152,16 @@ const PatientDocuments: React.FC = () => {
                 onViewCompleted={handleViewCompleted}
                 onRefresh={handleRefreshAssignments}
                 error={assignmentsError}
-                // IMPORTANT: Removed onLoadComplete prop which was causing the infinite loop
+                filterStatus={['not_started', 'in_progress']} // Only show not started and in progress documents
               />
             </TabsContent>
             
             <TabsContent value="documents" className="mt-0">
-              <MyDocuments clientId={userId} excludedTypes={['session_note', 'treatment_plan']} />
+              <MyDocuments 
+                clientId={userId} 
+                excludedTypes={['session_note', 'treatment_plan']} 
+                completedAssignments={completedAssignments} // Pass completed assignments
+              />
             </TabsContent>
           </Tabs>
         )}

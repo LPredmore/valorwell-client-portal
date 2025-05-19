@@ -6,7 +6,7 @@ import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@
 import { Calendar, Eye, FileText, Loader2, RefreshCw } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
-import { getCurrentUser, fetchClientHistoryData } from '@/integrations/supabase/client';
+import { getCurrentUser, fetchClientHistoryData, DocumentAssignment } from '@/integrations/supabase/client';
 import { useDocuments } from '@/hooks/useDocuments';
 import { getDocumentDownloadURLWithRetry } from '@/utils/enhancedFetching';
 import ClientHistoryViewDialog from './ClientHistoryViewDialog';
@@ -14,9 +14,14 @@ import ClientHistoryViewDialog from './ClientHistoryViewDialog';
 type MyDocumentsProps = {
   clientId?: string;
   excludedTypes?: string[];
+  completedAssignments?: DocumentAssignment[]; // New prop to receive completed assignments
 };
 
-const MyDocuments: React.FC<MyDocumentsProps> = ({ clientId, excludedTypes = [] }) => {
+const MyDocuments: React.FC<MyDocumentsProps> = ({ 
+  clientId, 
+  excludedTypes = [], 
+  completedAssignments = [] 
+}) => {
   const [userId, setUserId] = useState<string | undefined>(clientId);
   const [userLoading, setUserLoading] = useState<boolean>(!clientId);
   const [userError, setUserError] = useState<string | null>(null);
@@ -36,6 +41,29 @@ const MyDocuments: React.FC<MyDocumentsProps> = ({ clientId, excludedTypes = [] 
   const filteredDocuments = excludedTypes.length > 0
     ? documents.filter(doc => !excludedTypes.includes(doc.document_type))
     : documents;
+
+  // Create a combined list of documents and completed assignments (as documents)
+  const processedCompletedAssignments = completedAssignments.map(assignment => ({
+    id: assignment.id,
+    document_title: assignment.document_name,
+    document_type: 'assigned_document',
+    document_date: assignment.updated_at || assignment.created_at,
+    file_path: '', // This will be determined during viewing
+    created_at: assignment.created_at,
+    assignment: assignment // Store the original assignment for reference
+  }));
+
+  // Combine regular documents with processed assignments, avoiding duplicates
+  const allDocuments = [
+    ...filteredDocuments,
+    ...processedCompletedAssignments.filter(assignmentDoc => 
+      // Only include completed assignments that don't match existing documents
+      // This helps avoid duplicating client_history documents which are both in clinical_documents and document_assignments
+      !filteredDocuments.some(doc => 
+        doc.document_title === assignmentDoc.document_title
+      )
+    )
+  ];
 
   // Only fetch current user if no clientId is provided - only run ONCE
   useEffect(() => {
@@ -78,11 +106,40 @@ const MyDocuments: React.FC<MyDocumentsProps> = ({ clientId, excludedTypes = [] 
     try {
       // For Client History documents, use the special dialog instead of PDF
       if (document.document_type === 'client_history') {
-        await fetchClientHistoryForm(document.client_id);
+        await fetchClientHistoryForm(document.client_id || userId);
         return;
       }
       
-      // For other document types, use the regular PDF viewer
+      // For completed assignments as documents
+      if (document.document_type === 'assigned_document' && document.assignment) {
+        console.log('Viewing completed assignment document:', document.assignment);
+        // For client_history assignments, use the special dialog
+        if (document.document_title.toLowerCase().includes('client history')) {
+          await fetchClientHistoryForm(userId || document.assignment.client_id);
+          return;
+        }
+        
+        // For other assignments, try to find a matching clinical document
+        const matchingDoc = documents.find(doc => 
+          doc.document_title.toLowerCase().includes(document.document_title.toLowerCase())
+        );
+        
+        if (matchingDoc && matchingDoc.file_path) {
+          console.log('Found matching document with file path:', matchingDoc.file_path);
+          const url = await getDocumentDownloadURLWithRetry(matchingDoc.file_path);
+          
+          if (url) {
+            window.open(url, '_blank');
+            return;
+          }
+        }
+        
+        // If no match found, show a message
+        toast.info("Document viewer for this form type is in development");
+        return;
+      }
+      
+      // For regular documents with file paths
       if (!document.file_path) {
         toast.error("Document path is missing");
         return;
@@ -148,6 +205,11 @@ const MyDocuments: React.FC<MyDocumentsProps> = ({ clientId, excludedTypes = [] 
   const isLoading = userLoading || docsLoading;
   const errorMessage = userError || docsError;
 
+  // Sort documents by date (newest first)
+  const sortedDocuments = [...allDocuments].sort((a, b) => {
+    return new Date(b.document_date).getTime() - new Date(a.document_date).getTime();
+  });
+
   return (
     <>
       <Card>
@@ -181,7 +243,7 @@ const MyDocuments: React.FC<MyDocumentsProps> = ({ clientId, excludedTypes = [] 
                 Retry
               </Button>
             </div>
-          ) : filteredDocuments.length === 0 ? (
+          ) : sortedDocuments.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-8 text-center">
               <FileText className="h-12 w-12 text-gray-300 mb-3" />
               <h3 className="text-lg font-medium">No documents available</h3>
@@ -203,7 +265,7 @@ const MyDocuments: React.FC<MyDocumentsProps> = ({ clientId, excludedTypes = [] 
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredDocuments.map((doc) => (
+                  {sortedDocuments.map((doc) => (
                     <TableRow key={doc.id}>
                       <TableCell className="font-medium">{doc.document_title}</TableCell>
                       <TableCell>{formatDocumentType(doc.document_type)}</TableCell>
@@ -244,6 +306,10 @@ const MyDocuments: React.FC<MyDocumentsProps> = ({ clientId, excludedTypes = [] 
 
 // Helper function to format document types for display
 const formatDocumentType = (type: string): string => {
+  if (type === 'assigned_document') {
+    return 'Completed Form';
+  }
+  
   const typeMap: Record<string, string> = {
     'informed_consent': 'Informed Consent',
     'client_history': 'Client History',

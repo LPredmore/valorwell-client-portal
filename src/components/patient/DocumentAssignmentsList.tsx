@@ -13,7 +13,7 @@ interface DocumentAssignmentsListProps {
   onViewCompleted: (assignment: DocumentAssignment) => void;
   onRefresh?: () => void;
   error?: string | null;
-  // IMPORTANT: Removed onLoadComplete prop which was causing infinite loop
+  filterStatus?: string[]; // New prop to filter assignments by status
 }
 
 const DocumentAssignmentsList: React.FC<DocumentAssignmentsListProps> = ({
@@ -23,10 +23,13 @@ const DocumentAssignmentsList: React.FC<DocumentAssignmentsListProps> = ({
   onContinueForm,
   onViewCompleted,
   onRefresh,
-  error
+  error,
+  filterStatus = [] // Default to show all statuses
 }) => {
-  // IMPORTANT: Removed useEffect that was calling onLoadComplete
-  // This was the root cause of the infinite loop
+  // Filter assignments based on filterStatus prop
+  const filteredAssignments = filterStatus.length > 0
+    ? assignments.filter(assignment => filterStatus.includes(assignment.status))
+    : assignments;
   
   const getStatusIcon = (status: string) => {
     switch(status) {
@@ -83,7 +86,7 @@ const DocumentAssignmentsList: React.FC<DocumentAssignmentsListProps> = ({
     }
   };
   
-  console.log('Rendering document assignments:', assignments);
+  console.log('Rendering filtered document assignments:', filteredAssignments);
 
   return (
     <Card>
@@ -126,7 +129,7 @@ const DocumentAssignmentsList: React.FC<DocumentAssignmentsListProps> = ({
               </Button>
             )}
           </div>
-        ) : assignments.length === 0 ? (
+        ) : filteredAssignments.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-8 text-center">
             <ClipboardCheck className="h-12 w-12 text-gray-300 mb-4" />
             <h3 className="text-lg font-medium">No forms assigned</h3>
@@ -136,7 +139,7 @@ const DocumentAssignmentsList: React.FC<DocumentAssignmentsListProps> = ({
           </div>
         ) : (
           <div className="space-y-4">
-            {assignments.map(assignment => (
+            {filteredAssignments.map(assignment => (
               <div key={assignment.id} className="flex items-center justify-between p-4 border rounded-md">
                 <div className="flex items-center gap-3">
                   {getStatusIcon(assignment.status)}
