@@ -17,15 +17,15 @@ export const PHQ9AssessmentSection: React.FC<PHQ9AssessmentSectionProps> = ({
   
   // Parse score safely with error handling
   let phq9Score: number | undefined = undefined;
-  if (phq9Data.phq9_score !== undefined) {
+  if (phq9Data.total_score !== undefined) {
     try {
-      phq9Score = typeof phq9Data.phq9_score === 'number' 
-        ? phq9Data.phq9_score 
-        : parseFloat(phq9Data.phq9_score);
+      phq9Score = typeof phq9Data.total_score === 'number' 
+        ? phq9Data.total_score 
+        : parseFloat(phq9Data.total_score);
       
       // Validate if score is a valid number
       if (isNaN(phq9Score)) {
-        console.warn("[PHQ9AssessmentSection] Invalid PHQ-9 score:", phq9Data.phq9_score);
+        console.warn("[PHQ9AssessmentSection] Invalid PHQ-9 score:", phq9Data.total_score);
         phq9Score = undefined;
       }
     } catch (e) {

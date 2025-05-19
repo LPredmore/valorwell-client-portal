@@ -262,6 +262,9 @@ export const updateClientProfile = async (clientId: string, profileData: any) =>
 // Function to save PHQ-9 assessment
 export const savePHQ9Assessment = async (assessmentData: any) => {
   try {
+    console.log('Saving PHQ-9 assessment data:', assessmentData);
+    
+    // First save the assessment data to get the ID
     const { data, error } = await supabase
       .from('phq9_assessments')
       .insert(assessmentData)
@@ -271,8 +274,45 @@ export const savePHQ9Assessment = async (assessmentData: any) => {
       console.error('Error saving PHQ-9 assessment:', error);
       return { success: false, error };
     }
+    
+    const savedAssessment = data[0];
+    console.log('PHQ-9 assessment saved successfully:', savedAssessment);
 
-    return { success: true, data: data[0] };
+    // Now call the edge function to generate a narrative
+    try {
+      console.log('Calling generate-phq9-narrative edge function');
+      const { data: narrativeData, error: narrativeError } = await supabase.functions.invoke(
+        'generate-phq9-narrative',
+        {
+          body: { assessmentData }
+        }
+      );
+
+      if (narrativeError) {
+        console.error('Error generating PHQ-9 narrative:', narrativeError);
+      } else if (narrativeData?.success && narrativeData?.narrative) {
+        console.log('Generated PHQ-9 narrative:', narrativeData.narrative);
+        
+        // Update the assessment record with the generated narrative
+        const { error: updateError } = await supabase
+          .from('phq9_assessments')
+          .update({ phq9_narrative: narrativeData.narrative })
+          .eq('id', savedAssessment.id);
+
+        if (updateError) {
+          console.error('Error updating PHQ-9 assessment with narrative:', updateError);
+        } else {
+          console.log('PHQ-9 assessment updated with narrative successfully');
+          // Update the saved assessment with the narrative for the return value
+          savedAssessment.phq9_narrative = narrativeData.narrative;
+        }
+      }
+    } catch (narrativeGenError) {
+      console.error('Exception in PHQ-9 narrative generation:', narrativeGenError);
+      // Narrative generation failed, but we've still saved the assessment data
+    }
+
+    return { success: true, data: savedAssessment };
   } catch (error) {
     console.error('Exception while saving PHQ-9 assessment:', error);
     return { success: false, error };

@@ -113,7 +113,7 @@ const PHQ9Template: React.FC<PHQ9TemplateProps> = ({
           appointment_id: appointmentId // Include the appointment ID if provided
         };
         
-        // Save the assessment to the database
+        // Save the assessment to the database and generate AI analysis
         const result = await savePHQ9Assessment(assessmentData);
         
         if (!result.success) {
@@ -126,16 +126,18 @@ const PHQ9Template: React.FC<PHQ9TemplateProps> = ({
           // Still continue with the flow even if saving fails
         } else {
           console.log('PHQ-9 assessment saved successfully:', result.data);
+          toast({
+            title: "Assessment Saved",
+            description: "PHQ-9 assessment has been saved and AI analysis has been generated.",
+          });
         }
       } else {
         console.warn('Cannot save PHQ-9 assessment: Missing client data or ID');
+        toast({
+          title: "Assessment Completed",
+          description: "The assessment has been completed, but client data was not available for saving.",
+        });
       }
-      
-      // Keep existing notification code
-      toast({
-        title: "Assessment Saved",
-        description: "PHQ-9 assessment has been saved successfully.",
-      });
       
     } catch (error) {
       console.error('Error in PHQ-9 submission:', error);
