@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -33,9 +32,9 @@ const MyDocuments: React.FC<MyDocumentsProps> = ({ clientId, excludedTypes = [] 
     ? documents.filter(doc => !excludedTypes.includes(doc.document_type))
     : documents;
 
-  // Only fetch current user if no clientId is provided
+  // Only fetch current user if no clientId is provided - only run ONCE
   useEffect(() => {
-    if (!clientId) {
+    if (!clientId && !userId) {
       const fetchCurrentUser = async () => {
         setUserLoading(true);
         setUserError(null);
@@ -60,14 +59,15 @@ const MyDocuments: React.FC<MyDocumentsProps> = ({ clientId, excludedTypes = [] 
       
       fetchCurrentUser();
     }
-  }, [clientId]);
+  }, [clientId, userId]);
 
-  // Fetch documents once we have a user ID
+  // Fetch documents once we have a user ID - only run ONCE when userId changes
   useEffect(() => {
-    if (userId && !docsLoading) {
+    if (userId) {
+      console.log(`Initial document fetch for user ${userId}`);
       fetchDocuments(false);
     }
-  }, [userId, fetchDocuments, docsLoading]);
+  }, [userId]); // Only depend on userId, NOT fetchDocuments
 
   const handleViewDocument = async (filePath: string) => {
     try {
@@ -92,6 +92,7 @@ const MyDocuments: React.FC<MyDocumentsProps> = ({ clientId, excludedTypes = [] 
   };
 
   const handleRefresh = () => {
+    console.log('Manual document refresh requested');
     if (userId) {
       retryFetch();
     } else if (!clientId) {

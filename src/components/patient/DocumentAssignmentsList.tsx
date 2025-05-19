@@ -13,6 +13,7 @@ interface DocumentAssignmentsListProps {
   onViewCompleted: (assignment: DocumentAssignment) => void;
   onRefresh?: () => void;
   error?: string | null;
+  // IMPORTANT: Removed onLoadComplete prop which was causing infinite loop
 }
 
 const DocumentAssignmentsList: React.FC<DocumentAssignmentsListProps> = ({
@@ -24,7 +25,8 @@ const DocumentAssignmentsList: React.FC<DocumentAssignmentsListProps> = ({
   onRefresh,
   error
 }) => {
-  // Removed useEffect that was causing infinite loop
+  // IMPORTANT: Removed useEffect that was calling onLoadComplete
+  // This was the root cause of the infinite loop
   
   const getStatusIcon = (status: string) => {
     switch(status) {

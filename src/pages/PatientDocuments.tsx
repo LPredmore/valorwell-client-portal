@@ -26,12 +26,13 @@ const PatientDocuments: React.FC = () => {
     retryFetch: retryAssignmentsFetch
   } = useDocumentAssignments(userId || undefined);
 
-  // Initial load of assignments
+  // Initial load of assignments - ONLY run once when userId is available
   useEffect(() => {
     if (userId) {
+      console.log('Initial fetch of assignments on mount or userId change');
       fetchAssignments();
     }
-  }, [userId, fetchAssignments]);
+  }, [userId]); // Only depend on userId, not fetchAssignments
 
   const handleStartForm = (assignment: DocumentAssignment) => {
     console.log('Starting form:', assignment);
@@ -64,7 +65,8 @@ const PatientDocuments: React.FC = () => {
     
     // Refresh the assignments list after saving
     if (userId) {
-      fetchAssignments(true);
+      console.log('Refreshing assignments after form save');
+      fetchAssignments(true); // Force refresh
     }
   };
 
@@ -77,12 +79,13 @@ const PatientDocuments: React.FC = () => {
     
     // Refresh the assignments list after completing
     if (userId) {
-      fetchAssignments(true);
+      console.log('Refreshing assignments after form completion');
+      fetchAssignments(true); // Force refresh
     }
   };
 
   const handleRefreshAssignments = () => {
-    console.log('Manually refreshing document assignments');
+    console.log('Manually refreshing document assignments via button click');
     if (userId) {
       retryAssignmentsFetch();
     }
@@ -146,6 +149,7 @@ const PatientDocuments: React.FC = () => {
                 onViewCompleted={handleViewCompleted}
                 onRefresh={handleRefreshAssignments}
                 error={assignmentsError}
+                // IMPORTANT: Removed onLoadComplete prop which was causing the infinite loop
               />
             </TabsContent>
             

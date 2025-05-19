@@ -11,12 +11,14 @@ export async function fetchClinicalDocumentsWithRetry(clientId: string) {
     () => fetchClinicalDocuments(clientId),
     {
       maxRetries: 3,
-      retryDelay: 1000,
+      retryDelay: 1000, // Start with 1s delay, then 2s, then 4s with exponential backoff
       onError: (error, retryCount) => {
         console.warn(`Error fetching clinical documents (attempt ${retryCount}/3):`, error);
+        // Don't show toast on every retry - just log to console
       },
       onFinalError: (error) => {
         console.error('Failed to fetch clinical documents after multiple attempts:', error);
+        // Only show toast on final error
         toast.error('Failed to load documents after several attempts');
       }
     }
@@ -31,9 +33,10 @@ export async function fetchDocumentAssignmentsWithRetry(clientId: string) {
     () => fetchDocumentAssignments(clientId),
     {
       maxRetries: 3,
-      retryDelay: 1000,
+      retryDelay: 1000, // Start with 1s delay, then 2s, then 4s with exponential backoff
       onError: (error, retryCount) => {
         console.warn(`Error fetching document assignments (attempt ${retryCount}/3):`, error);
+        // Don't show toast on every retry - just log to console
       },
       onFinalError: (error) => {
         console.error('Failed to fetch document assignments after multiple attempts:', error);
@@ -51,12 +54,14 @@ export async function getCurrentUserWithRetry() {
     () => getCurrentUser(),
     {
       maxRetries: 3,
-      retryDelay: 1000,
+      retryDelay: 1000, // Start with 1s delay, then 2s, then 4s with exponential backoff
       onError: (error, retryCount) => {
         console.warn(`Error fetching current user (attempt ${retryCount}/3):`, error);
+        // Don't show toast on every retry - just log to console
       },
       onFinalError: (error) => {
         console.error('Failed to fetch current user after multiple attempts:', error);
+        // Only show toast on final error
         toast.error('Failed to verify your identity after several attempts');
       }
     }

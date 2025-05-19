@@ -8,6 +8,8 @@ export function useDocumentAssignments(clientId?: string) {
   const [assignments, setAssignments] = useState<DocumentAssignment[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [fetchAttempts, setFetchAttempts] = useState<number>(0);
+  const MAX_FETCH_ATTEMPTS = 3;
   
   // Clear error state
   const clearError = () => setLoadError(null);
@@ -30,11 +32,23 @@ export function useDocumentAssignments(clientId?: string) {
       return { success: false, message: 'Previous error exists' };
     }
     
+    // Reset attempts count on forced refresh
+    if (forceRefresh) {
+      setFetchAttempts(0);
+    }
+    
+    // Check if exceeded max attempts
+    if (fetchAttempts >= MAX_FETCH_ATTEMPTS && !forceRefresh) {
+      console.log('Maximum fetch attempts reached. Use manual refresh to try again.');
+      setLoadError('Unable to load after several attempts. Please try again later.');
+      return { success: false, message: 'Max attempts reached' };
+    }
+    
     setIsLoading(true);
     clearError();
     
     try {
-      console.log(`Fetching document assignments for client: ${clientId}`);
+      console.log(`Fetching document assignments for client: ${clientId} (attempt ${fetchAttempts + 1})`);
       const { data, error } = await fetchDocumentAssignmentsWithRetry(clientId);
       
       if (error) {
@@ -47,17 +61,27 @@ export function useDocumentAssignments(clientId?: string) {
         return { success: true, message: 'No assignments found' };
       }
 
-      console.log(`Fetched ${data.length} document assignments`);
+      console.log(`Fetched ${data.length} document assignments successfully`);
       setAssignments(data);
       return { success: true, message: `Fetched ${data.length} assignments` };
     } catch (error) {
       console.error('Error in useDocumentAssignments hook:', error);
-      setLoadError('Failed to load assignments. Please try again later.');
+      
+      // Increment attempts counter
+      setFetchAttempts(prev => prev + 1);
+      
+      // Set user-friendly error message
+      if (fetchAttempts + 1 >= MAX_FETCH_ATTEMPTS) {
+        setLoadError('Failed to load assignments after multiple attempts. Please try again later.');
+      } else {
+        setLoadError('Failed to load assignments. Retry will happen automatically.');
+      }
+      
       return { success: false, message: 'Error fetching assignments' };
     } finally {
       setIsLoading(false);
     }
-  }, [clientId, isLoading, loadError]);
+  }, [clientId, isLoading, loadError, fetchAttempts]);
   
   // Debounced version for when rapid calls might occur
   const debouncedFetchAssignments = useCallback(
@@ -65,8 +89,9 @@ export function useDocumentAssignments(clientId?: string) {
     [fetchAssignments]
   );
   
-  // Manual retry with error clearing
+  // Manual retry with error clearing and attempt reset
   const retryFetch = useCallback(() => {
+    setFetchAttempts(0); // Reset attempts counter on manual retry
     return fetchAssignments(true);
   }, [fetchAssignments]);
   
@@ -77,6 +102,7 @@ export function useDocumentAssignments(clientId?: string) {
     fetchAssignments,
     debouncedFetchAssignments,
     retryFetch,
-    clearError
+    clearError,
+    fetchAttempts
   };
 }

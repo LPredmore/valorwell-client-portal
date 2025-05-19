@@ -16,6 +16,8 @@ export function useDocuments(clientId?: string) {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [fetchAttempts, setFetchAttempts] = useState<number>(0);
+  const MAX_FETCH_ATTEMPTS = 3;
   
   // Clear error state
   const clearError = () => setLoadError(null);
@@ -38,11 +40,23 @@ export function useDocuments(clientId?: string) {
       return { success: false, message: 'Previous error exists' };
     }
     
+    // Reset attempts count on forced refresh
+    if (forceRefresh) {
+      setFetchAttempts(0);
+    }
+    
+    // Check if exceeded max attempts
+    if (fetchAttempts >= MAX_FETCH_ATTEMPTS && !forceRefresh) {
+      console.log('Maximum fetch attempts reached. Use manual refresh to try again.');
+      setLoadError('Unable to load after several attempts. Please try again later.');
+      return { success: false, message: 'Max attempts reached' };
+    }
+    
     setIsLoading(true);
     clearError();
     
     try {
-      console.log(`Fetching clinical documents for client: ${clientId}`);
+      console.log(`Fetching clinical documents for client: ${clientId} (attempt ${fetchAttempts + 1})`);
       const documents = await fetchClinicalDocumentsWithRetry(clientId);
       
       if (!documents || documents.length === 0) {
@@ -51,17 +65,27 @@ export function useDocuments(clientId?: string) {
         return { success: true, message: 'No documents found' };
       }
 
-      console.log(`Fetched ${documents.length} clinical documents`);
+      console.log(`Fetched ${documents.length} clinical documents successfully`);
       setDocuments(documents);
       return { success: true, message: `Fetched ${documents.length} documents` };
     } catch (error) {
       console.error('Error in useDocuments hook:', error);
-      setLoadError('Failed to load documents. Please try again later.');
+      
+      // Increment attempts counter
+      setFetchAttempts(prev => prev + 1);
+      
+      // Set user-friendly error message
+      if (fetchAttempts + 1 >= MAX_FETCH_ATTEMPTS) {
+        setLoadError('Failed to load documents after multiple attempts. Please try again later.');
+      } else {
+        setLoadError('Failed to load documents. Retry will happen automatically.');
+      }
+      
       return { success: false, message: 'Error fetching documents' };
     } finally {
       setIsLoading(false);
     }
-  }, [clientId, isLoading, loadError]);
+  }, [clientId, isLoading, loadError, fetchAttempts]);
   
   // Debounced version for when rapid calls might occur
   const debouncedFetchDocuments = useCallback(
@@ -69,8 +93,9 @@ export function useDocuments(clientId?: string) {
     [fetchDocuments]
   );
   
-  // Manual retry with error clearing
+  // Manual retry with error clearing and attempt reset
   const retryFetch = useCallback(() => {
+    setFetchAttempts(0); // Reset attempts counter on manual retry
     return fetchDocuments(true);
   }, [fetchDocuments]);
   
@@ -81,6 +106,7 @@ export function useDocuments(clientId?: string) {
     fetchDocuments,
     debouncedFetchDocuments,
     retryFetch,
-    clearError
+    clearError,
+    fetchAttempts
   };
 }
