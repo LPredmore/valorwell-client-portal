@@ -38,13 +38,20 @@ const InsuranceSection: React.FC<InsuranceSectionProps> = ({
   
   const suffix = getSuffix();
   
-  // Check if this insurance section has data
+  // Check if this insurance section has data or if we're in edit mode
   const hasInsuranceData = () => {
     const company = form.getValues(`${prefix}insurance_company${suffix}`);
-    return !!company;
+    const type = form.getValues(`${prefix}insurance_type${suffix}`);
+    const policyNumber = form.getValues(`${prefix}policy_number${suffix}`);
+    
+    // Show section if any insurance data exists or if we're in editing mode
+    return !!(company || type || policyNumber) || isEditing;
   };
   
-  if (!hasInsuranceData() && !isEditing) {
+  // Debug log to see what's happening
+  console.log(`Insurance ${title} - company: ${form.getValues(`${prefix}insurance_company${suffix}`)}, type: ${form.getValues(`${prefix}insurance_type${suffix}`)}`);
+  
+  if (!hasInsuranceData()) {
     return null;
   }
   

@@ -18,6 +18,17 @@ const PatientInsurance = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   
+  // Debug: Log client profile data
+  useEffect(() => {
+    if (clientProfile) {
+      console.log("PatientInsurance - Client profile loaded:", {
+        insurance_company: clientProfile.client_insurance_company_primary,
+        insurance_type: clientProfile.client_insurance_type_primary,
+        policy_number: clientProfile.client_policy_number_primary
+      });
+    }
+  }, [clientProfile]);
+  
   // Set up form
   const form = useForm<ClientDetails>({
     defaultValues: {
@@ -29,6 +40,7 @@ const PatientInsurance = () => {
   useEffect(() => {
     if (clientProfile) {
       form.reset(clientProfile);
+      console.log("Form reset with client profile data", form.getValues());
     }
   }, [clientProfile, form]);
   
