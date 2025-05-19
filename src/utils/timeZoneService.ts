@@ -7,6 +7,81 @@ export class TimeZoneService {
   public static readonly DATE_FORMAT = 'yyyy-MM-dd';
 
   /**
+   * Maps common non-standard timezone formats to their IANA equivalents
+   */
+  private static timeZoneMap: Record<string, string> = {
+    // US Timezones with their common abbreviations
+    'eastern standard time': 'America/New_York',
+    'eastern standard time (est)': 'America/New_York',
+    'est': 'America/New_York',
+    'eastern time': 'America/New_York',
+    'et': 'America/New_York',
+    
+    'central standard time': 'America/Chicago',
+    'central standard time (cst)': 'America/Chicago',
+    'cst': 'America/Chicago',
+    'central time': 'America/Chicago',
+    'ct': 'America/Chicago',
+    
+    'mountain standard time': 'America/Denver',
+    'mountain standard time (mst)': 'America/Denver',
+    'mst': 'America/Denver',
+    'mountain time': 'America/Denver',
+    'mt': 'America/Denver',
+    
+    'pacific standard time': 'America/Los_Angeles',
+    'pacific standard time (pst)': 'America/Los_Angeles',
+    'pst': 'America/Los_Angeles',
+    'pacific time': 'America/Los_Angeles',
+    'pt': 'America/Los_Angeles',
+    
+    'alaska standard time': 'America/Anchorage',
+    'ast': 'America/Anchorage',
+    'alaska time': 'America/Anchorage',
+    
+    'hawaii standard time': 'Pacific/Honolulu',
+    'hst': 'Pacific/Honolulu',
+    'hawaii time': 'Pacific/Honolulu',
+  };
+
+  /**
+   * Tries to normalize a timezone string to a valid IANA timezone identifier
+   * @param timezone The timezone string to normalize
+   * @returns A valid IANA timezone string if found, otherwise the original string
+   */
+  public static normalizeTimeZone(timezone: string | null | undefined): string {
+    if (!timezone) {
+      return this.DEFAULT_TIMEZONE;
+    }
+
+    // First try direct matching (some inputs might already be valid IANA)
+    if (IANAZone.isValidZone(timezone)) {
+      return timezone;
+    }
+
+    // Normalize the input by lowercase and removing extra spaces
+    const normalizedInput = timezone.toLowerCase().trim();
+    
+    // Check if we have a direct mapping
+    if (this.timeZoneMap[normalizedInput]) {
+      console.log(`[TimeZoneService] Mapped "${timezone}" to IANA zone: ${this.timeZoneMap[normalizedInput]}`);
+      return this.timeZoneMap[normalizedInput];
+    }
+
+    // For inputs like "Eastern Time (US & Canada)" common in some systems
+    for (const [key, value] of Object.entries(this.timeZoneMap)) {
+      if (normalizedInput.includes(key)) {
+        console.log(`[TimeZoneService] Partial match: "${timezone}" mapped to ${value}`);
+        return value;
+      }
+    }
+
+    // If no match found, return default
+    console.warn(`[TimeZoneService] Could not map "${timezone}" to a valid IANA timezone, using default.`);
+    return this.DEFAULT_TIMEZONE;
+  }
+
+  /**
    * Ensures that the given timezone is a valid IANA timezone.
    * If the timezone is null, undefined, or invalid, it returns the default timezone.
    * @param timezone The timezone string to validate.
@@ -19,12 +94,22 @@ export class TimeZoneService {
     }
 
     try {
-      if (!IANAZone.isValidZone(timezone)) {
-        console.warn(`Invalid timezone '${timezone}' provided, using default timezone: ${this.DEFAULT_TIMEZONE}`);
+      // First try to normalize non-standard formats
+      const normalizedZone = this.normalizeTimeZone(timezone);
+      
+      if (!IANAZone.isValidZone(normalizedZone)) {
+        console.warn(`Invalid timezone '${timezone}' (normalized: ${normalizedZone}), using default timezone: ${this.DEFAULT_TIMEZONE}`);
         return this.DEFAULT_TIMEZONE;
       }
-      DateTime.now().setZone(timezone); // Try using the timezone to verify it
-      return timezone;
+      
+      // Double check by creating a DateTime with this timezone
+      try {
+        DateTime.now().setZone(normalizedZone);
+        return normalizedZone;
+      } catch (error) {
+        console.error(`Error using normalized timezone '${normalizedZone}', using default:`, error);
+        return this.DEFAULT_TIMEZONE;
+      }
     } catch (error) {
       console.error(`Error validating timezone '${timezone}', using default timezone:`, error);
       return this.DEFAULT_TIMEZONE;
@@ -330,7 +415,26 @@ export class TimeZoneService {
     try {
       const now = DateTime.now().setZone(safeTimezone);
       const offsetFormatted = now.toFormat('ZZ');
-      const zoneName = safeTimezone.split('/').pop()?.replace('_', ' ') || safeTimezone;
+      
+      // Extract a friendly name from the timezone identifier
+      let zoneName = safeTimezone.split('/').pop()?.replace('_', ' ') || safeTimezone;
+      
+      // Add a mapped name if applicable
+      for (const [key, value] of Object.entries(this.timeZoneMap)) {
+        if (value === safeTimezone) {
+          // Use the first matching name that's nicely formatted
+          const prettyName = key
+            .split(' ')
+            .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+            .join(' ');
+          
+          if (key.length > 3) { // Avoid using just abbreviations
+            zoneName = prettyName;
+            break;
+          }
+        }
+      }
+      
       return `${zoneName} (${offsetFormatted})`;
     } catch (error) {
       console.error('Error getting timezone display name:', error);

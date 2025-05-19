@@ -14,6 +14,7 @@ import { Appointment } from '@/types/appointment';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useClinicianData } from '@/hooks/useClinicianData';
+
 const PatientDashboard = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -38,6 +39,20 @@ const PatientDashboard = () => {
     clinicianData,
     isLoading: isClinicianLoading
   } = useClinicianData(clientProfile?.client_assigned_therapist || undefined);
+
+  // Determine the client's timezone safely with detailed logging for debugging
+  const clientTimeZone = React.useMemo(() => {
+    let timezone = clientProfile?.client_time_zone;
+    
+    // Log the raw timezone value we got from the profile
+    console.log(`[PatientDashboard] Raw client timezone from profile: ${timezone || 'undefined'}`);
+    
+    // Use TimeZoneService to ensure we have a valid IANA timezone
+    const safeTimezone = TimeZoneService.ensureIANATimeZone(timezone);
+    console.log(`[PatientDashboard] Normalized timezone: ${safeTimezone}`);
+    
+    return safeTimezone;
+  }, [clientProfile?.client_time_zone]);
 
   // Set up loading timeout effect
   useEffect(() => {
@@ -76,7 +91,9 @@ const PatientDashboard = () => {
       isLoading,
       authState,
       clientProfileComplete: clientProfile?.client_is_profile_complete,
-      path: window.location.pathname
+      path: window.location.pathname,
+      clientTimeZone,
+      rawTimeZone: clientProfile?.client_time_zone
     });
 
     // SECOND REDIRECTION CHECK: Runs whenever data changes
@@ -89,7 +106,7 @@ const PatientDashboard = () => {
       });
       return;
     }
-  }, [clientStatus, navigate, isLoading, authState, clientProfile]);
+  }, [clientStatus, navigate, isLoading, authState, clientProfile, clientTimeZone]);
 
   // THIRD SAFETY CHECK: Final verification after the component has fully rendered
   useEffect(() => {
@@ -114,8 +131,8 @@ const PatientDashboard = () => {
       setIsLoadingAppointments(true);
       setAppointmentError(null);
       try {
-        // Get client's timezone or fall back to browser timezone
-        const clientTimeZone = TimeZoneService.ensureIANATimeZone(clientProfile.client_time_zone || 'America/New_York');
+        // Use the processed client timezone
+        console.log(`[PatientDashboard] Fetching appointments using timezone: ${clientTimeZone}`);
 
         // Get today's date in UTC
         const todayUTC = TimeZoneService.now().toUTC().startOf('day');
@@ -185,7 +202,7 @@ const PatientDashboard = () => {
       }
     };
     fetchAppointments();
-  }, [userId, clientProfile]);
+  }, [userId, clientProfile, clientTimeZone]);
 
   // Handle booking dialog
   const handleOpenBookingDialog = () => {
@@ -200,19 +217,21 @@ const PatientDashboard = () => {
 
   // Format time for display in user's time zone
   const formatAppointmentTime = (utcTimestamp: string) => {
-    const clientTimeZone = clientProfile?.client_time_zone || 'America/New_York';
+    console.log(`[formatAppointmentTime] Using timezone: ${clientTimeZone} for timestamp: ${utcTimestamp}`);
     return TimeZoneService.formatUTCInTimezone(utcTimestamp, clientTimeZone, 'h:mm a');
   };
 
   // Format date from UTC timestamp
   const formatAppointmentDate = (utcTimestamp: string) => {
-    const clientTimeZone = clientProfile?.client_time_zone || 'America/New_York';
     const localDate = TimeZoneService.fromUTC(utcTimestamp, clientTimeZone);
     return localDate.toFormat('EEEE, MMMM d, yyyy');
   };
 
   // Get timezone display name
-  const timeZoneDisplay = clientProfile?.client_time_zone ? TimeZoneService.getTimeZoneDisplayName(clientProfile.client_time_zone) : 'Local time';
+  const timeZoneDisplay = TimeZoneService.getTimeZoneDisplayName(clientTimeZone);
+  
+  // FINAL RENDER CHECK: Even after loading is complete, check status one final time
+  const isNewOrIncompleteClient = (clientStatus === 'New' || clientStatus === null || clientStatus === undefined) && clientProfile?.client_is_profile_complete !== true;
   if (isLoading) {
     return <div className="flex items-center justify-center h-screen flex-col">
         <Loader2 className="h-12 w-12 animate-spin text-blue-500 mb-4" />
@@ -229,7 +248,6 @@ const PatientDashboard = () => {
   }
 
   // FINAL RENDER CHECK: Even after loading is complete, check status one final time
-  const isNewOrIncompleteClient = (clientStatus === 'New' || clientStatus === null || clientStatus === undefined) && clientProfile?.client_is_profile_complete !== true;
   if (isNewOrIncompleteClient) {
     console.log("[PatientDashboard] PRE-RENDER CHECK: User has New status or incomplete profile, redirecting to profile setup");
     // Use a timeout to avoid potential rendering issues
@@ -268,7 +286,7 @@ const PatientDashboard = () => {
               <Card>
                 <CardHeader className="pb-2">
                   <CardTitle className="text-lg">Today's Appointments</CardTitle>
-                  <CardDescription>Sessions scheduled for today</CardDescription>
+                  <CardDescription>Sessions scheduled for today in {timeZoneDisplay}</CardDescription>
                 </CardHeader>
                 <CardContent className="pt-2">
                   {isLoadingAppointments ? <div className="flex justify-center items-center py-8">
@@ -279,7 +297,7 @@ const PatientDashboard = () => {
                     </div> : todayAppointments.length > 0 ? <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead>Time <span className="text-xs text-gray-500">({timeZoneDisplay})</span></TableHead>
+                          <TableHead>Time</TableHead>
                           <TableHead>Therapist</TableHead>
                           <TableHead>Type</TableHead>
                         </TableRow>
@@ -339,7 +357,7 @@ const PatientDashboard = () => {
               <Card>
                 <CardHeader className="pb-2">
                   <CardTitle className="text-lg">Upcoming Appointments</CardTitle>
-                  <CardDescription>Your scheduled sessions</CardDescription>
+                  <CardDescription>Your scheduled sessions in {timeZoneDisplay}</CardDescription>
                 </CardHeader>
                 <CardContent className="pt-2">
                   {isLoadingAppointments ? <div className="flex justify-center items-center py-8">
@@ -351,7 +369,7 @@ const PatientDashboard = () => {
                       <TableHeader>
                         <TableRow>
                           <TableHead>Date</TableHead>
-                          <TableHead>Time <span className="text-xs text-gray-500">({timeZoneDisplay})</span></TableHead>
+                          <TableHead>Time</TableHead>
                           <TableHead>Type</TableHead>
                         </TableRow>
                       </TableHeader>
@@ -381,7 +399,7 @@ const PatientDashboard = () => {
       
       {/* Appointment Booking Dialog */}
       <AppointmentBookingDialog open={isBookingDialogOpen} onOpenChange={setIsBookingDialogOpen} clinicianId={clientProfile?.client_assigned_therapist || null} clinicianName={null} // We could fetch this if needed
-    clientId={userId} onAppointmentBooked={handleBookingComplete} userTimeZone={clientProfile?.client_time_zone} />
+    clientId={userId} onAppointmentBooked={handleBookingComplete} userTimeZone={clientTimeZone} />
     </NewLayout>;
 };
 export default PatientDashboard;
