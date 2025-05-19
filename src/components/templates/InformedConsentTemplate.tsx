@@ -10,7 +10,7 @@ import { Video, Shield, AlertTriangle, Calendar, FileText, Check } from 'lucide-
 import { format } from 'date-fns';
 import { useAuth } from '@/context/NewAuthContext';
 import { useNavigate } from 'react-router-dom';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 import { handleFormSubmission } from '@/utils/formSubmissionUtils';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -36,7 +36,6 @@ const InformedConsentTemplate: React.FC<InformedConsentTemplateProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { userId } = useAuth();
   const navigate = useNavigate();
-  const { toast } = useToast();
   const formRef = useRef<HTMLDivElement>(null);
 
   const form = useForm<FormData>({
@@ -49,25 +48,24 @@ const InformedConsentTemplate: React.FC<InformedConsentTemplateProps> = ({
 
   const handleSubmit = async (data: FormData) => {
     if (!userId) {
-      toast({
-        title: "Error",
-        description: "User ID not found. Please ensure you are logged in.",
-        variant: "destructive"
-      });
+      toast.error("User ID not found. Please ensure you are logged in.");
       return;
     }
 
     setIsSubmitting(true);
     
     try {
+      // If the parent component provided an onSubmit handler, use it
       if (onSubmit) {
-        // If onSubmit prop exists, use it directly
-        const result = await onSubmit(data);
+        console.log("[InformedConsentTemplate] Using provided onSubmit handler");
+        await onSubmit(data);
         setIsSubmitting(false);
         return;
       }
 
       // Otherwise handle submission internally
+      console.log("[InformedConsentTemplate] Using internal submission logic");
+      
       // Prepare document data for PDF generation
       const documentData = {
         ...data,
@@ -86,6 +84,9 @@ const InformedConsentTemplate: React.FC<InformedConsentTemplateProps> = ({
         createdBy: userId
       };
 
+      console.log("[InformedConsentTemplate] Submitting form with data:", documentData);
+      console.log("[InformedConsentTemplate] Document info:", documentInfo);
+
       // Use the shared form submission utility to handle PDF generation and document assignment updates
       const result = await handleFormSubmission(
         'informed-consent-form',
@@ -95,10 +96,7 @@ const InformedConsentTemplate: React.FC<InformedConsentTemplateProps> = ({
       );
 
       if (result.success) {
-        toast({
-          title: "Success",
-          description: "Your informed consent has been submitted successfully.",
-        });
+        toast.success("Your informed consent has been submitted successfully.");
 
         if (onClose) {
           onClose();
@@ -106,19 +104,11 @@ const InformedConsentTemplate: React.FC<InformedConsentTemplateProps> = ({
           navigate('/patient-dashboard');
         }
       } else {
-        toast({
-          title: "Error",
-          description: result.message || "There was a problem submitting your informed consent.",
-          variant: "destructive"
-        });
+        toast.error(result.message || "There was a problem submitting your informed consent.");
       }
     } catch (error) {
-      console.error("Error submitting informed consent:", error);
-      toast({
-        title: "Error",
-        description: "There was a problem submitting your informed consent. Please try again.",
-        variant: "destructive"
-      });
+      console.error("[InformedConsentTemplate] Error submitting informed consent:", error);
+      toast.error("There was a problem submitting your informed consent. Please try again.");
     } finally {
       setIsSubmitting(false);
     }

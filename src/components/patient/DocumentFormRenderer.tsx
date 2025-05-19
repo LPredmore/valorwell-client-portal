@@ -28,7 +28,9 @@ const DocumentFormRenderer: React.FC<DocumentFormRendererProps> = ({
     setIsSubmitting(true);
     
     try {
-      console.log('Saving form data:', formData);
+      console.log('[DocumentFormRenderer] Saving form data:', formData);
+      console.log('[DocumentFormRenderer] Client ID:', clientId);
+      console.log('[DocumentFormRenderer] Assignment:', assignment);
       
       // Update the assignment status
       const newStatus = isDraft ? 'in_progress' : 'completed';
@@ -63,7 +65,7 @@ const DocumentFormRenderer: React.FC<DocumentFormRendererProps> = ({
         onSave();
       }
     } catch (error: any) {
-      console.error('Error saving document:', error);
+      console.error('[DocumentFormRenderer] Error saving document:', error);
       toast.error(`Error: ${error.message || 'Failed to save document'}`);
     } finally {
       setIsSubmitting(false);
