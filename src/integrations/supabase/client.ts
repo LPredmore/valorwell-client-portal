@@ -85,22 +85,60 @@ export const getCurrentUser = async () => {
   }
 };
 
-// Function to create video room (placeholder)
+// Function to create video room - updated to use the create-daily-room edge function
 export const getOrCreateVideoRoom = async (appointmentId: string): Promise<{ success: boolean; url?: string; error?: any }> => {
   try {
-    // This is a placeholder implementation
     console.log(`Creating video room for appointment: ${appointmentId}`);
     
-    // Simulate API call to create room
-    await new Promise(resolve => setTimeout(resolve, 500));
+    // Check if the appointment already has a video room URL
+    const { data: appointmentData, error: appointmentError } = await supabase
+      .from('appointments')
+      .select('video_room_url')
+      .eq('id', appointmentId)
+      .single();
     
-    // Return mock URL for now
-    return { 
-      success: true, 
-      url: `https://video.example.com/room/${appointmentId}` 
-    };
+    if (appointmentError) {
+      console.error('Error checking appointment for video room URL:', appointmentError);
+      return { success: false, error: appointmentError };
+    }
+    
+    // If the appointment already has a video room URL, return it
+    if (appointmentData?.video_room_url) {
+      console.log('Found existing video room URL:', appointmentData.video_room_url);
+      return { success: true, url: appointmentData.video_room_url };
+    }
+    
+    // Call the edge function to create a Daily.co room
+    console.log('Calling create-daily-room edge function');
+    const { data, error } = await supabase.functions.invoke('create-daily-room', {
+      body: { appointmentId }
+    });
+    
+    if (error) {
+      console.error('Error creating video room via edge function:', error);
+      return { success: false, error };
+    }
+    
+    if (!data?.url) {
+      console.error('No URL returned from create-daily-room function');
+      return { success: false, error: 'No URL returned from video room creation' };
+    }
+    
+    // Save the video room URL to the appointment
+    const { error: updateError } = await supabase
+      .from('appointments')
+      .update({ video_room_url: data.url })
+      .eq('id', appointmentId);
+    
+    if (updateError) {
+      console.error('Error updating appointment with video room URL:', updateError);
+      // We'll still return success since the room was created
+    }
+    
+    console.log('Successfully created and stored video room URL:', data.url);
+    return { success: true, url: data.url };
   } catch (error) {
-    console.error('Error creating video room:', error);
+    console.error('Exception in getOrCreateVideoRoom:', error);
     return { success: false, error };
   }
 };

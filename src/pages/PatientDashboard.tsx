@@ -16,6 +16,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useClinicianData } from '@/hooks/useClinicianData';
 import PHQ9Template from '@/components/templates/PHQ9Template';
 import VideoChat from '@/components/video/VideoChat';
+import { convertToClientDetails } from '@/utils/clientProfileConverter';
 
 const PatientDashboard = () => {
   const navigate = useNavigate();
@@ -42,6 +43,8 @@ const PatientDashboard = () => {
   const [showPHQ9, setShowPHQ9] = useState(false);
   const [pendingAppointmentId, setPendingAppointmentId] = useState<string | number | null>(null);
   const [isLoadingVideoSession, setIsLoadingVideoSession] = useState(false);
+  const [videoError, setVideoError] = useState<string | null>(null);
+  const [isRetrying, setIsRetrying] = useState(false);
 
   // Add state for clinician data
   const {
@@ -236,14 +239,16 @@ const PatientDashboard = () => {
     return localDate.toFormat('EEEE, MMMM d, yyyy');
   };
 
-  // New handler for starting a therapy session
+  // New handler for starting a therapy session with improved error handling
   const handleStartSession = async (appointmentId: string | number) => {
     console.log(`Starting session for appointment ${appointmentId}`);
     setPendingAppointmentId(appointmentId);
     setShowPHQ9(true);
+    // Reset any previous errors
+    setVideoError(null);
   };
 
-  // Handle PHQ9 completion
+  // Handle PHQ9 completion with enhanced error handling
   const handlePHQ9Complete = async () => {
     setShowPHQ9(false);
     
@@ -268,6 +273,7 @@ const PatientDashboard = () => {
         });
       } catch (error) {
         console.error('Error starting video session:', error);
+        setVideoError(error.message || "Failed to start video session");
         toast.error("Failed to start video session", {
           description: "Please try again or contact support"
         });
@@ -278,11 +284,45 @@ const PatientDashboard = () => {
     }
   };
 
-  // Handle closing video session
+  // Add retry mechanism for video sessions
+  const handleRetryVideoSession = async (appointmentId: string | number) => {
+    setIsRetrying(true);
+    setVideoError(null);
+    
+    try {
+      // Force recreation of the room
+      const result = await getOrCreateVideoRoom(appointmentId.toString());
+      
+      if (!result.success || !result.url) {
+        throw new Error(result.error?.message || result.error || 'Failed to create video room on retry');
+      }
+      
+      setCurrentVideoUrl(result.url);
+      setIsVideoOpen(true);
+      
+      toast.success("Video session reconnected", {
+        description: "You have been reconnected to your session"
+      });
+    } catch (error) {
+      console.error('Error retrying video session:', error);
+      setVideoError(error.message || "Failed to reconnect to video session");
+      toast.error("Failed to reconnect", {
+        description: "Please contact support for assistance"
+      });
+    } finally {
+      setIsRetrying(false);
+    }
+  };
+
+  // Handle closing video session with cleanup
   const handleCloseVideoSession = () => {
     setIsVideoOpen(false);
     setCurrentVideoUrl("");
+    setVideoError(null);
   };
+
+  // Convert clientProfile to ClientDetails for PHQ9Template
+  const clientDetailsForPHQ9 = convertToClientDetails(clientProfile);
 
   // Get timezone display name
   const timeZoneDisplay = TimeZoneService.getTimeZoneDisplayName(clientTimeZone);
@@ -378,10 +418,10 @@ const PatientDashboard = () => {
                                 variant="outline" 
                                 size="sm" 
                                 onClick={() => handleStartSession(appointment.id)}
-                                disabled={isLoadingVideoSession}
+                                disabled={isLoadingVideoSession || isRetrying}
                                 className="bg-valorwell-700 text-white hover:bg-valorwell-800"
                               >
-                                {isLoadingVideoSession ? "Loading..." : "Start Session"}
+                                {isLoadingVideoSession || isRetrying ? "Loading..." : "Start Session"}
                               </Button>
                             </TableCell>
                           </TableRow>
@@ -506,9 +546,30 @@ const PatientDashboard = () => {
         <PHQ9Template 
           onClose={() => setShowPHQ9(false)} 
           clinicianName={clinicianData ? `${clinicianData.clinician_first_name} ${clinicianData.clinician_last_name}` : "Your Therapist"} 
-          clientData={clientProfile} 
+          clientData={clientDetailsForPHQ9} 
           onComplete={handlePHQ9Complete} 
         />
+      )}
+
+      {/* Video Chat Error Dialog */}
+      {videoError && !isVideoOpen && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
+          <div className="bg-white p-6 rounded-lg max-w-md">
+            <h3 className="text-lg font-semibold mb-2 text-red-600">Video Session Error</h3>
+            <p className="mb-4">{videoError}</p>
+            {pendingAppointmentId && (
+              <div className="flex justify-end space-x-2">
+                <Button variant="outline" onClick={() => setVideoError(null)}>Cancel</Button>
+                <Button 
+                  onClick={() => handleRetryVideoSession(pendingAppointmentId)} 
+                  disabled={isRetrying}
+                >
+                  {isRetrying ? "Retrying..." : "Retry Connection"}
+                </Button>
+              </div>
+            )}
+          </div>
+        </div>
       )}
 
       {/* Video Chat Component */}
