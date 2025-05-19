@@ -115,7 +115,7 @@ const ClientHistoryTemplate: React.FC<ClientHistoryTemplateProps> = ({ clientDat
         documentType: 'client_history',
         documentDate: new Date(),
         documentTitle: 'Client History Form',
-        createdBy: userId
+        createdBy: userId // Using userId instead of string 'client'
       };
       
       // Submit the form data

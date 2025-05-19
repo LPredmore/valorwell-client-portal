@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import html2canvas from 'html2canvas';
@@ -102,7 +101,7 @@ export const handleFormSubmission = async (
         document_title: documentInfo.documentTitle,
         document_date: documentInfo.documentDate.toISOString().split('T')[0],
         file_path: filePath,
-        created_by: documentInfo.createdBy || documentInfo.clientId // Set to client ID if no creator specified
+        created_by: documentInfo.createdBy || documentInfo.clientId // Ensure created_by is a UUID, using clientId as fallback
       })
       .select()
       .single();
@@ -200,9 +199,10 @@ const saveClientHistory = async (clientId: string, formData: any, pdfPath: strin
   }
 };
 
-/**
- * Process form elements to ensure their values are properly displayed in the PDF
- */
+// Export constant for bucket name so it can be imported elsewhere
+export { CLINICAL_DOCUMENTS_BUCKET };
+
+// Keep processFormElementsForPDF function as is
 const processFormElementsForPDF = (element: HTMLElement) => {
   // Process all inputs
   const inputs = element.querySelectorAll('input');
@@ -245,5 +245,3 @@ const processFormElementsForPDF = (element: HTMLElement) => {
   
   return element;
 };
-
-export { CLINICAL_DOCUMENTS_BUCKET };

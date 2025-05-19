@@ -52,7 +52,7 @@ const DocumentFormRenderer: React.FC<DocumentFormRendererProps> = ({
           documentType: documentType,
           documentDate: new Date(),
           documentTitle: assignment.document_name,
-          createdBy: 'client'
+          createdBy: clientId // Using clientId instead of the string 'client'
         };
         
         if (formData.formElementId) {
@@ -83,7 +83,7 @@ const DocumentFormRenderer: React.FC<DocumentFormRendererProps> = ({
           document_title: assignment.document_name,
           document_date: new Date().toISOString().split('T')[0],
           file_path: formData.pdf_path || '', // Use the file path from PDF generation
-          created_by: 'client' // Indicates this was filled out by the client
+          created_by: clientId // Using clientId instead of the string 'client'
         };
         
         // Validate document data before saving
