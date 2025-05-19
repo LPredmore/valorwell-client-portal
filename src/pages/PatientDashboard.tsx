@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import NewLayout from '@/components/layout/NewLayout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -410,17 +409,15 @@ const PatientDashboard = () => {
                       </div>
                     ) : (
                       <Avatar className="w-32 h-32 border border-gray-200 rounded-md">
-                        {clinicianData?.clinician_image_url ? (
-                          <AvatarImage 
-                            src={clinicianData.clinician_image_url} 
-                            alt="Therapist" 
-                            className="object-cover w-full h-full rounded-md"
-                          />
-                        ) : (
-                          <AvatarFallback className="w-full h-full text-2xl bg-blue-100 text-blue-800 rounded-md">
-                            {clinicianData?.clinician_first_name?.[0] || ''}{clinicianData?.clinician_last_name?.[0] || ''}
-                          </AvatarFallback>
-                        )}
+                        {/* Update to use the correct property for the clinician image URL */}
+                        <AvatarImage 
+                          src={clinicianData?.clinician_image_url || ""} 
+                          alt="Therapist" 
+                          className="object-cover w-full h-full rounded-md"
+                        />
+                        <AvatarFallback className="w-full h-full text-2xl bg-blue-100 text-blue-800 rounded-md">
+                          {clinicianData?.clinician_first_name?.[0] || ''}{clinicianData?.clinician_last_name?.[0] || ''}
+                        </AvatarFallback>
                       </Avatar>
                     )}
                     <div>
@@ -428,7 +425,7 @@ const PatientDashboard = () => {
                         {isClinicianLoading ? (
                           "Loading therapist information..."
                         ) : clinicianData ? (
-                          `About ${clinicianData.clinician_first_name || ''} ${clinicianData.clinician_last_name || ''}, ${clinicianData.clinician_license_type || 'Therapist'}`
+                          `About ${clinicianData.clinician_first_name || ''} ${clinicianData.clinician_last_name || ''}, ${clinicianData.clinician_type || 'Therapist'}`
                         ) : (
                           "No assigned therapist"
                         )}
