@@ -161,22 +161,6 @@ const ClientHistoryTemplate: React.FC<ClientHistoryTemplateProps> = ({ clientDat
     { value: "masters", label: "Master's Degree" },
     { value: "doctorate", label: "Doctorate or Professional Degree" }
   ];
-  
-  // Medical conditions that could be selected
-  const medicalConditions = [
-    "Anxiety", "Depression", "ADHD", "Insomnia", "Chronic Pain", 
-    "High Blood Pressure", "Diabetes", "Thyroid Issues"
-  ];
-  
-  const [selectedConditions, setSelectedConditions] = useState<string[]>([]);
-  
-  const toggleCondition = (condition: string) => {
-    setSelectedConditions(current => 
-      current.includes(condition)
-        ? current.filter(c => c !== condition)
-        : [...current, condition]
-    );
-  };
 
   return (
     <div className="w-full max-w-5xl mx-auto pb-12" id="client-history-form">
