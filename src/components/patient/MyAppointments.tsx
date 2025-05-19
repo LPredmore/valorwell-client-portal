@@ -215,7 +215,7 @@ const MyAppointments: React.FC<MyAppointmentsProps> = ({ pastAppointments: initi
 
         // Flag that we've loaded appointments to prevent reloading
         safeSetState(setHasLoadedAppointments, true);
-
+        
         if (data && data.length > 0) {
           console.log("Past appointments data fetched successfully:", data.length, "appointments");
           
