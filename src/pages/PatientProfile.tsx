@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import Layout from '@/components/layout/Layout';
 import { useForm } from 'react-hook-form';
@@ -6,6 +7,7 @@ import { getCurrentUser, getClientByUserId, updateClientProfile } from '@/integr
 import { useToast } from '@/components/ui/use-toast';
 import MyProfile from '@/components/patient/MyProfile';
 import { useAuth } from '@/context/NewAuthContext';
+import { getUserTimeZone, getTimeZoneDisplayName } from '@/utils/timeZoneUtils';
 
 const PatientProfile: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
@@ -45,6 +47,9 @@ const PatientProfile: React.FC = () => {
       gender: '',
       genderIdentity: '',
       state: '',
+      address: '', // Added address field
+      city: '', // Added city field
+      zipCode: '', // Added zip code field
       timeZone: ''
     }
   });
@@ -96,6 +101,12 @@ const PatientProfile: React.FC = () => {
         });
       }
 
+      // Get user timezone if none exists in profile
+      const timeZone = client.client_time_zone || getUserTimeZone();
+      
+      // Format timezone for display if it exists
+      const displayTimeZone = timeZone ? getTimeZoneDisplayName(timeZone) : '';
+
       form.reset({
         firstName: client.client_first_name || '',
         lastName: client.client_last_name || '',
@@ -107,7 +118,10 @@ const PatientProfile: React.FC = () => {
         gender: client.client_gender || '',
         genderIdentity: client.client_gender_identity || '',
         state: client.client_state || '',
-        timeZone: client.client_time_zone || ''
+        address: client.client_address || '', // Added address field
+        city: client.client_city || '', // Added city field
+        zipCode: client.client_zip_code || '', // Added zip code field
+        timeZone: client.client_time_zone || timeZone
       });
     } catch (error) {
       console.error("Error fetching client data:", error);
@@ -145,6 +159,9 @@ const PatientProfile: React.FC = () => {
         client_gender: formValues.gender,
         client_gender_identity: formValues.genderIdentity,
         client_state: formValues.state,
+        client_address: formValues.address, // Added address field
+        client_city: formValues.city, // Added city field
+        client_zip_code: formValues.zipCode, // Added zip code field
         client_time_zone: formValues.timeZone
       };
 
