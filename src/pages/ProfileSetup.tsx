@@ -11,7 +11,7 @@ import Layout from '@/components/layout/Layout';
 import { supabase } from '@/integrations/supabase/client';
 import FormFieldWrapper from '@/components/ui/FormFieldWrapper';
 import { useToast } from '@/hooks/use-toast';
-import { timezoneOptions } from '@/utils/timezoneOptions';
+import { timezoneOptions, getTimezoneOption, getTimezoneLabel } from '@/utils/timezoneOptions';
 import { DateField } from '@/components/ui/DateField';
 import SignupChampva from '@/components/signup/SignupChampva';
 import SignupTricare from '@/components/signup/SignupTricare';
@@ -251,6 +251,18 @@ const ProfileSetup = () => {
       console.log(`[ProfileSetup] Field ${String(fieldName)} identified as date field with value:`, value);
       valueToSave = formatDateForDB(value);
       console.log(`[ProfileSetup] Formatted date value for DB:`, valueToSave);
+    } 
+    // Special handling for time_zone field to ensure IANA format is saved
+    else if (fieldName === 'client_time_zone') {
+      console.log(`[ProfileSetup] Time zone value before processing:`, value);
+      // If the value is a label (like "Eastern Time (ET) - New York"), extract the IANA value
+      if (value && typeof value === 'string') {
+        const tzOption = timezoneOptions.find(tz => tz.label === value);
+        if (tzOption) {
+          valueToSave = tzOption.value; // Use the IANA identifier (e.g., "America/New_York")
+          console.log(`[ProfileSetup] Converted time zone label to IANA value:`, valueToSave);
+        }
+      }
     } else if (value === null || value === undefined) {
       valueToSave = null;
     }
@@ -548,6 +560,18 @@ const ProfileSetup = () => {
         const formattedDateOfBirth = formatDateForDB(dob);
         console.log(`[ProfileSetup] Step 2 Save - Formatted DOB for DB: ${formattedDateOfBirth}`);
         
+        // Get time zone value and ensure it's the IANA value
+        const timeZoneValue = values.client_time_zone;
+        console.log(`[ProfileSetup] Step 2 Save - Original time zone value: ${timeZoneValue}`);
+        
+        // If it's a label, convert to IANA value
+        let ianaTimeZone = timeZoneValue;
+        const tzOption = timezoneOptions.find(tz => tz.label === timeZoneValue);
+        if (tzOption) {
+          ianaTimeZone = tzOption.value;
+          console.log(`[ProfileSetup] Step 2 Save - Converted time zone to IANA: ${ianaTimeZone}`);
+        }
+        
         try {
           const { error } = await supabase.from('clients').update({
               client_date_of_birth: formattedDateOfBirth, 
@@ -555,7 +579,7 @@ const ProfileSetup = () => {
               client_gender: values.client_gender, 
               client_gender_identity: values.client_gender_identity, 
               client_state: values.client_state, 
-              client_time_zone: values.client_time_zone, 
+              client_time_zone: ianaTimeZone, // Save the IANA value
               client_vacoverage: values.client_vacoverage
             }).eq('id', clientId);
           if (error) throw error;
@@ -739,11 +763,85 @@ const ProfileSetup = () => {
     const { formState } = form; const isStep2Valid = formState.isValid; 
     return ( <Form {...form}><div className="space-y-6"><div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <DateField control={form.control} name="client_date_of_birth" label="Date of Birth" required={true}/>
-            <FormFieldWrapper control={form.control} name="client_gender" label="Birth Gender" type="select" options={["Male", "Female", "Prefer not to say"]} required={true}/>
-            <FormFieldWrapper control={form.control} name="client_gender_identity" label="Gender Identity" type="select" options={["Male", "Female", "Non-binary", "Transgender", "Prefer not to say", "Other"]} required={true}/>
-            <FormFieldWrapper control={form.control} name="client_state" label="State of Primary Residence" type="select" options={["Alabama", "Alaska", "Arizona", "Arkansas", "California", "Colorado", "Connecticut", "Delaware", "Florida", "Georgia", "Hawaii", "Idaho", "Illinois", "Indiana", "Iowa", "Kansas", "Kentucky", "Louisiana", "Maine", "Maryland", "Massachusetts", "Michigan", "Minnesota", "Mississippi", "Missouri", "Montana", "Nebraska", "Nevada", "New Hampshire", "New Jersey", "New Mexico", "New York", "North Carolina", "North Dakota", "Ohio", "Oklahoma", "Oregon", "Pennsylvania", "Rhode Island", "South Carolina", "South Dakota", "Tennessee", "Texas", "Utah", "Vermont", "Virginia", "Washington", "West Virginia", "Wisconsin", "Wyoming"]} required={true}/>
-            <FormFieldWrapper control={form.control} name="client_time_zone" label="Time Zone" type="select" options={timezoneOptions.map(tz => tz.label)} valueMapper={(label) => { const o = timezoneOptions.find(tz_1 => tz_1.label === label); return o ? o.value : ''; }} labelMapper={(value) => { const o = timezoneOptions.find(tz_1 => tz_1.value === value); return o ? o.label : ''; }} required={true}/>
-            <FormFieldWrapper control={form.control} name="client_vacoverage" label="What type of VA Coverage do you have?" type="select" options={["CHAMPVA", "TRICARE", "VA Community Care", "None - I am a veteran", "None - I am not a veteran"]} required={true}/>
+            
+            <FormFieldWrapper 
+              control={form.control} 
+              name="client_gender" 
+              label="Birth Gender" 
+              type="select" 
+              options={["Male", "Female", "Prefer not to say"]} 
+              required={true}
+              onValueCommit={(name, value) => handleImmediateSave(name as keyof ProfileFormValues, value)}
+            />
+            
+            <FormFieldWrapper 
+              control={form.control} 
+              name="client_gender_identity" 
+              label="Gender Identity" 
+              type="select" 
+              options={["Male", "Female", "Non-binary", "Transgender", "Prefer not to say", "Other"]} 
+              required={true}
+              onValueCommit={(name, value) => handleImmediateSave(name as keyof ProfileFormValues, value)}
+            />
+            
+            <FormFieldWrapper 
+              control={form.control} 
+              name="client_state" 
+              label="State of Primary Residence" 
+              type="select" 
+              options={[
+                "Alabama", "Alaska", "Arizona", "Arkansas", "California", "Colorado", 
+                "Connecticut", "Delaware", "Florida", "Georgia", "Hawaii", "Idaho", 
+                "Illinois", "Indiana", "Iowa", "Kansas", "Kentucky", "Louisiana", 
+                "Maine", "Maryland", "Massachusetts", "Michigan", "Minnesota", 
+                "Mississippi", "Missouri", "Montana", "Nebraska", "Nevada", 
+                "New Hampshire", "New Jersey", "New Mexico", "New York", 
+                "North Carolina", "North Dakota", "Ohio", "Oklahoma", "Oregon", 
+                "Pennsylvania", "Rhode Island", "South Carolina", "South Dakota", 
+                "Tennessee", "Texas", "Utah", "Vermont", "Virginia", "Washington", 
+                "West Virginia", "Wisconsin", "Wyoming"
+              ]} 
+              required={true}
+              onValueCommit={(name, value) => handleImmediateSave(name as keyof ProfileFormValues, value)}
+            />
+            
+            {/* Updated Time Zone field with explicit value and label mapping */}
+            <FormFieldWrapper 
+              control={form.control} 
+              name="client_time_zone" 
+              label="Time Zone" 
+              type="select" 
+              options={timezoneOptions.map(tz => tz.label)} 
+              valueMapper={(label) => {
+                // Convert label to IANA value
+                const option = timezoneOptions.find(tz => tz.label === label);
+                const value = option ? option.value : '';
+                console.log(`[ProfileSetup] Time zone valueMapper - label: ${label}, mapped to: ${value}`);
+                return value;
+              }} 
+              labelMapper={(value) => {
+                // Convert IANA value to label
+                const option = timezoneOptions.find(tz => tz.value === value);
+                const label = option ? option.label : value;
+                console.log(`[ProfileSetup] Time zone labelMapper - value: ${value}, mapped to: ${label}`);
+                return label;
+              }} 
+              required={true}
+              onValueCommit={(name, value) => {
+                console.log(`[ProfileSetup] Time zone onValueCommit with value: ${value}`);
+                handleImmediateSave(name as keyof ProfileFormValues, value);
+              }}
+            />
+            
+            <FormFieldWrapper 
+              control={form.control} 
+              name="client_vacoverage" 
+              label="What type of VA Coverage do you have?" 
+              type="select" 
+              options={["CHAMPVA", "TRICARE", "VA Community Care", "None - I am a veteran", "None - I am not a veteran"]} 
+              required={true}
+              onValueCommit={(name, value) => handleImmediateSave(name as keyof ProfileFormValues, value)}
+            />
         </div><div className="flex justify-between mt-8"> <Button type="button" variant="outline" onClick={handleGoBack} className="flex items-center gap-2"> <ArrowLeft className="h-4 w-4" /> Back </Button> <Button type="button" onClick={handleNext} disabled={!isStep2Valid} className="bg-valorwell-600 hover:bg-valorwell-700 text-white font-medium py-2 px-8 rounded-md flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"> Next <ArrowRight className="h-4 w-4" /> </Button> </div></div></Form> );
   };
   const renderStepThree = () => { 

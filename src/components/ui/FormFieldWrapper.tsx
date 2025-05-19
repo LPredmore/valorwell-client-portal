@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState, useRef } from 'react';
 import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
@@ -70,6 +71,7 @@ const FormFieldWrapper: React.FC<FormFieldWrapperProps> = ({
           
           // If a valueMapper is provided, map the selected option label to its actual value
           const valueToStore = valueMapper ? valueMapper(selectedValue) : selectedValue;
+          console.log(`FormFieldWrapper ${name} mapped value to store:`, valueToStore);
           
           // Update both the form field and our local state
           field.onChange(valueToStore);

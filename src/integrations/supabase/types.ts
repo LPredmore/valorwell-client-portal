@@ -2342,6 +2342,14 @@ export type Database = {
         | "West Virginia"
         | "Wisconsin"
         | "Wyoming"
+      time_zones:
+        | "America/New_York"
+        | "America/Chicago"
+        | "America/Denver"
+        | "America/Los_Angeles"
+        | "America/Anchorage"
+        | "Pacific/Honolulu"
+        | "America/Phoenix"
       user_role: "user" | "admin"
     }
     CompositeTypes: {
@@ -2567,6 +2575,15 @@ export const Constants = {
         "West Virginia",
         "Wisconsin",
         "Wyoming",
+      ],
+      time_zones: [
+        "America/New_York",
+        "America/Chicago",
+        "America/Denver",
+        "America/Los_Angeles",
+        "America/Anchorage",
+        "Pacific/Honolulu",
+        "America/Phoenix",
       ],
       user_role: ["user", "admin"],
     },
