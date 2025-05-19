@@ -46,7 +46,7 @@ const DocumentFormRenderer: React.FC<DocumentFormRendererProps> = ({
           document_type: getDocumentType(assignment.document_name),
           document_title: assignment.document_name,
           document_date: new Date().toISOString().split('T')[0],
-          file_path: formData.pdf_path || `documents/${clientId}/${getDocumentType(assignment.document_name)}_${Date.now()}.pdf`,
+          file_path: formData.pdf_path || `${clientId}/${getDocumentType(assignment.document_name)}_${Date.now()}.pdf`,
           created_by: 'client' // Indicates this was filled out by the client
         };
         
@@ -93,6 +93,7 @@ const DocumentFormRenderer: React.FC<DocumentFormRendererProps> = ({
         return (
           <InformedConsentTemplate 
             onClose={onCancel}
+            onSubmit={(data) => handleSave(data, false)}
           />
         );
       default:

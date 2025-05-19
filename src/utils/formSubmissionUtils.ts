@@ -62,9 +62,9 @@ export const handleFormSubmission = async (
     // Convert PDF to blob
     const pdfBlob = pdf.output('blob');
     
-    // Step 2: Upload PDF to Supabase storage
+    // Step 2: Upload PDF to Supabase storage - using the correct bucket
     const { data: uploadData, error: uploadError } = await supabase.storage
-      .from('client_documents')
+      .from('documents')
       .upload(`${documentInfo.clientId}/${filename}`, pdfBlob, {
         contentType: 'application/pdf',
         upsert: false
@@ -75,24 +75,21 @@ export const handleFormSubmission = async (
       throw new Error(`Error uploading document: ${uploadError.message}`);
     }
     
-    // Get the public URL for the uploaded file
-    const { data: urlData } = await supabase.storage
-      .from('client_documents')
-      .getPublicUrl(`${documentInfo.clientId}/${filename}`);
+    console.log('Document uploaded successfully:', uploadData);
     
-    const documentUrl = urlData.publicUrl;
+    // The file path should be relative to the bucket
+    const filePath = `${documentInfo.clientId}/${filename}`;
     
     // Step 3: Create document record in database
     const { data: docData, error: docError } = await supabase
-      .from('documents')
+      .from('clinical_documents')
       .insert({
         client_id: documentInfo.clientId,
         document_type: documentInfo.documentType,
         document_title: documentInfo.documentTitle,
-        document_url: documentUrl,
-        document_date: documentInfo.documentDate,
-        created_by: documentInfo.createdBy,
-        document_data: documentData
+        document_date: documentInfo.documentDate.toISOString().split('T')[0],
+        file_path: filePath,
+        created_by: documentInfo.createdBy
       })
       .select()
       .single();
@@ -102,19 +99,18 @@ export const handleFormSubmission = async (
       throw new Error(`Error creating document record: ${docError.message}`);
     }
     
+    console.log('Document record created:', docData);
+    
     // Step 4: Update document assignments if needed
     const { data: assignmentData, error: assignmentError } = await supabase
       .from('document_assignments')
       .update({ 
         status: 'completed',
-        completed_date: new Date(),
-        document_id: docData.id
+        updated_at: new Date().toISOString()
       })
-      .match({ 
-        client_id: documentInfo.clientId, 
-        document_name: documentName,
-        status: 'assigned' 
-      });
+      .eq('client_id', documentInfo.clientId)
+      .eq('document_name', documentName)
+      .eq('status', 'not_started');
     
     if (assignmentError) {
       console.error('Error updating document assignment:', assignmentError);
@@ -125,6 +121,7 @@ export const handleFormSubmission = async (
     return {
       success: true,
       documentId: docData.id,
+      filePath: filePath,
       message: 'Document submitted successfully'
     };
     

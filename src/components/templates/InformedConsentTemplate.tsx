@@ -25,11 +25,13 @@ type FormData = z.infer<typeof formSchema>;
 interface InformedConsentTemplateProps {
   clientData?: any;
   onClose?: () => void;
+  onSubmit?: (data: any) => void;
 }
 
 const InformedConsentTemplate: React.FC<InformedConsentTemplateProps> = ({ 
   clientData,
-  onClose 
+  onClose,
+  onSubmit 
 }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { userId } = useAuth();
@@ -58,6 +60,14 @@ const InformedConsentTemplate: React.FC<InformedConsentTemplateProps> = ({
     setIsSubmitting(true);
     
     try {
+      if (onSubmit) {
+        // If onSubmit prop exists, use it directly
+        const result = await onSubmit(data);
+        setIsSubmitting(false);
+        return;
+      }
+
+      // Otherwise handle submission internally
       // Prepare document data for PDF generation
       const documentData = {
         ...data,

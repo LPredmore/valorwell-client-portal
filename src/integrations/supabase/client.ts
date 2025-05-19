@@ -129,6 +129,8 @@ export const fetchClinicalDocuments = async (clientId: string): Promise<any[]> =
 // Function to get document download URL
 export const getDocumentDownloadURL = async (filePath: string): Promise<string | null> => {
   try {
+    console.log('Getting download URL for file path:', filePath);
+    // Use the documents bucket
     const { data, error } = await supabase.storage
       .from('documents')
       .createSignedUrl(filePath, 60 * 60); // URL valid for 1 hour
