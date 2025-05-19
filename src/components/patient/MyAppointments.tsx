@@ -7,6 +7,10 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { getUserTimeZone } from '@/utils/timeZoneUtils';
 import { TimeZoneService } from '@/utils/timeZoneService';
+import { DebugUtils } from '@/utils/debugUtils';
+
+// Create a unique session ID for consistent debugging
+const DEBUG_SESSION = DebugUtils.generateSessionId();
 
 interface PastAppointment {
   id: string | number;
@@ -61,6 +65,15 @@ const MyAppointments: React.FC<MyAppointmentsProps> = ({ pastAppointments: initi
   // Client timezone with default
   const [clientTimeZone, setClientTimeZone] = useState<string>(TimeZoneService.DEFAULT_TIMEZONE);
 
+  // Debug info
+  console.log(`[${DEBUG_SESSION}] MyAppointments - Initial Render State:`, { 
+    loading, 
+    hasInitialized,
+    hasLoadedClientData, 
+    hasLoadedAppointments,
+    appointmentsCount: pastAppointments.length
+  });
+
   // Reset component mount status on unmount
   useEffect(() => {
     return () => {
@@ -86,7 +99,7 @@ const MyAppointments: React.FC<MyAppointmentsProps> = ({ pastAppointments: initi
       try {
         const now = Date.now();
         if (now - lastFetchTime.current < FETCH_COOLDOWN) {
-          console.log("Throttling client data fetch - too soon since last fetch");
+          console.log(`[${DEBUG_SESSION}] Throttling client data fetch - too soon since last fetch`);
           return;
         }
         
@@ -94,17 +107,19 @@ const MyAppointments: React.FC<MyAppointmentsProps> = ({ pastAppointments: initi
         fetchAttempts.current++;
         
         if (fetchAttempts.current > MAX_FETCH_ATTEMPTS) {
-          console.warn("Maximum fetch attempts reached for client data");
+          console.warn(`[${DEBUG_SESSION}] Maximum fetch attempts reached for client data`);
           return;
         }
         
         safeSetState(setLoading, true);
+        console.log(`[${DEBUG_SESSION}] Fetching client data...`);
         
         // Get current authenticated user
         const { data: { user }, error: userError } = await supabase.auth.getUser();
         
         if (userError || !user) {
-          console.error('Error getting current user:', userError);
+          console.error(`[${DEBUG_SESSION}] Error getting current user:`, userError);
+          safeSetState(setError, new Error(`Failed to get current user: ${userError?.message || 'Unknown error'}`));
           safeSetState(setLoading, false);
           return;
         }
@@ -117,28 +132,30 @@ const MyAppointments: React.FC<MyAppointmentsProps> = ({ pastAppointments: initi
           .single();
           
         if (clientError) {
-          console.error('Error getting client data:', clientError);
+          console.error(`[${DEBUG_SESSION}] Error getting client data:`, clientError);
+          safeSetState(setError, new Error(`Failed to fetch client data: ${clientError.message}`));
           safeSetState(setLoading, false);
           return;
         }
         
         if (!client) {
-          console.warn('No client data found for user:', user.id);
+          console.warn(`[${DEBUG_SESSION}] No client data found for user:`, user.id);
+          safeSetState(setError, new Error('No client profile found'));
           safeSetState(setLoading, false);
           return;
         }
         
-        console.log('Client data retrieved:', client);
+        console.log(`[${DEBUG_SESSION}] Client data retrieved:`, client);
         safeSetState(setClientData, client);
         
         // Get timezone from client data or default to browser
         if (client?.client_time_zone) {
           const safeTimezone = TimeZoneService.ensureIANATimeZone(client.client_time_zone);
-          console.log(`Setting client timezone from database: ${client.client_time_zone} → ${safeTimezone}`);
+          console.log(`[${DEBUG_SESSION}] Setting client timezone from database: ${client.client_time_zone} → ${safeTimezone}`);
           safeSetState(setClientTimeZone, safeTimezone);
         } else {
           const browserTimezone = getUserTimeZone();
-          console.log(`No client timezone found, using browser timezone: ${browserTimezone}`);
+          console.log(`[${DEBUG_SESSION}] No client timezone found, using browser timezone: ${browserTimezone}`);
           safeSetState(setClientTimeZone, TimeZoneService.ensureIANATimeZone(browserTimezone));
         }
         
@@ -158,10 +175,11 @@ const MyAppointments: React.FC<MyAppointmentsProps> = ({ pastAppointments: initi
         // Mark client data as loaded
         safeSetState(setHasLoadedClientData, true);
       } catch (error) {
-        console.error('Error fetching client data:', error);
+        console.error(`[${DEBUG_SESSION}] Error fetching client data:`, error);
         safeSetState(setError, error instanceof Error ? error : new Error('Failed to fetch client data'));
       } finally {
         safeSetState(setLoading, false);
+        console.log(`[${DEBUG_SESSION}] Client data fetch complete, hasLoadedClientData:`, hasLoadedClientData);
       }
     };
     
@@ -171,7 +189,14 @@ const MyAppointments: React.FC<MyAppointmentsProps> = ({ pastAppointments: initi
   // Load appointments once client data is available
   useEffect(() => {
     // Only proceed if we have client data and haven't loaded appointments yet
-    if (!clientData?.id || !hasLoadedClientData || loading || hasLoadedAppointments) {
+    if (!clientData?.id || !hasLoadedClientData || hasLoadedAppointments) {
+      if (!clientData?.id) {
+        console.log(`[${DEBUG_SESSION}] Waiting for client data before fetching appointments`);
+      } else if (!hasLoadedClientData) {
+        console.log(`[${DEBUG_SESSION}] Client data not fully processed yet`);
+      } else if (hasLoadedAppointments) {
+        console.log(`[${DEBUG_SESSION}] Appointments already loaded, skipping fetch`);
+      }
       return;
     }
     
@@ -179,7 +204,7 @@ const MyAppointments: React.FC<MyAppointmentsProps> = ({ pastAppointments: initi
       try {
         const now = Date.now();
         if (now - lastFetchTime.current < FETCH_COOLDOWN) {
-          console.log("Throttling appointments fetch - too soon since last fetch");
+          console.log(`[${DEBUG_SESSION}] Throttling appointments fetch - too soon since last fetch`);
           return;
         }
         
@@ -187,12 +212,12 @@ const MyAppointments: React.FC<MyAppointmentsProps> = ({ pastAppointments: initi
         fetchAttempts.current++;
         
         if (fetchAttempts.current > MAX_FETCH_ATTEMPTS) {
-          console.warn("Maximum fetch attempts reached for appointments");
+          console.warn(`[${DEBUG_SESSION}] Maximum fetch attempts reached for appointments`);
           return;
         }
         
         safeSetState(setLoading, true);
-        console.log(`Fetching past appointments for client ${clientData.id} with timezone ${clientTimeZone}`);
+        console.log(`[${DEBUG_SESSION}] Fetching past appointments for client ${clientData.id} with timezone ${clientTimeZone}`);
         
         // Get the current time in UTC
         const nowUTC = TimeZoneService.now().toUTC().toISO();
@@ -206,18 +231,23 @@ const MyAppointments: React.FC<MyAppointmentsProps> = ({ pastAppointments: initi
           .order('start_at', { ascending: false })
           .limit(20); // Add limit to prevent potential performance issues
 
+        // Always set hasLoadedAppointments to true since we've attempted to load the data
+        safeSetState(setHasLoadedAppointments, true);
+        
         if (error) {
-          console.error('Error fetching past appointments:', error);
-          safeSetState(setLoading, false);
+          console.error(`[${DEBUG_SESSION}] Error fetching past appointments:`, error);
           safeSetState(setError, new Error(`Failed to fetch past appointments: ${error.message}`));
+          safeSetState(setLoading, false);
           return;
         }
 
-        // Flag that we've loaded appointments to prevent reloading
-        safeSetState(setHasLoadedAppointments, true);
+        console.log(`[${DEBUG_SESSION}] Appointment fetch successful:`, { 
+          dataExists: !!data, 
+          appointmentCount: data?.length || 0 
+        });
         
         if (data && data.length > 0) {
-          console.log("Past appointments data fetched successfully:", data.length, "appointments");
+          console.log(`[${DEBUG_SESSION}] Past appointments data fetched successfully:`, data.length, "appointments");
           
           const formattedAppointments = data.map(appointment => {
             try {
@@ -235,7 +265,7 @@ const MyAppointments: React.FC<MyAppointmentsProps> = ({ pastAppointments: initi
                 end_at: appointment.end_at
               };
             } catch (error) {
-              console.error('Error processing appointment:', error, appointment);
+              console.error(`[${DEBUG_SESSION}] Error processing appointment:`, error, appointment);
               return {
                 id: appointment.id || 'unknown-id',
                 formattedDate: 'Date unavailable',
@@ -250,22 +280,36 @@ const MyAppointments: React.FC<MyAppointmentsProps> = ({ pastAppointments: initi
           
           safeSetState(setPastAppointments, formattedAppointments);
         } else {
-          console.log("No past appointments found");
+          console.log(`[${DEBUG_SESSION}] No past appointments found, setting empty array`);
           safeSetState(setPastAppointments, []);
         }
       } catch (error) {
-        console.error('Error in fetchPastAppointments:', error);
+        console.error(`[${DEBUG_SESSION}] Error in fetchPastAppointments:`, error);
         safeSetState(setError, error instanceof Error ? error : new Error('Failed to fetch past appointments'));
       } finally {
+        // Always set loading to false when we're done, regardless of outcome
         safeSetState(setLoading, false);
+        console.log(`[${DEBUG_SESSION}] Past appointments fetch complete, states:`, {
+          loading: false,
+          hasLoadedAppointments: true,
+          appointmentCount: pastAppointments.length
+        });
       }
     };
     
     fetchPastAppointments();
-  }, [clientData, hasLoadedClientData, loading, hasLoadedAppointments, clientTimeZone, clinicianName, safeSetState]);
+  }, [clientData, hasLoadedClientData, hasLoadedAppointments, clientTimeZone, clinicianName, safeSetState, pastAppointments.length]);
 
   // Safely get timezone display with error handling
   const timeZoneDisplay = TimeZoneService.getTimeZoneDisplayName(clientTimeZone);
+
+  // Add additional logging for render decisions
+  console.log(`[${DEBUG_SESSION}] Rendering MyAppointments with states:`, {
+    error: !!error,
+    loading,
+    hasLoadedAppointments,
+    pastAppointmentsLength: pastAppointments.length
+  });
 
   // If there's an error, show error state
   if (error) {
@@ -282,6 +326,9 @@ const MyAppointments: React.FC<MyAppointmentsProps> = ({ pastAppointments: initi
     );
   }
 
+  // Simplified loading condition - only show loading if we're actually loading and haven't loaded appointments yet
+  const isLoading = loading && !hasLoadedAppointments;
+  
   return (
     <Card>
       <CardHeader>
@@ -289,7 +336,7 @@ const MyAppointments: React.FC<MyAppointmentsProps> = ({ pastAppointments: initi
         <CardDescription>View your appointment history</CardDescription>
       </CardHeader>
       <CardContent>
-        {loading && !hasLoadedAppointments ? (
+        {isLoading ? (
           <div className="py-6 text-center">Loading past appointments...</div>
         ) : pastAppointments.length > 0 ? (
           <div>
@@ -328,3 +375,4 @@ const MyAppointments: React.FC<MyAppointmentsProps> = ({ pastAppointments: initi
 };
 
 export default MyAppointments;
+
