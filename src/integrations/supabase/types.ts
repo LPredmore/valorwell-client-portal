@@ -2276,6 +2276,15 @@ export type Database = {
         | "therapy_note"
         | "questionnaire"
       event_type: "appointment" | "time_off" | "availability"
+      insurance_type:
+        | "PPO"
+        | "HMO"
+        | "EPO"
+        | "POS"
+        | "Medicare"
+        | "Medicaid"
+        | "CHIP"
+        | "Other"
       states:
         | "Alabama"
         | "Alaska"
@@ -2491,6 +2500,16 @@ export const Constants = {
         "questionnaire",
       ],
       event_type: ["appointment", "time_off", "availability"],
+      insurance_type: [
+        "PPO",
+        "HMO",
+        "EPO",
+        "POS",
+        "Medicare",
+        "Medicaid",
+        "CHIP",
+        "Other",
+      ],
       states: [
         "Alabama",
         "Alaska",

@@ -9,8 +9,8 @@ import { supabase } from '@/integrations/supabase/client';
 import MyInsurance from '@/components/patient/MyInsurance';
 import { ClientDetails } from '@/types/client';
 
-// Constants for dropdown options
-const insuranceTypes = ["Commercial", "Medicaid", "Medicare", "TRICARE", "Other"];
+// Updated insurance type options to match the database enum values
+const insuranceTypes = ["PPO", "HMO", "EPO", "POS", "Medicare", "Medicaid", "CHIP", "TRICARE", "Other"];
 const relationshipTypes = ["Self", "Spouse", "Child", "Other"];
 
 const PatientInsurance = () => {
@@ -41,6 +41,7 @@ const PatientInsurance = () => {
     if (clientProfile) {
       form.reset(clientProfile);
       console.log("Form reset with client profile data", form.getValues());
+      console.log("Insurance type primary:", clientProfile.client_insurance_type_primary);
     }
   }, [clientProfile, form]);
   
@@ -51,6 +52,7 @@ const PatientInsurance = () => {
       
       const formValues = form.getValues();
       console.log("Saving insurance data:", formValues);
+      console.log("Insurance type being saved:", formValues.client_insurance_type_primary);
       
       const { error } = await supabase
         .from('clients')

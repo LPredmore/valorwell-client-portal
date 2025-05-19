@@ -1,4 +1,3 @@
-
 /**
  * Represents a client in the system.
  * This interface matches the schema of the clients table.
@@ -142,4 +141,6 @@ export interface SessionNoteTemplateProps {
 }
 
 export const relationshipOptions = ["Self", "Spouse", "Child", "Other"];
-export const insuranceTypeOptions = ["Commercial", "Medicaid", "Medicare", "TRICARE", "Other"];
+
+// Updated to match database enum values
+export const insuranceTypeOptions = ["PPO", "HMO", "EPO", "POS", "Medicare", "Medicaid", "CHIP", "TRICARE", "Other"];
