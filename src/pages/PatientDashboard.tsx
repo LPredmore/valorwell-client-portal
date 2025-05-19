@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import NewLayout from '@/components/layout/NewLayout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -10,17 +9,27 @@ import {
   CardTitle 
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Calendar, Loader2 } from 'lucide-react';
+import { Calendar, Loader2, Clock, AlertCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/NewAuthContext';
 import { toast } from 'sonner';
 import AppointmentBookingDialog from '@/components/patient/AppointmentBookingDialog';
+import { supabase } from '@/integrations/supabase/client';
+import { TimeZoneService } from '@/utils/timeZoneService';
+import { Appointment } from '@/types/appointment';
+import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
 
 const PatientDashboard = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('dashboard');
   const { clientStatus, authState, isLoading, clientProfile, userId } = useAuth();
   const [isBookingDialogOpen, setIsBookingDialogOpen] = useState(false);
+  
+  // New states for appointments
+  const [upcomingAppointments, setUpcomingAppointments] = useState<Appointment[]>([]);
+  const [todayAppointments, setTodayAppointments] = useState<Appointment[]>([]);
+  const [isLoadingAppointments, setIsLoadingAppointments] = useState(false);
+  const [appointmentError, setAppointmentError] = useState<Error | null>(null);
   
   // IMMEDIATE REDIRECTION: Run this effect first and with highest priority
   // This will run as soon as the component mounts, before any other effects
@@ -90,24 +99,100 @@ const PatientDashboard = () => {
     return () => clearTimeout(timer);
   }, [clientStatus, navigate, clientProfile]);
   
-  // If still loading, show loading indicator with timeout handling
-  const [showLoadingTimeout, setShowLoadingTimeout] = useState(false);
-  
+  // Fetch appointments for the logged-in user
   useEffect(() => {
-    let timeoutId: NodeJS.Timeout | null = null;
-    
-    if (isLoading) {
-      timeoutId = setTimeout(() => {
-        setShowLoadingTimeout(true);
-      }, 5000); // Show timeout message after 5 seconds
-    }
-    
-    return () => {
-      if (timeoutId) {
-        clearTimeout(timeoutId);
+    if (!userId || !clientProfile) return;
+
+    const fetchAppointments = async () => {
+      setIsLoadingAppointments(true);
+      setAppointmentError(null);
+
+      try {
+        // Get client's timezone or fall back to browser timezone
+        const clientTimeZone = TimeZoneService.ensureIANATimeZone(
+          clientProfile.client_time_zone || 'America/New_York'
+        );
+
+        // Get today's date in UTC
+        const todayUTC = TimeZoneService.now().toUTC().startOf('day');
+        
+        console.log("Fetching appointments for client:", userId);
+
+        const { data, error } = await supabase
+          .from('appointments')
+          .select(`
+            *,
+            client:client_id(
+              client_first_name, 
+              client_last_name,
+              client_preferred_name
+            )
+          `)
+          .eq('client_id', userId)
+          .eq('status', 'scheduled')
+          .gte('start_at', todayUTC.toISO())
+          .order('start_at', { ascending: true });
+          
+        if (error) {
+          console.error('Error fetching appointments:', error);
+          setAppointmentError(error);
+          return;
+        }
+        
+        console.log("Appointments data from Supabase:", data);
+        
+        if (data && data.length > 0) {
+          const today = TimeZoneService.today(clientTimeZone);
+          
+          // Process and separate appointments
+          const todayAppts: Appointment[] = [];
+          const upcomingAppts: Appointment[] = [];
+
+          data.forEach(appointment => {
+            try {
+              // Add the clientName convenience property
+              const clientFirstName = appointment.client?.client_first_name || '';
+              const clientLastName = appointment.client?.client_last_name || '';
+              const clientPreferredName = appointment.client?.client_preferred_name || '';
+              
+              const enhancedAppointment = {
+                ...appointment,
+                clientName: clientPreferredName ? `${clientPreferredName} ${clientLastName}` : `${clientFirstName} ${clientLastName}`
+              };
+              
+              // Check if appointment is today
+              const appointmentDate = TimeZoneService.fromUTC(appointment.start_at, clientTimeZone);
+              const isAppointmentToday = TimeZoneService.isSameDay(appointmentDate, today);
+              
+              if (isAppointmentToday) {
+                todayAppts.push(enhancedAppointment);
+              } else {
+                upcomingAppts.push(enhancedAppointment);
+              }
+            } catch (error) {
+              console.error('Error processing appointment:', error);
+            }
+          });
+          
+          setTodayAppointments(todayAppts);
+          setUpcomingAppointments(upcomingAppts);
+          console.log("Today's appointments:", todayAppts);
+          console.log("Upcoming appointments:", upcomingAppts);
+        } else {
+          // No appointments found
+          setTodayAppointments([]);
+          setUpcomingAppointments([]);
+        }
+      } catch (error) {
+        console.error('Error in fetchAppointments:', error);
+        setAppointmentError(error instanceof Error ? error : new Error('Failed to fetch appointments'));
+      } finally {
+        setIsLoadingAppointments(false);
       }
     };
-  }, [isLoading]);
+    
+    fetchAppointments();
+  }, [userId, clientProfile]);
   
   // Handle booking dialog
   const handleOpenBookingDialog = () => {
@@ -117,7 +202,27 @@ const PatientDashboard = () => {
   const handleBookingComplete = () => {
     toast.success("Appointment booked successfully!");
     setIsBookingDialogOpen(false);
+    // Refresh appointments after booking
+    window.location.reload(); // Simple refresh for now
   };
+
+  // Format time for display in user's time zone
+  const formatAppointmentTime = (utcTimestamp: string) => {
+    const clientTimeZone = clientProfile?.client_time_zone || 'America/New_York';
+    return TimeZoneService.formatUTCInTimezone(utcTimestamp, clientTimeZone, 'h:mm a');
+  };
+  
+  // Format date from UTC timestamp
+  const formatAppointmentDate = (utcTimestamp: string) => {
+    const clientTimeZone = clientProfile?.client_time_zone || 'America/New_York';
+    const localDate = TimeZoneService.fromUTC(utcTimestamp, clientTimeZone);
+    return localDate.toFormat('EEEE, MMMM d, yyyy');
+  };
+  
+  // Get timezone display name
+  const timeZoneDisplay = clientProfile?.client_time_zone ? 
+    TimeZoneService.getTimeZoneDisplayName(clientProfile.client_time_zone) : 
+    'Local time';
   
   if (isLoading) {
     return (
@@ -226,11 +331,43 @@ const PatientDashboard = () => {
                   <CardDescription>Sessions scheduled for today</CardDescription>
                 </CardHeader>
                 <CardContent className="pt-2">
-                  <div className="flex flex-col items-center justify-center py-8 text-center">
-                    <Calendar className="h-16 w-16 text-gray-300 mb-4" />
-                    <h3 className="text-lg font-medium">No appointments today</h3>
-                    <p className="text-sm text-gray-500 mt-1">Check your upcoming appointments below</p>
-                  </div>
+                  {isLoadingAppointments ? (
+                    <div className="flex justify-center items-center py-8">
+                      <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+                    </div>
+                  ) : appointmentError ? (
+                    <div className="flex items-center justify-center py-8 text-red-500">
+                      <AlertCircle className="h-6 w-6 mr-2" />
+                      <span>Error loading appointments</span>
+                    </div>
+                  ) : todayAppointments.length > 0 ? (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Time <span className="text-xs text-gray-500">({timeZoneDisplay})</span></TableHead>
+                          <TableHead>Therapist</TableHead>
+                          <TableHead>Type</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {todayAppointments.map(appointment => (
+                          <TableRow key={appointment.id}>
+                            <TableCell>
+                              {formatAppointmentTime(appointment.start_at)} - {formatAppointmentTime(appointment.end_at)}
+                            </TableCell>
+                            <TableCell>{clientProfile?.client_assigned_therapist ? 'Your Therapist' : 'Unassigned'}</TableCell>
+                            <TableCell>{appointment.type}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center py-8 text-center">
+                      <Calendar className="h-16 w-16 text-gray-300 mb-4" />
+                      <h3 className="text-lg font-medium">No appointments today</h3>
+                      <p className="text-sm text-gray-500 mt-1">Check your upcoming appointments below</p>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
               
@@ -266,14 +403,46 @@ const PatientDashboard = () => {
                   <CardDescription>Your scheduled sessions</CardDescription>
                 </CardHeader>
                 <CardContent className="pt-2">
-                  <div className="flex flex-col items-center justify-center py-8 text-center">
-                    <Calendar className="h-16 w-16 text-gray-300 mb-4" />
-                    <h3 className="text-lg font-medium">No upcoming appointments</h3>
-                    <p className="text-sm text-gray-500 mt-1">Schedule a session with your therapist</p>
-                    <Button className="mt-4" onClick={handleOpenBookingDialog}>
-                      Book Appointment
-                    </Button>
-                  </div>
+                  {isLoadingAppointments ? (
+                    <div className="flex justify-center items-center py-8">
+                      <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+                    </div>
+                  ) : appointmentError ? (
+                    <div className="flex items-center justify-center py-8 text-red-500">
+                      <AlertCircle className="h-6 w-6 mr-2" />
+                      <span>Error loading appointments</span>
+                    </div>
+                  ) : upcomingAppointments.length > 0 ? (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Date</TableHead>
+                          <TableHead>Time <span className="text-xs text-gray-500">({timeZoneDisplay})</span></TableHead>
+                          <TableHead>Type</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {upcomingAppointments.map(appointment => (
+                          <TableRow key={appointment.id}>
+                            <TableCell>{formatAppointmentDate(appointment.start_at)}</TableCell>
+                            <TableCell>
+                              {formatAppointmentTime(appointment.start_at)} - {formatAppointmentTime(appointment.end_at)}
+                            </TableCell>
+                            <TableCell>{appointment.type}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center py-8 text-center">
+                      <Calendar className="h-16 w-16 text-gray-300 mb-4" />
+                      <h3 className="text-lg font-medium">No upcoming appointments</h3>
+                      <p className="text-sm text-gray-500 mt-1">Schedule a session with your therapist</p>
+                      <Button className="mt-4" onClick={handleOpenBookingDialog}>
+                        Book Appointment
+                      </Button>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </div>
