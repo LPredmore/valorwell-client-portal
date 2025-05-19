@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import NewLayout from '@/components/layout/NewLayout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -311,27 +310,6 @@ const PatientDashboard = () => {
               onClick={() => navigate('/patient-dashboard')}
             >
               Dashboard
-            </TabsTrigger>
-            <TabsTrigger 
-              value="profile" 
-              className="data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:text-blue-600 rounded-none px-4 py-2"
-              onClick={() => navigate('/patient-profile')}
-            >
-              Profile
-            </TabsTrigger>
-            <TabsTrigger 
-              value="past-appointments" 
-              className="data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:text-blue-600 rounded-none px-4 py-2"
-              onClick={() => {}} // This would navigate to past appointments
-            >
-              Past Appointments
-            </TabsTrigger>
-            <TabsTrigger 
-              value="documents" 
-              className="data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:text-blue-600 rounded-none px-4 py-2"
-              onClick={() => navigate('/patient-documents')}
-            >
-              Documents
             </TabsTrigger>
             <TabsTrigger 
               value="insurance" 
