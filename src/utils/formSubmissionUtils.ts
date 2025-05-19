@@ -5,9 +5,6 @@ import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import { v4 as uuidv4 } from 'uuid';
 
-// Standardize on BUCKET_NAME constant to ensure consistency across the application
-const BUCKET_NAME = 'clinical_documents';
-
 /**
  * Handles document form submission by generating a PDF and updating related database records
  * 
@@ -30,16 +27,9 @@ export const handleFormSubmission = async (
   documentData: any
 ) => {
   try {
-    console.log(`[formSubmissionUtils] Starting submission for ${documentName}`, { 
-      formElementId, 
-      clientId: documentInfo.clientId,
-      documentType: documentInfo.documentType
-    });
-    
     // Step 1: Generate PDF from form
     const formElement = document.getElementById(formElementId);
     if (!formElement) {
-      console.error(`Form element with id "${formElementId}" not found`);
       throw new Error(`Form element with id "${formElementId}" not found`);
     }
 
@@ -66,48 +56,29 @@ export const handleFormSubmission = async (
       imgHeight
     );
     
-    // Generate a unique filename with proper structure: {clientId}/{documentType}/{uuid}_{timestamp}.pdf
-    const timestamp = new Date().getTime();
-    const uniqueId = uuidv4();
-    const filename = `${uniqueId}_${timestamp}.pdf`;
-    const filePath = `${documentInfo.clientId}/${documentInfo.documentType}/${filename}`;
+    // Generate a unique filename
+    const filename = `${documentInfo.documentType}_${uuidv4()}.pdf`;
     
     // Convert PDF to blob
     const pdfBlob = pdf.output('blob');
     
-    console.log(`[formSubmissionUtils] PDF generated successfully, uploading to ${BUCKET_NAME} bucket path: ${filePath}`);
-    
-    // Step 2: Upload PDF to Supabase storage - using the standardized bucket name
+    // Step 2: Upload PDF to Supabase storage - using the correct bucket
     const { data: uploadData, error: uploadError } = await supabase.storage
-      .from(BUCKET_NAME)
-      .upload(filePath, pdfBlob, {
+      .from('documents')
+      .upload(`${documentInfo.clientId}/${filename}`, pdfBlob, {
         contentType: 'application/pdf',
         upsert: false
       });
     
     if (uploadError) {
-      console.error(`[formSubmissionUtils] Error uploading document to ${BUCKET_NAME} bucket:`, uploadError);
-      
-      // Try again with alternate bucket as a fallback (in case we're dealing with legacy data)
-      const fallbackBucket = 'documents';
-      console.warn(`[formSubmissionUtils] Attempting fallback upload to '${fallbackBucket}' bucket`);
-      
-      const { data: fallbackData, error: fallbackError } = await supabase.storage
-        .from(fallbackBucket)
-        .upload(filePath, pdfBlob, {
-          contentType: 'application/pdf',
-          upsert: false
-        });
-        
-      if (fallbackError) {
-        console.error('[formSubmissionUtils] Fallback upload also failed:', fallbackError);
-        throw new Error(`Error uploading document: ${uploadError.message}`);
-      } else {
-        console.log('[formSubmissionUtils] Fallback upload succeeded:', fallbackData);
-      }
-    } else {
-      console.log('[formSubmissionUtils] Document uploaded successfully:', uploadData);
+      console.error('Error uploading document:', uploadError);
+      throw new Error(`Error uploading document: ${uploadError.message}`);
     }
+    
+    console.log('Document uploaded successfully:', uploadData);
+    
+    // The file path should be relative to the bucket
+    const filePath = `${documentInfo.clientId}/${filename}`;
     
     // Step 3: Create document record in database
     const { data: docData, error: docError } = await supabase
@@ -124,11 +95,11 @@ export const handleFormSubmission = async (
       .single();
     
     if (docError) {
-      console.error('[formSubmissionUtils] Error creating document record:', docError);
+      console.error('Error creating document record:', docError);
       throw new Error(`Error creating document record: ${docError.message}`);
     }
     
-    console.log('[formSubmissionUtils] Document record created:', docData);
+    console.log('Document record created:', docData);
     
     // Step 4: Update document assignments if needed
     const { data: assignmentData, error: assignmentError } = await supabase
@@ -142,7 +113,7 @@ export const handleFormSubmission = async (
       .eq('status', 'not_started');
     
     if (assignmentError) {
-      console.error('[formSubmissionUtils] Error updating document assignment:', assignmentError);
+      console.error('Error updating document assignment:', assignmentError);
       // This is not a critical error as the document was created successfully
       console.warn('Could not update document assignment status');
     }
@@ -155,7 +126,7 @@ export const handleFormSubmission = async (
     };
     
   } catch (error) {
-    console.error('[formSubmissionUtils] Document submission error:', error);
+    console.error('Document submission error:', error);
     return {
       success: false,
       message: error instanceof Error ? error.message : 'Unknown error occurred'

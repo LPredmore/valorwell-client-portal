@@ -1,4 +1,3 @@
-
 import React, { useState, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
@@ -11,8 +10,9 @@ import { Video, Shield, AlertTriangle, Calendar, FileText, Check } from 'lucide-
 import { format } from 'date-fns';
 import { useAuth } from '@/context/NewAuthContext';
 import { useNavigate } from 'react-router-dom';
-import { toast } from 'sonner';
+import { useToast } from '@/hooks/use-toast';
 import { handleFormSubmission } from '@/utils/formSubmissionUtils';
+import { supabase } from '@/integrations/supabase/client';
 
 // Form validation schema
 const formSchema = z.object({
@@ -36,6 +36,7 @@ const InformedConsentTemplate: React.FC<InformedConsentTemplateProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { userId } = useAuth();
   const navigate = useNavigate();
+  const { toast } = useToast();
   const formRef = useRef<HTMLDivElement>(null);
 
   const form = useForm<FormData>({
@@ -48,24 +49,25 @@ const InformedConsentTemplate: React.FC<InformedConsentTemplateProps> = ({
 
   const handleSubmit = async (data: FormData) => {
     if (!userId) {
-      toast.error("User ID not found. Please ensure you are logged in.");
+      toast({
+        title: "Error",
+        description: "User ID not found. Please ensure you are logged in.",
+        variant: "destructive"
+      });
       return;
     }
 
     setIsSubmitting(true);
     
     try {
-      // If the parent component provided an onSubmit handler, use it
       if (onSubmit) {
-        console.log("[InformedConsentTemplate] Using provided onSubmit handler");
-        await onSubmit(data);
+        // If onSubmit prop exists, use it directly
+        const result = await onSubmit(data);
         setIsSubmitting(false);
         return;
       }
 
       // Otherwise handle submission internally
-      console.log("[InformedConsentTemplate] Using internal submission logic");
-      
       // Prepare document data for PDF generation
       const documentData = {
         ...data,
@@ -75,7 +77,7 @@ const InformedConsentTemplate: React.FC<InformedConsentTemplateProps> = ({
         signatureDate: format(new Date(), 'MMMM d, yyyy')
       };
 
-      // Create document info for PDF generation - using standardized document type
+      // Create document info for PDF generation
       const documentInfo = {
         clientId: userId,
         documentType: 'informed_consent',
@@ -83,9 +85,6 @@ const InformedConsentTemplate: React.FC<InformedConsentTemplateProps> = ({
         documentTitle: 'Informed Consent for Telehealth Services',
         createdBy: userId
       };
-
-      console.log("[InformedConsentTemplate] Submitting form with data:", documentData);
-      console.log("[InformedConsentTemplate] Document info:", documentInfo);
 
       // Use the shared form submission utility to handle PDF generation and document assignment updates
       const result = await handleFormSubmission(
@@ -96,7 +95,10 @@ const InformedConsentTemplate: React.FC<InformedConsentTemplateProps> = ({
       );
 
       if (result.success) {
-        toast.success("Your informed consent has been submitted successfully.");
+        toast({
+          title: "Success",
+          description: "Your informed consent has been submitted successfully.",
+        });
 
         if (onClose) {
           onClose();
@@ -104,11 +106,19 @@ const InformedConsentTemplate: React.FC<InformedConsentTemplateProps> = ({
           navigate('/patient-dashboard');
         }
       } else {
-        toast.error(result.message || "There was a problem submitting your informed consent.");
+        toast({
+          title: "Error",
+          description: result.message || "There was a problem submitting your informed consent.",
+          variant: "destructive"
+        });
       }
     } catch (error) {
-      console.error("[InformedConsentTemplate] Error submitting informed consent:", error);
-      toast.error("There was a problem submitting your informed consent. Please try again.");
+      console.error("Error submitting informed consent:", error);
+      toast({
+        title: "Error",
+        description: "There was a problem submitting your informed consent. Please try again.",
+        variant: "destructive"
+      });
     } finally {
       setIsSubmitting(false);
     }

@@ -126,44 +126,21 @@ export const fetchClinicalDocuments = async (clientId: string): Promise<any[]> =
   }
 };
 
-// Function to get document download URL - using standardized bucket name
+// Function to get document download URL
 export const getDocumentDownloadURL = async (filePath: string): Promise<string | null> => {
   try {
     console.log('Getting download URL for file path:', filePath);
-    // Use the standardized clinical_documents bucket
-    const primaryBucket = 'clinical_documents';
-    const { data: primaryData, error: primaryError } = await supabase.storage
-      .from(primaryBucket)
+    // Use the documents bucket
+    const { data, error } = await supabase.storage
+      .from('documents')
       .createSignedUrl(filePath, 60 * 60); // URL valid for 1 hour
 
-    if (primaryData?.signedUrl) {
-      console.log(`URL successfully generated from ${primaryBucket} bucket:`, primaryData.signedUrl);
-      return primaryData.signedUrl;
+    if (error) {
+      console.error('Error getting document URL:', error);
+      return null;
     }
 
-    if (primaryError) {
-      console.warn(`Error getting document URL from ${primaryBucket} bucket:`, primaryError);
-      
-      // Try fallback to legacy 'documents' bucket if the primary lookup fails
-      const fallbackBucket = 'documents';
-      console.log(`Attempting fallback to ${fallbackBucket} bucket for path:`, filePath);
-      
-      const { data: fallbackData, error: fallbackError } = await supabase.storage
-        .from(fallbackBucket)
-        .createSignedUrl(filePath, 60 * 60);
-      
-      if (fallbackData?.signedUrl) {
-        console.log(`URL successfully generated from fallback ${fallbackBucket} bucket:`, fallbackData.signedUrl);
-        return fallbackData.signedUrl;
-      }
-      
-      if (fallbackError) {
-        console.error(`Fallback also failed - error getting document URL from ${fallbackBucket} bucket:`, fallbackError);
-      }
-    }
-
-    console.error('Could not generate signed URL for file path:', filePath);
-    return null;
+    return data?.signedUrl || null;
   } catch (error) {
     console.error('Error generating document URL:', error);
     return null;

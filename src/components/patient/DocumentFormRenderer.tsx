@@ -6,7 +6,6 @@ import { toast } from 'sonner';
 import { DocumentAssignment, updateDocumentStatus, saveDocumentSubmission } from '@/integrations/supabase/client';
 import ClientHistoryTemplate from '@/components/templates/ClientHistoryTemplate';
 import InformedConsentTemplate from '@/components/templates/InformedConsentTemplate';
-import { handleFormSubmission } from '@/utils/formSubmissionUtils';
 
 interface DocumentFormRendererProps {
   assignment: DocumentAssignment;
@@ -29,9 +28,7 @@ const DocumentFormRenderer: React.FC<DocumentFormRendererProps> = ({
     setIsSubmitting(true);
     
     try {
-      console.log('[DocumentFormRenderer] Saving form data:', formData);
-      console.log('[DocumentFormRenderer] Client ID:', clientId);
-      console.log('[DocumentFormRenderer] Assignment:', assignment);
+      console.log('Saving form data:', formData);
       
       // Update the assignment status
       const newStatus = isDraft ? 'in_progress' : 'completed';
@@ -43,18 +40,13 @@ const DocumentFormRenderer: React.FC<DocumentFormRendererProps> = ({
       
       // If completed, save to clinical_documents
       if (!isDraft) {
-        const documentType = getDocumentType(assignment.document_name);
-        // Create a standardized file path format: {clientId}/{documentType}/{timestamp}.pdf
-        const timestamp = Date.now();
-        const filePath = `${clientId}/${documentType}/${timestamp}.pdf`;
-        
         // Save the PDF path and document data
         const documentData = {
           client_id: clientId,
-          document_type: documentType,
+          document_type: getDocumentType(assignment.document_name),
           document_title: assignment.document_name,
           document_date: new Date().toISOString().split('T')[0],
-          file_path: filePath,
+          file_path: formData.pdf_path || `${clientId}/${getDocumentType(assignment.document_name)}_${Date.now()}.pdf`,
           created_by: 'client' // Indicates this was filled out by the client
         };
         
@@ -71,7 +63,7 @@ const DocumentFormRenderer: React.FC<DocumentFormRendererProps> = ({
         onSave();
       }
     } catch (error: any) {
-      console.error('[DocumentFormRenderer] Error saving document:', error);
+      console.error('Error saving document:', error);
       toast.error(`Error: ${error.message || 'Failed to save document'}`);
     } finally {
       setIsSubmitting(false);
