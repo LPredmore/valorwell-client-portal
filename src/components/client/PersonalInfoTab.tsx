@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { format } from "date-fns";
 import {
@@ -152,6 +153,46 @@ const PersonalInfoTab: React.FC<TabProps> = ({
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Age</FormLabel>
+                  <FormControl>
+                    <Input {...field} readOnly={!isEditing} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            {/* Address fields */}
+            <FormField
+              control={form.control}
+              name="client_address"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Address</FormLabel>
+                  <FormControl>
+                    <Input {...field} readOnly={!isEditing} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="client_city"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>City</FormLabel>
+                  <FormControl>
+                    <Input {...field} readOnly={!isEditing} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="client_zip_code"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>ZIP Code</FormLabel>
                   <FormControl>
                     <Input {...field} readOnly={!isEditing} />
                   </FormControl>

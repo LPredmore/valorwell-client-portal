@@ -147,6 +147,37 @@ const MyProfile: React.FC<MyProfileProps> = ({
                   readOnly={true}
                 />
 
+                {/* Address fields */}
+                <FormFieldWrapper
+                  control={form.control}
+                  name="address"
+                  label="Street Address"
+                  readOnly={!isEditing}
+                />
+
+                <FormFieldWrapper
+                  control={form.control}
+                  name="city"
+                  label="City"
+                  readOnly={!isEditing}
+                />
+
+                <FormFieldWrapper
+                  control={form.control}
+                  name="state"
+                  label="State"
+                  type="select"
+                  options={stateOptions}
+                  readOnly={!isEditing}
+                />
+
+                <FormFieldWrapper
+                  control={form.control}
+                  name="zipCode"
+                  label="ZIP Code"
+                  readOnly={!isEditing}
+                />
+
                 <FormFieldWrapper
                   control={form.control}
                   name="gender"
@@ -162,15 +193,6 @@ const MyProfile: React.FC<MyProfileProps> = ({
                   label="Gender Identity"
                   type="select"
                   options={genderIdentityOptions}
-                  readOnly={!isEditing}
-                />
-
-                <FormFieldWrapper
-                  control={form.control}
-                  name="state"
-                  label="State"
-                  type="select"
-                  options={stateOptions}
                   readOnly={!isEditing}
                 />
 

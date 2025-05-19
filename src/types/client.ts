@@ -14,6 +14,9 @@ export interface ClientDetails {
   client_gender: string | null;
   client_gender_identity: string | null;
   client_state: string | null;
+  client_address: string | null; // Added address field
+  client_city: string | null; // Added city field
+  client_zip_code: string | null; // Added zip code field
   client_time_zone: string | null;
   client_minor: string | null; // Changed from boolean to string to match schema and usage
   client_status: string | null;

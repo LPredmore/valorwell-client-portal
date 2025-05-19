@@ -36,6 +36,9 @@ type ClientFormData = {
   client_gender?: string;
   client_gender_identity?: string;
   client_state?: string;
+  client_address?: string; // Added address field
+  client_city?: string; // Added city field
+  client_zip_code?: string; // Added zip code field
   client_time_zone?: string;
   client_vacoverage?: string;
   client_champva?: string;
@@ -93,6 +96,9 @@ const profileStep2Schema = z.object({
   client_gender: z.string().min(1, "Birth gender is required"),
   client_gender_identity: z.string().min(1, "Gender identity is required"),
   client_state: z.string().min(1, "State is required"),
+  client_address: z.string().min(1, "Address is required"),
+  client_city: z.string().min(1, "City is required"),
+  client_zip_code: z.string().min(5, "Valid ZIP code is required"),
   client_time_zone: z.string().min(1, "Time zone is required"),
   client_vacoverage: z.string().min(1, "VA coverage information is required"),
 });
@@ -100,6 +106,9 @@ const profileStep2Schema = z.object({
 type ProfileFormValues = z.infer<typeof profileStep1Schema> &
   Partial<z.infer<typeof profileStep2Schema>> & {
     client_age?: number | null;
+    client_address?: string; // Added address field
+    client_city?: string; // Added city field
+    client_zip_code?: string; // Added zip code field
     client_champva?: string;
     client_other_insurance?: string;
     client_champva_agreement?: boolean;
@@ -217,7 +226,8 @@ const ProfileSetup = () => {
         client_first_name: '', client_preferred_name: '', client_last_name: '',
         client_email: '', client_phone: '', client_relationship: '',
         client_date_of_birth: null, client_age: null, client_gender: '', client_gender_identity: '',
-        client_state: '', client_time_zone: '', client_vacoverage: '', client_champva: '',
+        client_state: '', client_address: '', client_city: '', client_zip_code: '', // Added new fields with defaults
+        client_time_zone: '', client_vacoverage: '', client_champva: '',
         client_other_insurance: '', client_champva_agreement: false, client_mental_health_referral: '',
         client_branchOS: '', client_recentdischarge: null, client_disabilityrating: '',
         client_tricare_beneficiary_category: '', client_tricare_sponsor_name: '',
@@ -458,6 +468,9 @@ const ProfileSetup = () => {
         client_gender: clientRecord.client_gender || '',
         client_gender_identity: clientRecord.client_gender_identity || '',
         client_state: clientRecord.client_state || '',
+        client_address: clientRecord.client_address || '', // Added address field
+        client_city: clientRecord.client_city || '', // Added city field
+        client_zip_code: clientRecord.client_zip_code || '', // Added zip code field
         client_time_zone: clientRecord.client_time_zone || '',
         client_vacoverage: clientRecord.client_vacoverage || '',
         client_champva: clientRecord.client_champva || '',
@@ -549,7 +562,7 @@ const ProfileSetup = () => {
     let dataSaved = false;
 
     if (currentStep === 2) {
-      const isStep2Valid = await form.trigger(["client_date_of_birth", "client_gender", "client_gender_identity", "client_state", "client_time_zone", "client_vacoverage"]);
+      const isStep2Valid = await form.trigger(["client_date_of_birth", "client_gender", "client_gender_identity", "client_state", "client_address", "client_city", "client_zip_code", "client_time_zone", "client_vacoverage"]);
       if (!isStep2Valid) { toast({ title: "Validation Error", description: "Please complete all fields in Step 2.", variant: "destructive" }); return; }
       if (clientId) {
         const dob = values.client_date_of_birth;
@@ -578,7 +591,10 @@ const ProfileSetup = () => {
               client_age: age, 
               client_gender: values.client_gender, 
               client_gender_identity: values.client_gender_identity, 
-              client_state: values.client_state, 
+              client_state: values.client_state,
+              client_address: values.client_address, // Added address field
+              client_city: values.client_city, // Added city field 
+              client_zip_code: values.client_zip_code, // Added zip code field
               client_time_zone: ianaTimeZone, // Save the IANA value
               client_vacoverage: values.client_vacoverage
             }).eq('id', clientId);
@@ -784,10 +800,27 @@ const ProfileSetup = () => {
               onValueCommit={(name, value) => handleImmediateSave(name as keyof ProfileFormValues, value)}
             />
             
+            {/* Address Section - Added new fields */}
+            <FormFieldWrapper 
+              control={form.control} 
+              name="client_address" 
+              label="Street Address" 
+              required={true}
+              onValueCommit={(name, value) => handleImmediateSave(name as keyof ProfileFormValues, value)}
+            />
+            
+            <FormFieldWrapper 
+              control={form.control} 
+              name="client_city" 
+              label="City" 
+              required={true}
+              onValueCommit={(name, value) => handleImmediateSave(name as keyof ProfileFormValues, value)}
+            />
+            
             <FormFieldWrapper 
               control={form.control} 
               name="client_state" 
-              label="State of Primary Residence" 
+              label="State" 
               type="select" 
               options={[
                 "Alabama", "Alaska", "Arizona", "Arkansas", "California", "Colorado", 
@@ -801,6 +834,14 @@ const ProfileSetup = () => {
                 "Tennessee", "Texas", "Utah", "Vermont", "Virginia", "Washington", 
                 "West Virginia", "Wisconsin", "Wyoming"
               ]} 
+              required={true}
+              onValueCommit={(name, value) => handleImmediateSave(name as keyof ProfileFormValues, value)}
+            />
+            
+            <FormFieldWrapper 
+              control={form.control} 
+              name="client_zip_code" 
+              label="ZIP Code" 
               required={true}
               onValueCommit={(name, value) => handleImmediateSave(name as keyof ProfileFormValues, value)}
             />
