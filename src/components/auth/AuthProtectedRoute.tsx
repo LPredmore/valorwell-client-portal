@@ -1,3 +1,4 @@
+
 import React, { useEffect } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth, AuthState } from '@/context/NewAuthContext';
@@ -23,7 +24,8 @@ const AuthProtectedRoute: React.FC<AuthProtectedRouteProps> = ({
     userRole, 
     clientStatus, 
     authError,
-    clientProfile
+    clientProfile,
+    refreshUserData
   } = useAuth();
   
   const location = useLocation();
@@ -34,6 +36,32 @@ const AuthProtectedRoute: React.FC<AuthProtectedRouteProps> = ({
       console.log(`[AuthProtectedRoute] Status: authState=${authState}, isLoading=${isLoading}, authInitialized=${authInitialized}, userRole=${userRole}, clientStatus=${clientStatus}, blockNewClients=${blockNewClients}, path=${location.pathname}`);
     }
   }, [authState, isLoading, authInitialized, userRole, clientStatus, blockNewClients, location]);
+
+  // Detect redirect loops and attempt to recover
+  useEffect(() => {
+    const redirectCount = parseInt(sessionStorage.getItem('redirectCount') || '0', 10);
+    
+    if (redirectCount > 5) {
+      console.error('[AuthProtectedRoute] Detected potential redirect loop. Attempting recovery.');
+      sessionStorage.setItem('redirectCount', '0'); // Reset counter
+      
+      // Try to refresh user data to recover from auth state issues
+      if (authState === AuthState.AUTHENTICATED && !clientProfile) {
+        console.log('[AuthProtectedRoute] Authenticated user missing profile data, trying to refresh');
+        refreshUserData().catch(err => {
+          console.error('[AuthProtectedRoute] Error refreshing user data:', err);
+        });
+      }
+    } else {
+      // Increment redirect counter
+      sessionStorage.setItem('redirectCount', (redirectCount + 1).toString());
+      
+      // Auto-reset counter after 5 seconds of no redirects
+      setTimeout(() => {
+        sessionStorage.setItem('redirectCount', '0');
+      }, 5000);
+    }
+  }, [location.pathname, authState, clientProfile, refreshUserData]);
 
   // Handle loading timeout - Always initialize the state
   const [showLoadingTimeout, setShowLoadingTimeout] = React.useState(false);
@@ -122,10 +150,15 @@ const AuthProtectedRoute: React.FC<AuthProtectedRouteProps> = ({
               Refresh Page
             </button>
             <button
-              onClick={() => window.location.href = '/login'}
+              onClick={() => {
+                // Clear session storage and local storage auth data
+                sessionStorage.clear();
+                localStorage.removeItem('supabase.auth.token');
+                window.location.href = '/login';
+              }}
               className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors block w-full"
             >
-              Go to Login
+              Reset Authentication & Go to Login
             </button>
           </div>
         </div>
@@ -193,6 +226,7 @@ const AuthProtectedRoute: React.FC<AuthProtectedRouteProps> = ({
 
   // Access granted
   console.log(`[AuthProtectedRoute] Access granted to protected route for client`);
+  sessionStorage.setItem('redirectCount', '0'); // Reset counter on successful access
   return <>{children}</>;
 };
 

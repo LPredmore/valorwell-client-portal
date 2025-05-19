@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useEffect, useState, useMemo, useRef } from 'react';
 import AuthService, { AuthState, AuthError } from '@/services/AuthService';
 import { supabase } from '@/integrations/supabase/client';
@@ -144,10 +145,15 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
           return;
         }
         
-        setClientProfile(null);
-        // CRITICAL FIX: Always default to "New" status when data retrieval fails
+        // Create a minimum profile with just the ID to prevent issues
+        const minimalProfile = {
+          id: userId,
+          client_status: 'New'
+        };
+        
+        setClientProfile(minimalProfile as ClientProfile);
         setClientStatus('New');
-        DebugUtils.log(sessionId, '[AuthProvider] Setting default status to "New" after failed retrieval');
+        DebugUtils.log(sessionId, '[AuthProvider] Setting minimal client profile after failed retrieval', minimalProfile);
       } else if (data) {
         DebugUtils.log(sessionId, '[AuthProvider] Client data loaded', data);
         setClientProfile(data as ClientProfile);
@@ -159,16 +165,28 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
         DebugUtils.log(sessionId, `[AuthProvider] Client status explicitly set to "${status}"`);
       } else {
         // CRITICAL FIX: No data returned but no error either (unusual case)
-        setClientProfile(null);
+        // Create a minimum profile with just the ID
+        const minimalProfile = {
+          id: userId,
+          client_status: 'New'
+        };
+        
+        setClientProfile(minimalProfile as ClientProfile);
         setClientStatus('New');
-        DebugUtils.log(sessionId, '[AuthProvider] No client data found, setting default status to "New"');
+        DebugUtils.log(sessionId, '[AuthProvider] No client data found, setting minimal profile', minimalProfile);
       }
     } catch (err) {
       DebugUtils.error(sessionId, '[AuthProvider] Exception loading client data', err);
-      // CRITICAL FIX: Default to "New" status on any kind of error
-      setClientProfile(null);
+      
+      // CRITICAL FIX: Create minimal profile on any kind of error
+      const minimalProfile = {
+        id: userId,
+        client_status: 'New'
+      };
+      
+      setClientProfile(minimalProfile as ClientProfile);
       setClientStatus('New');
-      DebugUtils.log(sessionId, '[AuthProvider] Exception occurred, setting default status to "New"');
+      DebugUtils.log(sessionId, '[AuthProvider] Exception occurred, setting minimal profile', minimalProfile);
     } finally {
       // Always set isLoading to false when client data loading completes or fails
       DebugUtils.log(sessionId, '[AuthProvider] Client data loading complete, setting isLoading to false');
@@ -180,9 +198,11 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
 
   // Match the refreshUserData return type with the interface
   const refreshUserDataWrapper = async (): Promise<void> => {
+    DebugUtils.log(sessionId, '[AuthProvider] Manually refreshing user data');
     await AuthService.refreshSession();
     // After refreshing the session, explicitly reload client data
     if (userId) {
+      clientDataAttempts.current = 0; // Reset attempts counter
       await loadClientData(userId);
       DebugUtils.log(sessionId, '[AuthProvider] Client data explicitly reloaded after session refresh');
     }
