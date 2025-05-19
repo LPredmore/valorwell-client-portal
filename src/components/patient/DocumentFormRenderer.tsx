@@ -138,6 +138,9 @@ const DocumentFormRenderer: React.FC<DocumentFormRendererProps> = ({
     client_gender: clientProfile.client_gender || null,
     client_gender_identity: clientProfile.client_gender_identity || null,
     client_state: clientProfile.client_state || null,
+    client_address: clientProfile.client_address || null, // Add the address field
+    client_city: clientProfile.client_city || null, // Add the city field
+    client_zip_code: clientProfile.client_zip_code || null, // Add the zip code field
     client_time_zone: clientProfile.client_time_zone || null,
     client_minor: clientProfile.client_minor || null,
     client_status: clientProfile.client_status || null,
