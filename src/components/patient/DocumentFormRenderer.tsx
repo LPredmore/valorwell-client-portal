@@ -8,6 +8,7 @@ import ClientHistoryTemplate from '@/components/templates/ClientHistoryTemplate'
 import InformedConsentTemplate from '@/components/templates/InformedConsentTemplate';
 import { handleFormSubmission, CLINICAL_DOCUMENTS_BUCKET } from '@/utils/formSubmissionUtils';
 import { useAuth } from '@/context/NewAuthContext';
+import { ClientDetails } from '@/types/client';
 
 interface DocumentFormRendererProps {
   assignment: DocumentAssignment;
@@ -124,6 +125,28 @@ const DocumentFormRenderer: React.FC<DocumentFormRendererProps> = ({
     return typeMap[documentName] || documentName.toLowerCase().replace(/\s+/g, '_');
   };
   
+  // Convert ClientProfile to ClientDetails format
+  const clientData: ClientDetails | null = clientProfile ? {
+    id: clientProfile.id,
+    client_first_name: clientProfile.client_first_name || null,
+    client_last_name: clientProfile.client_last_name || null,
+    client_preferred_name: clientProfile.client_preferred_name || null,
+    client_email: clientProfile.client_email || null,
+    client_phone: clientProfile.client_phone || null,
+    client_date_of_birth: clientProfile.client_date_of_birth || null,
+    client_age: clientProfile.client_age || null,
+    client_gender: clientProfile.client_gender || null,
+    client_gender_identity: clientProfile.client_gender_identity || null,
+    client_state: clientProfile.client_state || null,
+    client_time_zone: clientProfile.client_time_zone || null,
+    client_minor: clientProfile.client_minor || null,
+    client_status: clientProfile.client_status || null,
+    client_assigned_therapist: clientProfile.client_assigned_therapist || null,
+    client_referral_source: clientProfile.client_referral_source || null,
+    client_self_goal: clientProfile.client_self_goal || null,
+    client_diagnosis: clientProfile.client_diagnosis || null,
+  } : null;
+  
   const renderForm = () => {
     switch(assignment.document_name) {
       case 'Client History Form':
@@ -131,7 +154,7 @@ const DocumentFormRenderer: React.FC<DocumentFormRendererProps> = ({
           <ClientHistoryTemplate 
             onClose={onCancel}
             onSubmit={(data) => handleSave(data, false)}
-            clientData={clientProfile}
+            clientData={clientData}
           />
         );
       case 'Informed Consent':

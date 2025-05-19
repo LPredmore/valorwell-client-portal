@@ -19,6 +19,93 @@ interface ClientHistoryTemplateProps {
   clientData?: ClientDetails | null;
 }
 
+// Define all the missing options and data structures
+const relationshipTypes = [
+  "Father", "Mother", "Stepfather", "Stepmother", "Brother", "Sister", 
+  "Stepbrother", "Stepsister", "Grandfather", "Grandmother", "Spouse", 
+  "Child", "Friend", "Other"
+];
+
+const educationOptions = [
+  "Less than High School", "High School / GED", "Some College", "Associate's Degree",
+  "Bachelor's Degree", "Master's Degree", "Doctoral Degree", "Professional Degree (MD, JD, etc.)"
+];
+
+const symptoms = {
+  mood: [
+    "Depressed Mood", "Anxiety", "Panic", "Irritability", "Mood Swings", 
+    "Hopelessness", "Loneliness", "Overwhelmed", "Anger", "Grief"
+  ],
+  physical: [
+    "Fatigue", "Sleep Issues", "Appetite Changes", "Weight Changes", 
+    "Chronic Pain", "Headaches", "Muscle Tension", "Nausea", "Dizziness"
+  ],
+  behavioral: [
+    "Isolation", "Avoidance", "Compulsive Behaviors", "Aggression", 
+    "Self-Harm", "Impulsivity", "Hyperactivity", "Decreased Motivation"
+  ],
+  cognitive: [
+    "Worry", "Racing Thoughts", "Indecisiveness", "Confusion", 
+    "Poor Concentration", "Memory Problems", "Intrusive Thoughts", "Rumination"
+  ],
+  lifeStressors: [
+    "Work Stress", "Financial Problems", "Relationship Issues", "Family Conflict", 
+    "Health Concerns", "Loss/Grief", "Major Life Changes", "Trauma", "Legal Issues"
+  ]
+};
+
+const medicalConditions = [
+  "High Blood Pressure", "Diabetes", "Heart Disease", "Stroke", "Cancer",
+  "Thyroid Problems", "Chronic Pain", "Respiratory Issues", "Gastrointestinal Issues",
+  "Neurological Disorders", "Autoimmune Disorders", "Sleep Disorders"
+];
+
+const childhoodExperiences = [
+  "Neglect", "Physical Abuse", "Sexual Abuse", "Emotional Abuse", 
+  "Parental Divorce/Separation", "Family Substance Abuse",
+  "Family Mental Illness", "Incarcerated Household Member", 
+  "Domestic Violence", "Bullying", "Frequent Relocations"
+];
+
+interface FamilyMember {
+  id: string;
+  relationshipType: string;
+  name: string;
+  personality: string;
+  relationshipGrowing?: string;
+  relationshipNow: string;
+}
+
+interface PastTreatment {
+  id: string;
+  year: string;
+  reason: string;
+  length: string;
+  provider: string;
+}
+
+interface Medication {
+  id: string;
+  name: string;
+  purpose: string;
+  duration: string;
+}
+
+interface PastSpouse {
+  id: string;
+  name: string;
+  personality: string;
+  relationship: string;
+}
+
+interface SymptomCategories {
+  mood: string[];
+  physical: string[];
+  behavioral: string[];
+  cognitive: string[];
+  lifeStressors: string[];
+}
+
 const ClientHistoryTemplate: React.FC<ClientHistoryTemplateProps> = ({ onClose, onSubmit, clientData }) => {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -48,6 +135,56 @@ const ClientHistoryTemplate: React.FC<ClientHistoryTemplateProps> = ({ onClose, 
   const [selectedMedicalConditions, setSelectedMedicalConditions] = useState<string[]>([]);
 
   const form = useForm();
+
+  // Add the missing handler functions
+  const handleSymptomChange = (symptom: string, isChecked: boolean) => {
+    if (isChecked) {
+      setSelectedSymptoms([...selectedSymptoms, symptom]);
+    } else {
+      setSelectedSymptoms(selectedSymptoms.filter(s => s !== symptom));
+    }
+  };
+
+  const handleChildhoodExperienceChange = (experience: string, isChecked: boolean) => {
+    if (isChecked) {
+      setSelectedChildhoodExperiences([...selectedChildhoodExperiences, experience]);
+    } else {
+      setSelectedChildhoodExperiences(selectedChildhoodExperiences.filter(e => e !== experience));
+    }
+  };
+
+  const handleMedicalConditionChange = (condition: string, isChecked: boolean) => {
+    if (isChecked) {
+      setSelectedMedicalConditions([...selectedMedicalConditions, condition]);
+    } else {
+      setSelectedMedicalConditions(selectedMedicalConditions.filter(c => c !== condition));
+    }
+  };
+
+  const handleAddFamily = () => {
+    const newId = Date.now().toString();
+    setFamily([...family, { id: newId, relationshipType: '', name: '', personality: '', relationshipGrowing: '', relationshipNow: '' }]);
+  };
+
+  const handleAddHousehold = () => {
+    const newId = Date.now().toString();
+    setCurrentHousehold([...currentHousehold, { id: newId, relationshipType: '', name: '', personality: '', relationshipNow: '' }]);
+  };
+
+  const handleAddSpouse = () => {
+    const newId = Date.now().toString();
+    setPastSpouses([...pastSpouses, { id: newId, name: '', personality: '', relationship: '' }]);
+  };
+
+  const handleAddTreatment = () => {
+    const newId = Date.now().toString();
+    setTreatments([...treatments, { id: newId, year: '', reason: '', length: '', provider: '' }]);
+  };
+
+  const handleAddMedication = () => {
+    const newId = Date.now().toString();
+    setMedications([...medications, { id: newId, name: '', purpose: '', duration: '' }]);
+  };
 
   const fullName = clientData 
     ? `${clientData.client_first_name || ''} ${clientData.client_last_name || ''}`.trim() 
@@ -248,7 +385,7 @@ const ClientHistoryTemplate: React.FC<ClientHistoryTemplateProps> = ({ onClose, 
                 </div>
               </div>
               
-              <div>
+              <div className="mb-6">
                 <h4 className="text-md font-medium mb-2">Life Stressors</h4>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
                   {symptoms.lifeStressors.map((symptom) => (
@@ -836,44 +973,5 @@ const ClientHistoryTemplate: React.FC<ClientHistoryTemplateProps> = ({ onClose, 
     </div>
   );
 };
-
-interface FamilyMember {
-  id: string;
-  relationshipType: string;
-  name: string;
-  personality: string;
-  relationshipGrowing?: string;
-  relationshipNow: string;
-}
-
-interface PastTreatment {
-  id: string;
-  year: string;
-  reason: string;
-  length: string;
-  provider: string;
-}
-
-interface Medication {
-  id: string;
-  name: string;
-  purpose: string;
-  duration: string;
-}
-
-interface PastSpouse {
-  id: string;
-  name: string;
-  personality: string;
-  relationship: string;
-}
-
-interface SymptomCategories {
-  mood: string[];
-  physical: string[];
-  behavioral: string[];
-  cognitive: string[];
-  lifeStressors: string[];
-}
 
 export default ClientHistoryTemplate;
