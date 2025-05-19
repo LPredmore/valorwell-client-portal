@@ -8,12 +8,14 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/NewAuthContext';
 import { toast } from 'sonner';
 import AppointmentBookingDialog from '@/components/patient/AppointmentBookingDialog';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, getOrCreateVideoRoom } from '@/integrations/supabase/client';
 import { TimeZoneService } from '@/utils/timeZoneService';
 import { Appointment } from '@/types/appointment';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useClinicianData } from '@/hooks/useClinicianData';
+import PHQ9Template from '@/components/templates/PHQ9Template';
+import VideoChat from '@/components/video/VideoChat';
 
 const PatientDashboard = () => {
   const navigate = useNavigate();
@@ -33,6 +35,13 @@ const PatientDashboard = () => {
   const [todayAppointments, setTodayAppointments] = useState<Appointment[]>([]);
   const [isLoadingAppointments, setIsLoadingAppointments] = useState(false);
   const [appointmentError, setAppointmentError] = useState<Error | null>(null);
+
+  // New states for session management
+  const [isVideoOpen, setIsVideoOpen] = useState(false);
+  const [currentVideoUrl, setCurrentVideoUrl] = useState("");
+  const [showPHQ9, setShowPHQ9] = useState(false);
+  const [pendingAppointmentId, setPendingAppointmentId] = useState<string | number | null>(null);
+  const [isLoadingVideoSession, setIsLoadingVideoSession] = useState(false);
 
   // Add state for clinician data
   const {
@@ -227,6 +236,54 @@ const PatientDashboard = () => {
     return localDate.toFormat('EEEE, MMMM d, yyyy');
   };
 
+  // New handler for starting a therapy session
+  const handleStartSession = async (appointmentId: string | number) => {
+    console.log(`Starting session for appointment ${appointmentId}`);
+    setPendingAppointmentId(appointmentId);
+    setShowPHQ9(true);
+  };
+
+  // Handle PHQ9 completion
+  const handlePHQ9Complete = async () => {
+    setShowPHQ9(false);
+    
+    if (pendingAppointmentId) {
+      setIsLoadingVideoSession(true);
+      
+      try {
+        // Get or create a video room for the appointment
+        const result = await getOrCreateVideoRoom(pendingAppointmentId.toString());
+        
+        if (!result.success || !result.url) {
+          console.error('Error creating video room:', result.error || 'Unknown error');
+          throw new Error(result.error?.message || result.error || 'Failed to create video room');
+        }
+        
+        console.log('Video room created/retrieved:', result.url);
+        setCurrentVideoUrl(result.url);
+        setIsVideoOpen(true);
+        
+        toast.success("Video session is ready", {
+          description: "You are now entering the video session"
+        });
+      } catch (error) {
+        console.error('Error starting video session:', error);
+        toast.error("Failed to start video session", {
+          description: "Please try again or contact support"
+        });
+      } finally {
+        setIsLoadingVideoSession(false);
+        setPendingAppointmentId(null);
+      }
+    }
+  };
+
+  // Handle closing video session
+  const handleCloseVideoSession = () => {
+    setIsVideoOpen(false);
+    setCurrentVideoUrl("");
+  };
+
   // Get timezone display name
   const timeZoneDisplay = TimeZoneService.getTimeZoneDisplayName(clientTimeZone);
   
@@ -274,7 +331,7 @@ const PatientDashboard = () => {
         
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="border-b w-full justify-start mb-6 bg-transparent p-0">
-            <TabsTrigger value="dashboard" className="data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:text-blue-600 rounded-none px-4 py-2" onClick={() => navigate('/patient-dashboard')}>
+            <TabsTrigger value="dashboard" className="data-[state=active]:border-b-2 data-[state=active]:border-valorwell-700 data-[state=active]:text-valorwell-700 rounded-none px-4 py-2" onClick={() => navigate('/patient-dashboard')}>
               Dashboard
             </TabsTrigger>
             
@@ -289,33 +346,55 @@ const PatientDashboard = () => {
                   <CardDescription>Sessions scheduled for today in {timeZoneDisplay}</CardDescription>
                 </CardHeader>
                 <CardContent className="pt-2">
-                  {isLoadingAppointments ? <div className="flex justify-center items-center py-8">
-                      <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
-                    </div> : appointmentError ? <div className="flex items-center justify-center py-8 text-red-500">
+                  {isLoadingAppointments ? (
+                    <div className="flex justify-center items-center py-8">
+                      <Loader2 className="h-8 w-8 animate-spin text-valorwell-700" />
+                    </div>
+                  ) : appointmentError ? (
+                    <div className="flex items-center justify-center py-8 text-red-500">
                       <AlertCircle className="h-6 w-6 mr-2" />
                       <span>Error loading appointments</span>
-                    </div> : todayAppointments.length > 0 ? <Table>
+                    </div>
+                  ) : todayAppointments.length > 0 ? (
+                    <Table>
                       <TableHeader>
                         <TableRow>
                           <TableHead>Time</TableHead>
                           <TableHead>Therapist</TableHead>
                           <TableHead>Type</TableHead>
+                          <TableHead className="text-right">Actions</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {todayAppointments.map(appointment => <TableRow key={appointment.id}>
+                        {todayAppointments.map(appointment => (
+                          <TableRow key={appointment.id}>
                             <TableCell>
                               {formatAppointmentTime(appointment.start_at)} - {formatAppointmentTime(appointment.end_at)}
                             </TableCell>
                             <TableCell>{clientProfile?.client_assigned_therapist ? 'Your Therapist' : 'Unassigned'}</TableCell>
                             <TableCell>{appointment.type}</TableCell>
-                          </TableRow>)}
+                            <TableCell className="text-right">
+                              <Button 
+                                variant="outline" 
+                                size="sm" 
+                                onClick={() => handleStartSession(appointment.id)}
+                                disabled={isLoadingVideoSession}
+                                className="bg-valorwell-700 text-white hover:bg-valorwell-800"
+                              >
+                                {isLoadingVideoSession ? "Loading..." : "Start Session"}
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
                       </TableBody>
-                    </Table> : <div className="flex flex-col items-center justify-center py-8 text-center">
+                    </Table>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center py-8 text-center">
                       <Calendar className="h-16 w-16 text-gray-300 mb-4" />
                       <h3 className="text-lg font-medium">No appointments today</h3>
                       <p className="text-sm text-gray-500 mt-1">Check your upcoming appointments below</p>
-                    </div>}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
               
@@ -332,15 +411,19 @@ const PatientDashboard = () => {
                 <CardContent className="pt-2">
                   <div className="flex items-start gap-4">
                     {/* Use Avatar component with clinician image */}
-                    {isClinicianLoading ? <div className="w-32 h-32 flex items-center justify-center bg-gray-100 rounded-md">
+                    {isClinicianLoading ? (
+                      <div className="w-32 h-32 flex items-center justify-center bg-gray-100 rounded-md">
                         <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
-                      </div> : <Avatar className="w-32 h-32 border border-gray-200 rounded-md">
+                      </div>
+                    ) : (
+                      <Avatar className="w-32 h-32 border border-gray-200 rounded-md">
                         {/* We need to check for image property that actually exists in the Clinician interface */}
                         <AvatarImage src={clinicianData?.clinician_image_url || ""} alt="Therapist" className="object-cover w-full h-full rounded-md" />
-                        <AvatarFallback className="w-full h-full text-2xl bg-blue-100 text-blue-800 rounded-md">
+                        <AvatarFallback className="w-full h-full text-2xl bg-valorwell-100 text-valorwell-700 rounded-md">
                           {clinicianData?.clinician_first_name?.[0] || ''}{clinicianData?.clinician_last_name?.[0] || ''}
                         </AvatarFallback>
-                      </Avatar>}
+                      </Avatar>
+                    )}
                     <div>
                       <h3 className="font-semibold mb-2">
                         {isClinicianLoading ? "Loading therapist information..." : clinicianData ? `About ${clinicianData.clinician_first_name || ''} ${clinicianData.clinician_last_name || ''}, ${clinicianData.clinician_type || 'Therapist'}` : "No assigned therapist"}
@@ -360,12 +443,17 @@ const PatientDashboard = () => {
                   <CardDescription>Your scheduled sessions in {timeZoneDisplay}</CardDescription>
                 </CardHeader>
                 <CardContent className="pt-2">
-                  {isLoadingAppointments ? <div className="flex justify-center items-center py-8">
-                      <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
-                    </div> : appointmentError ? <div className="flex items-center justify-center py-8 text-red-500">
+                  {isLoadingAppointments ? (
+                    <div className="flex justify-center items-center py-8">
+                      <Loader2 className="h-8 w-8 animate-spin text-valorwell-700" />
+                    </div>
+                  ) : appointmentError ? (
+                    <div className="flex items-center justify-center py-8 text-red-500">
                       <AlertCircle className="h-6 w-6 mr-2" />
                       <span>Error loading appointments</span>
-                    </div> : upcomingAppointments.length > 0 ? <Table>
+                    </div>
+                  ) : upcomingAppointments.length > 0 ? (
+                    <Table>
                       <TableHeader>
                         <TableRow>
                           <TableHead>Date</TableHead>
@@ -374,22 +462,27 @@ const PatientDashboard = () => {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {upcomingAppointments.map(appointment => <TableRow key={appointment.id}>
+                        {upcomingAppointments.map(appointment => (
+                          <TableRow key={appointment.id}>
                             <TableCell>{formatAppointmentDate(appointment.start_at)}</TableCell>
                             <TableCell>
                               {formatAppointmentTime(appointment.start_at)} - {formatAppointmentTime(appointment.end_at)}
                             </TableCell>
                             <TableCell>{appointment.type}</TableCell>
-                          </TableRow>)}
+                          </TableRow>
+                        ))}
                       </TableBody>
-                    </Table> : <div className="flex flex-col items-center justify-center py-8 text-center">
+                    </Table>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center py-8 text-center">
                       <Calendar className="h-16 w-16 text-gray-300 mb-4" />
                       <h3 className="text-lg font-medium">No upcoming appointments</h3>
                       <p className="text-sm text-gray-500 mt-1">Schedule a session with your therapist</p>
                       <Button className="mt-4" onClick={handleOpenBookingDialog}>
                         Book Appointment
                       </Button>
-                    </div>}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </div>
@@ -398,8 +491,34 @@ const PatientDashboard = () => {
       </div>
       
       {/* Appointment Booking Dialog */}
-      <AppointmentBookingDialog open={isBookingDialogOpen} onOpenChange={setIsBookingDialogOpen} clinicianId={clientProfile?.client_assigned_therapist || null} clinicianName={null} // We could fetch this if needed
-    clientId={userId} onAppointmentBooked={handleBookingComplete} userTimeZone={clientTimeZone} />
+      <AppointmentBookingDialog 
+        open={isBookingDialogOpen} 
+        onOpenChange={setIsBookingDialogOpen} 
+        clinicianId={clientProfile?.client_assigned_therapist || null} 
+        clinicianName={null} // We could fetch this if needed 
+        clientId={userId} 
+        onAppointmentBooked={handleBookingComplete} 
+        userTimeZone={clientTimeZone} 
+      />
+
+      {/* PHQ9 Assessment Dialog */}
+      {showPHQ9 && (
+        <PHQ9Template 
+          onClose={() => setShowPHQ9(false)} 
+          clinicianName={clinicianData ? `${clinicianData.clinician_first_name} ${clinicianData.clinician_last_name}` : "Your Therapist"} 
+          clientData={clientProfile} 
+          onComplete={handlePHQ9Complete} 
+        />
+      )}
+
+      {/* Video Chat Component */}
+      {currentVideoUrl && (
+        <VideoChat 
+          roomUrl={currentVideoUrl} 
+          isOpen={isVideoOpen} 
+          onClose={handleCloseVideoSession} 
+        />
+      )}
     </NewLayout>;
 };
 export default PatientDashboard;
