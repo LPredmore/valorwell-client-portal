@@ -85,19 +85,14 @@ const DocumentFormRenderer: React.FC<DocumentFormRendererProps> = ({
       case 'Client History Form':
         return (
           <ClientHistoryTemplate 
-            clientId={clientId} 
-            onSave={(data) => handleSave(data, true)} 
-            onComplete={(data) => handleSave(data, false)}
-            mode="client"
+            onClose={onCancel}
+            onSubmit={(data) => handleSave(data, false)}
           />
         );
       case 'Informed Consent':
         return (
           <InformedConsentTemplate 
-            clientId={clientId}
-            onSave={(data) => handleSave(data, true)}
-            onComplete={(data) => handleSave(data, false)}
-            mode="client"
+            onClose={onCancel}
           />
         );
       default:
