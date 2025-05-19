@@ -1,3 +1,4 @@
+
 import React, { Suspense } from "react";
 import { Toaster } from "sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -22,6 +23,7 @@ import ResetPassword from "./pages/ResetPassword";
 import UpdatePassword from "./pages/UpdatePassword";
 import AuthDebugPage from "./pages/AuthDebugPage";
 import PatientProfile from "./pages/PatientProfile";
+import PatientInsurance from "./pages/PatientInsurance";
 
 // Create a query client with improved error handling and retry logic
 const queryClient = new QueryClient({
@@ -57,6 +59,7 @@ function App() {
     console.log('- /patient-dashboard: blockNewClients=true (blocks new clients)');
     console.log('- /patient-documents: blockNewClients=true (blocks new clients)');
     console.log('- /patient-profile: blockNewClients=true (blocks new clients)');
+    console.log('- /patient-insurance: blockNewClients=true (blocks new clients)');
   }, []);
 
   return (
@@ -98,6 +101,11 @@ function App() {
                     <Route path="/patient-profile" element={
                       <AuthProtectedRoute allowedRoles={["client"]} blockNewClients={true}>
                         <PatientProfile />
+                      </AuthProtectedRoute>
+                    } />
+                    <Route path="/patient-insurance" element={
+                      <AuthProtectedRoute allowedRoles={["client"]} blockNewClients={true}>
+                        <PatientInsurance />
                       </AuthProtectedRoute>
                     } />
                     <Route path="/therapist-selection" element={

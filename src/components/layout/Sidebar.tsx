@@ -11,7 +11,8 @@ import {
   Home,
   LogOut,
   UserCheck,
-  CalendarCheck
+  CalendarCheck,
+  Shield
 } from 'lucide-react';
 import { useAuth } from '@/context/NewAuthContext';
 
@@ -34,6 +35,7 @@ const Sidebar = () => {
     { name: 'My Profile', path: '/patient-profile', icon: User },
     { name: 'Documents', path: '/patient-documents', icon: FileText },
     { name: 'Past Appointments', path: '/past-appointments', icon: CalendarCheck },
+    { name: 'Insurance', path: '/patient-insurance', icon: Shield },
     { name: 'Therapist Selection', path: '/therapist-selection', icon: UserCheck }
   ];
 
