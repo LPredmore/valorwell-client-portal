@@ -14,7 +14,7 @@ export interface ClientProfile {
   client_preferred_name?: string;
   client_email?: string;
   client_phone?: string;
-  client_status?: 'New' | 'Profile Complete' | 'Active' | 'Inactive' | string;
+  client_status?: 'New' | 'Profile Complete' | 'Active' | 'Inactive' | 'Therapist Selected' | string;
   client_is_profile_complete?: boolean;
   client_age?: number | null;
   client_state?: string | null;
@@ -38,15 +38,17 @@ export interface AuthContextType {
   refreshUserData: () => Promise<void>;
   hasRole: (role: string | string[]) => boolean;
   forceRefreshAuth: () => Promise<boolean>;
+  emergencyResetAuth: () => { success: boolean; message: string };
 }
 
 // Create the auth context
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 // Maximum time to wait for client data loading before forcing isLoading to false
-const CLIENT_DATA_LOADING_TIMEOUT = 15000; // 15 seconds (increased from 10s)
-const CLIENT_DATA_MAX_RETRIES = 5; // Maximum retries for loading client data (increased from 3)
-const CLIENT_DATA_RETRY_DELAY = 1500; // Delay between retries in ms (increased from 1000ms)
+const CLIENT_DATA_LOADING_TIMEOUT = 20000; // 20 seconds (increased from 15s)
+const CLIENT_DATA_MAX_RETRIES = 8; // Maximum retries for loading client data (increased from 5)
+const CLIENT_DATA_RETRY_DELAY = 2000; // Base delay between retries in ms (increased from 1500ms)
+const CLIENT_DATA_RETRY_JITTER = 1000; // Random jitter to add to retry delay
 
 // Provider component
 export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }) => {
@@ -58,13 +60,14 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
   const [userRole, setUserRole] = useState<string | null>(AuthService.userRole);
   const [clientProfile, setClientProfile] = useState<ClientProfile | null>(null);
   const [clientStatus, setClientStatus] = useState<ClientProfile['client_status'] | null>(null);
-  const [authInitialized, setAuthInitialized] = useState<boolean>(false);
+  const [authInitialized, setAuthInitialized] = useState<boolean>(AuthService.isInitialized);
   
   // Use refs to track loading state for safety timeouts
   const loadingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const clientDataAttempts = useRef<number>(0);
   const sessionId = useRef(DebugUtils.generateSessionId()).current;
   const profileLoadingRef = useRef<boolean>(false);
+  const isPreviewEnvironment = useRef(window.location.hostname.includes('lovableproject.com')).current;
 
   // Clear any existing timeout to prevent memory leaks
   const clearLoadingTimeout = () => {
@@ -77,9 +80,13 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
   // Set a safety timeout to ensure isLoading is eventually set to false
   const setLoadingSafetyTimeout = () => {
     clearLoadingTimeout();
+    
+    // Adjust timeout for Preview environment
+    const effectiveTimeout = isPreviewEnvironment ? CLIENT_DATA_LOADING_TIMEOUT * 1.5 : CLIENT_DATA_LOADING_TIMEOUT;
+    
     loadingTimeoutRef.current = setTimeout(() => {
       if (isLoading) {
-        DebugUtils.log(sessionId, '[AuthProvider] Safety timeout reached, forcing isLoading to false');
+        DebugUtils.log(sessionId, `[AuthProvider] Safety timeout reached after ${effectiveTimeout}ms, forcing isLoading to false`);
         setIsLoading(false);
         
         // If we're still waiting for client data but timeout is reached, create minimal profile
@@ -89,7 +96,15 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
           profileLoadingRef.current = false;
         }
       }
-    }, CLIENT_DATA_LOADING_TIMEOUT);
+    }, effectiveTimeout);
+    
+    // Add a preflight check to provide early warning feedback
+    setTimeout(() => {
+      if (isLoading && profileLoadingRef.current) {
+        DebugUtils.log(sessionId, '[AuthProvider] Client data loading taking longer than expected');
+        toast.loading("Loading profile data...", { id: "profile-loading", duration: 10000 });
+      }
+    }, effectiveTimeout / 2);
   };
 
   // Create minimal profile when we cannot load from database
@@ -109,6 +124,9 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
   // Initialize the auth context
   useEffect(() => {
     DebugUtils.log(sessionId, '[AuthProvider] Initializing auth context');
+    
+    // Log environment type for debugging
+    DebugUtils.log(sessionId, `[AuthProvider] Environment: ${isPreviewEnvironment ? 'Preview' : 'Standard'}`);
     
     // Set safety timeout on initial load
     setLoadingSafetyTimeout();
@@ -168,6 +186,12 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
     
     try {
       DebugUtils.log(sessionId, '[AuthProvider] Loading client data', { userId, attempt: clientDataAttempts.current });
+      
+      // Start with a toast for user feedback in preview environment or if retry count is high
+      if ((isPreviewEnvironment && retryCount > 1) || retryCount > 3) {
+        toast.loading("Loading your profile...", { id: "profile-loading-retry", duration: 3000 });
+      }
+      
       const { data, error } = await supabase
         .from('clients')
         .select('*')
@@ -177,10 +201,24 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
       if (error) {
         DebugUtils.error(sessionId, '[AuthProvider] Error loading client data', error);
         
-        // If we get an error but have tried less than max retries, retry after a short delay
+        // If we get an error but have tried less than max retries, retry after a delay with exponential backoff
         if (retryCount < CLIENT_DATA_MAX_RETRIES) {
-          DebugUtils.log(sessionId, `[AuthProvider] Retrying client data load (attempt ${retryCount + 1})`);
-          setTimeout(() => loadClientData(userId, retryCount + 1), CLIENT_DATA_RETRY_DELAY);
+          // Calculate delay with exponential backoff and jitter
+          const baseDelay = Math.min(CLIENT_DATA_RETRY_DELAY * Math.pow(1.5, retryCount), 10000);
+          const jitter = Math.random() * CLIENT_DATA_RETRY_JITTER;
+          const delay = baseDelay + jitter;
+          
+          DebugUtils.log(sessionId, `[AuthProvider] Retrying client data load in ${Math.round(delay)}ms (attempt ${retryCount + 1})`);
+          
+          // For preview environment, show a toast on higher retry counts
+          if (isPreviewEnvironment && retryCount >= 2) {
+            toast.loading(`Retrying profile load (${retryCount + 1}/${CLIENT_DATA_MAX_RETRIES})...`, { 
+              id: "profile-retry", 
+              duration: 2000 
+            });
+          }
+          
+          setTimeout(() => loadClientData(userId, retryCount + 1), delay);
           return;
         }
         
@@ -188,6 +226,17 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
         createMinimalProfile(userId);
       } else if (data) {
         DebugUtils.log(sessionId, '[AuthProvider] Client data loaded', data);
+        
+        // Dismiss any loading toasts
+        toast.dismiss("profile-loading");
+        toast.dismiss("profile-loading-retry");
+        toast.dismiss("profile-retry");
+        
+        // Success toast only for preview environment after retries
+        if (isPreviewEnvironment && retryCount > 0) {
+          toast.success("Profile loaded successfully");
+        }
+        
         setClientProfile(data as ClientProfile);
         
         // CRITICAL FIX: Ensure we're explicitly setting client_status with "New" default
@@ -205,7 +254,10 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
       
       // Retry if we haven't exceeded max retries
       if (retryCount < CLIENT_DATA_MAX_RETRIES) {
-        setTimeout(() => loadClientData(userId, retryCount + 1), CLIENT_DATA_RETRY_DELAY);
+        const delay = CLIENT_DATA_RETRY_DELAY * Math.pow(1.5, retryCount) + 
+          (Math.random() * CLIENT_DATA_RETRY_JITTER);
+        
+        setTimeout(() => loadClientData(userId, retryCount + 1), delay);
         return;
       }
       
@@ -220,6 +272,11 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
         clearLoadingTimeout();
         clientDataAttempts.current = 0;
         profileLoadingRef.current = false;
+        
+        // Dismiss any remaining loading toasts
+        toast.dismiss("profile-loading");
+        toast.dismiss("profile-loading-retry");
+        toast.dismiss("profile-retry");
       }
     }
   };
@@ -251,6 +308,8 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
   const forceRefreshAuth = async (): Promise<boolean> => {
     setIsLoading(true);
     try {
+      toast.loading("Restoring your session...", { id: "auth-restore", duration: 5000 });
+      
       // Reset and reinitialize auth service
       await AuthService.resetAndReinitialize();
       
@@ -260,15 +319,48 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
       // Reload client data if needed
       if (result && AuthService.userId) {
         await loadClientData(AuthService.userId, 0);
+        toast.success("Session restored successfully");
       } else {
         setIsLoading(false);
+        toast.error("Could not restore session");
       }
       
+      toast.dismiss("auth-restore");
       return result;
     } catch (error) {
       console.error("[AuthProvider] Force refresh failed:", error);
       setIsLoading(false);
+      toast.error("Session restore failed");
+      toast.dismiss("auth-restore");
       return false;
+    }
+  };
+  
+  // Add emergency reset method for complete auth reset
+  const emergencyResetAuth = (): { success: boolean; message: string } => {
+    try {
+      // Use AuthService's emergency reset method
+      const result = AuthService.emergencyReset();
+      
+      if (result.success) {
+        // Show success toast with delay to make it visible
+        setTimeout(() => {
+          toast.success("Authentication reset complete. Reloading page...");
+        }, 500);
+        
+        // Schedule page reload after toast is shown
+        setTimeout(() => {
+          window.location.reload();
+        }, 2000);
+      } else {
+        toast.error(result.message);
+      }
+      
+      return result;
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      toast.error(`Reset failed: ${errorMessage}`);
+      return { success: false, message: errorMessage };
     }
   };
 
@@ -292,7 +384,8 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
     resetPassword,
     refreshUserData: refreshUserDataWrapper,
     hasRole: AuthService.hasRole,
-    forceRefreshAuth
+    forceRefreshAuth,
+    emergencyResetAuth
   }), [authState, isLoading, authInitialized, authError, user, userId, userRole, clientStatus, clientProfile]);
 
   return <AuthContext.Provider value={contextValue}>{children}</AuthContext.Provider>;
