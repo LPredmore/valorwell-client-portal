@@ -122,6 +122,7 @@ export interface Clinician {
   clinician_email: string | null; // Added missing field
   clinician_bio: string | null;   // Added missing field
   clinician_status: string | null; // Added missing field
+  clinician_image_url: string | null; // Added missing field to match database schema
 }
 
 export interface TabProps {

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import NewLayout from '@/components/layout/NewLayout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -409,7 +410,7 @@ const PatientDashboard = () => {
                       </div>
                     ) : (
                       <Avatar className="w-32 h-32 border border-gray-200 rounded-md">
-                        {/* Update to use the correct property for the clinician image URL */}
+                        {/* We need to check for image property that actually exists in the Clinician interface */}
                         <AvatarImage 
                           src={clinicianData?.clinician_image_url || ""} 
                           alt="Therapist" 
