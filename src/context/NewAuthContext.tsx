@@ -4,6 +4,7 @@ import AuthService, { AuthState, AuthError } from '@/services/AuthService';
 import { supabase } from '@/integrations/supabase/client';
 import { User } from '@supabase/supabase-js';
 import { DebugUtils } from '@/utils/debugUtils';
+import { toast } from 'sonner';
 
 // Types for client profile
 export interface ClientProfile {
@@ -36,13 +37,16 @@ export interface AuthContextType {
   resetPassword: (email: string) => Promise<{ success: boolean; error?: AuthError }>;
   refreshUserData: () => Promise<void>;
   hasRole: (role: string | string[]) => boolean;
+  forceRefreshAuth: () => Promise<boolean>;
 }
 
 // Create the auth context
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 // Maximum time to wait for client data loading before forcing isLoading to false
-const CLIENT_DATA_LOADING_TIMEOUT = 10000; // 10 seconds
+const CLIENT_DATA_LOADING_TIMEOUT = 15000; // 15 seconds (increased from 10s)
+const CLIENT_DATA_MAX_RETRIES = 5; // Maximum retries for loading client data (increased from 3)
+const CLIENT_DATA_RETRY_DELAY = 1500; // Delay between retries in ms (increased from 1000ms)
 
 // Provider component
 export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }) => {
@@ -60,6 +64,7 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
   const loadingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const clientDataAttempts = useRef<number>(0);
   const sessionId = useRef(DebugUtils.generateSessionId()).current;
+  const profileLoadingRef = useRef<boolean>(false);
 
   // Clear any existing timeout to prevent memory leaks
   const clearLoadingTimeout = () => {
@@ -76,8 +81,29 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
       if (isLoading) {
         DebugUtils.log(sessionId, '[AuthProvider] Safety timeout reached, forcing isLoading to false');
         setIsLoading(false);
+        
+        // If we're still waiting for client data but timeout is reached, create minimal profile
+        if (profileLoadingRef.current && AuthService.currentState === AuthState.AUTHENTICATED && AuthService.userId) {
+          DebugUtils.log(sessionId, '[AuthProvider] Client data loading timed out, creating minimal profile');
+          createMinimalProfile(AuthService.userId);
+          profileLoadingRef.current = false;
+        }
       }
     }, CLIENT_DATA_LOADING_TIMEOUT);
+  };
+
+  // Create minimal profile when we cannot load from database
+  const createMinimalProfile = (userId: string) => {
+    const minimalProfile = {
+      id: userId,
+      client_status: 'New',
+      client_is_profile_complete: false
+    };
+    
+    setClientProfile(minimalProfile as ClientProfile);
+    setClientStatus('New');
+    DebugUtils.log(sessionId, '[AuthProvider] Created minimal profile for recovery', minimalProfile);
+    toast.warning("Using limited profile data. Some features may be unavailable.");
   };
 
   // Initialize the auth context
@@ -104,6 +130,16 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
         setClientProfile(null);
         setClientStatus(null);
         setIsLoading(false); // Ensure we're not stuck in loading state when logged out
+      } else if (newState === AuthState.ERROR && AuthService.userId) {
+        // Try to use any cached data we might have
+        const minimalProfile = {
+          id: AuthService.userId,
+          client_status: 'New',
+          client_is_profile_complete: false
+        };
+        setClientProfile(minimalProfile as ClientProfile);
+        setClientStatus('New');
+        setIsLoading(false);
       }
     });
 
@@ -114,14 +150,17 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
     };
   }, [sessionId]);
 
-  // Load client data with retry mechanism
-  const loadClientData = async (userId: string | null) => {
+  // Load client data with enhanced retry mechanism
+  const loadClientData = async (userId: string | null, retryCount = 0) => {
     if (!userId) {
       setIsLoading(false);
       // CRITICAL FIX: Default to New status when no user ID
       setClientStatus('New');
       return;
     }
+    
+    // Set flag to indicate we're loading profile data
+    profileLoadingRef.current = true;
     
     // Reset safety timeout when starting to load client data
     setLoadingSafetyTimeout();
@@ -138,22 +177,15 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
       if (error) {
         DebugUtils.error(sessionId, '[AuthProvider] Error loading client data', error);
         
-        // If we get an error but have tried less than 3 times, retry after a short delay
-        if (clientDataAttempts.current < 3) {
-          DebugUtils.log(sessionId, `[AuthProvider] Retrying client data load (attempt ${clientDataAttempts.current + 1})`);
-          setTimeout(() => loadClientData(userId), 1000);
+        // If we get an error but have tried less than max retries, retry after a short delay
+        if (retryCount < CLIENT_DATA_MAX_RETRIES) {
+          DebugUtils.log(sessionId, `[AuthProvider] Retrying client data load (attempt ${retryCount + 1})`);
+          setTimeout(() => loadClientData(userId, retryCount + 1), CLIENT_DATA_RETRY_DELAY);
           return;
         }
         
         // Create a minimum profile with just the ID to prevent issues
-        const minimalProfile = {
-          id: userId,
-          client_status: 'New'
-        };
-        
-        setClientProfile(minimalProfile as ClientProfile);
-        setClientStatus('New');
-        DebugUtils.log(sessionId, '[AuthProvider] Setting minimal client profile after failed retrieval', minimalProfile);
+        createMinimalProfile(userId);
       } else if (data) {
         DebugUtils.log(sessionId, '[AuthProvider] Client data loaded', data);
         setClientProfile(data as ClientProfile);
@@ -166,45 +198,77 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
       } else {
         // CRITICAL FIX: No data returned but no error either (unusual case)
         // Create a minimum profile with just the ID
-        const minimalProfile = {
-          id: userId,
-          client_status: 'New'
-        };
-        
-        setClientProfile(minimalProfile as ClientProfile);
-        setClientStatus('New');
-        DebugUtils.log(sessionId, '[AuthProvider] No client data found, setting minimal profile', minimalProfile);
+        createMinimalProfile(userId);
       }
     } catch (err) {
       DebugUtils.error(sessionId, '[AuthProvider] Exception loading client data', err);
       
-      // CRITICAL FIX: Create minimal profile on any kind of error
-      const minimalProfile = {
-        id: userId,
-        client_status: 'New'
-      };
+      // Retry if we haven't exceeded max retries
+      if (retryCount < CLIENT_DATA_MAX_RETRIES) {
+        setTimeout(() => loadClientData(userId, retryCount + 1), CLIENT_DATA_RETRY_DELAY);
+        return;
+      }
       
-      setClientProfile(minimalProfile as ClientProfile);
-      setClientStatus('New');
-      DebugUtils.log(sessionId, '[AuthProvider] Exception occurred, setting minimal profile', minimalProfile);
+      // CRITICAL FIX: Create minimal profile on any kind of error
+      createMinimalProfile(userId);
     } finally {
       // Always set isLoading to false when client data loading completes or fails
-      DebugUtils.log(sessionId, '[AuthProvider] Client data loading complete, setting isLoading to false');
-      setIsLoading(false);
-      clearLoadingTimeout();
-      clientDataAttempts.current = 0;
+      // And reset the profile loading flag
+      if (retryCount >= CLIENT_DATA_MAX_RETRIES || !profileLoadingRef.current) {
+        DebugUtils.log(sessionId, '[AuthProvider] Client data loading complete, setting isLoading to false');
+        setIsLoading(false);
+        clearLoadingTimeout();
+        clientDataAttempts.current = 0;
+        profileLoadingRef.current = false;
+      }
     }
   };
 
   // Match the refreshUserData return type with the interface
   const refreshUserDataWrapper = async (): Promise<void> => {
     DebugUtils.log(sessionId, '[AuthProvider] Manually refreshing user data');
-    await AuthService.refreshSession();
-    // After refreshing the session, explicitly reload client data
+    setIsLoading(true); // Set loading state during refresh
+    
+    // First refresh the auth session
+    const sessionRefreshed = await AuthService.refreshSession();
+    
+    // Then explicitly reload client data
     if (userId) {
       clientDataAttempts.current = 0; // Reset attempts counter
       await loadClientData(userId);
       DebugUtils.log(sessionId, '[AuthProvider] Client data explicitly reloaded after session refresh');
+    } else {
+      setIsLoading(false); // Ensure we're not stuck in loading state if no userId
+    }
+    
+    // If session refresh failed but we have userId, try to create minimal profile
+    if (!sessionRefreshed && userId) {
+      createMinimalProfile(userId);
+    }
+  };
+
+  // Add a method to force refresh auth - useful for recovery UI
+  const forceRefreshAuth = async (): Promise<boolean> => {
+    setIsLoading(true);
+    try {
+      // Reset and reinitialize auth service
+      await AuthService.resetAndReinitialize();
+      
+      // Force refresh session
+      const result = await AuthService.forceRefreshSession();
+      
+      // Reload client data if needed
+      if (result && AuthService.userId) {
+        await loadClientData(AuthService.userId, 0);
+      } else {
+        setIsLoading(false);
+      }
+      
+      return result;
+    } catch (error) {
+      console.error("[AuthProvider] Force refresh failed:", error);
+      setIsLoading(false);
+      return false;
     }
   };
 
@@ -227,7 +291,8 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
     logout,
     resetPassword,
     refreshUserData: refreshUserDataWrapper,
-    hasRole: AuthService.hasRole
+    hasRole: AuthService.hasRole,
+    forceRefreshAuth
   }), [authState, isLoading, authInitialized, authError, user, userId, userRole, clientStatus, clientProfile]);
 
   return <AuthContext.Provider value={contextValue}>{children}</AuthContext.Provider>;

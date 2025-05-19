@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { Session, User } from '@supabase/supabase-js';
 
@@ -23,9 +24,9 @@ interface AuthSession {
 }
 
 const AUTH_STORAGE_KEY = 'auth_session_cache';
-const AUTH_TIMEOUT = 90000; // 90 seconds timeout for auth operations (increased from 45s)
-const SESSION_EXPIRY_BUFFER = 900000; // 15 minutes buffer before actual expiry (increased from 10m)
-const MAX_RETRIES = 3; // Maximum number of retries for auth operations
+const AUTH_TIMEOUT = 120000; // 120 seconds timeout for auth operations (increased from 90s)
+const SESSION_EXPIRY_BUFFER = 1200000; // 20 minutes buffer before actual expiry (increased from 15m)
+const MAX_RETRIES = 4; // Maximum number of retries for auth operations (increased from 3)
 
 class AuthService {
   private static instance: AuthService;
@@ -34,6 +35,7 @@ class AuthService {
   private _sessionData: AuthSession | null = null;
   private _error: AuthError | null = null;
   private _initialCheckComplete = false;
+  private _networkErrorDetected = false;
 
   // Singleton pattern
   public static getInstance(): AuthService {
@@ -53,9 +55,27 @@ class AuthService {
     
     // Perform initial session check with timeout
     this.performInitialSessionCheck();
+    
+    // Add network status listener to help with recovery
+    this.setupNetworkStatusListeners();
   }
   
-  // Restore session from local storage if available
+  // Add network status monitoring to help with recovery
+  private setupNetworkStatusListeners(): void {
+    // Monitor for online/offline events to help with recovery
+    window.addEventListener('online', this.handleNetworkRecovery.bind(this));
+  }
+  
+  // Handle network recovery when connection is restored
+  private async handleNetworkRecovery(): Promise<void> {
+    if (this._networkErrorDetected && this._currentState === AuthState.ERROR) {
+      console.log('[AuthService] Network connection restored, attempting session recovery');
+      this._networkErrorDetected = false;
+      await this.refreshSession();
+    }
+  }
+  
+  // Restore session from local storage if available with enhanced validation
   private restoreSessionFromStorage(): void {
     try {
       const storedData = localStorage.getItem(AUTH_STORAGE_KEY);
@@ -63,8 +83,15 @@ class AuthService {
       
       const parsedData = JSON.parse(storedData) as AuthSession;
       
+      // Enhanced validation of stored session data
+      if (!parsedData.user?.id || !parsedData.session?.access_token) {
+        console.log('[AuthService] Stored session data incomplete or invalid, removing');
+        localStorage.removeItem(AUTH_STORAGE_KEY);
+        return;
+      }
+      
       // Only use cached data if it hasn't expired (with buffer time)
-      // Add a 5-minute buffer to ensure we don't use a session that's about to expire
+      // Add a buffer time to ensure we don't use a session that's about to expire
       if (parsedData.expiresAt && parsedData.expiresAt > (Date.now() + SESSION_EXPIRY_BUFFER)) {
         console.log('[AuthService] Restored session from storage');
         this._sessionData = parsedData;
@@ -85,43 +112,52 @@ class AuthService {
     }
   }
   
-  // Set up Supabase auth listener
+  // Set up Supabase auth listener with more robust error handling
   private setupAuthStateListener(): void {
-    supabase.auth.onAuthStateChange((event, session) => {
-      console.log(`[AuthService] Auth state changed: ${event}`);
-      
-      switch (event) {
-        case 'SIGNED_IN':
-        case 'TOKEN_REFRESHED':
-        case 'USER_UPDATED':
-          if (session) {
-            this.handleSuccessfulAuth(session);
-            
-            // Schedule next refresh before token expires
-            if (session.expires_at) {
-              const expiresIn = (session.expires_at * 1000) - Date.now();
-              const refreshTime = expiresIn - SESSION_EXPIRY_BUFFER;
+    try {
+      supabase.auth.onAuthStateChange((event, session) => {
+        console.log(`[AuthService] Auth state changed: ${event}`);
+        
+        switch (event) {
+          case 'SIGNED_IN':
+          case 'TOKEN_REFRESHED':
+          case 'USER_UPDATED':
+            if (session) {
+              this.handleSuccessfulAuth(session);
               
-              if (refreshTime > 0) {
-                console.log(`[AuthService] Scheduling refresh in ${refreshTime}ms`);
-                setTimeout(() => this.refreshSession(), refreshTime);
+              // Schedule next refresh before token expires
+              if (session.expires_at) {
+                const expiresIn = (session.expires_at * 1000) - Date.now();
+                const refreshTime = expiresIn - SESSION_EXPIRY_BUFFER;
+                
+                if (refreshTime > 0) {
+                  console.log(`[AuthService] Scheduling refresh in ${refreshTime}ms`);
+                  setTimeout(() => this.refreshSession(), refreshTime);
+                } else {
+                  // If token is already close to expiry, refresh immediately
+                  console.log('[AuthService] Token close to expiry, refreshing immediately');
+                  this.refreshSession();
+                }
               }
             }
-          }
-          break;
-          
-        case 'SIGNED_OUT':
-          this.handleSignOut();
-          break;
-          
-        case 'PASSWORD_RECOVERY':
-          // Handle password recovery if needed
-          break;
-          
-        default:
-          console.log(`[AuthService] Unhandled auth event: ${event}`);
-      }
-    });
+            break;
+            
+          case 'SIGNED_OUT':
+            this.handleSignOut();
+            break;
+            
+          case 'PASSWORD_RECOVERY':
+            // Handle password recovery if needed
+            break;
+            
+          default:
+            console.log(`[AuthService] Unhandled auth event: ${event}`);
+        }
+      });
+    } catch (error) {
+      console.error('[AuthService] Error setting up auth listener:', error);
+      // Even if listener setup fails, continue with initial session check
+    }
   }
   
   // Initial auth check with improved timeout protection and fallback mechanisms
@@ -131,10 +167,23 @@ class AuthService {
     try {
       console.log('[AuthService] Starting initial session check');
       
-      // Check network connectivity first
+      // Check network connectivity first with more detailed logging
       if (!navigator.onLine) {
-        console.warn('[AuthService] Network appears to be offline');
+        console.warn('[AuthService] Network appears to be offline, will use cached data if available');
+        this._networkErrorDetected = true;
         throw new Error('Network connectivity issue detected');
+      }
+      
+      // Pre-emptively load cached data as fallback
+      const storedData = localStorage.getItem(AUTH_STORAGE_KEY);
+      let cachedSession = null;
+      if (storedData) {
+        try {
+          cachedSession = JSON.parse(storedData);
+          console.log('[AuthService] Found cached session as fallback');
+        } catch (e) {
+          console.error('[AuthService] Error parsing stored session:', e);
+        }
       }
       
       // Use Promise.race with a more generous timeout
@@ -211,7 +260,21 @@ class AuthService {
                 return;
               } else {
                 console.log('[AuthService] User found but could not refresh session');
-                this._currentState = AuthState.UNAUTHENTICATED;
+                
+                // Last resort: use the user data we have to create a minimal session state
+                this._sessionData = {
+                  user: userData.user,
+                  session: null,
+                  role: userData.user.user_metadata?.role || 'client'
+                };
+                
+                this._currentState = AuthState.AUTHENTICATED;
+                this._error = {
+                  message: 'Partial authentication - limited functionality available',
+                  code: 'PARTIAL_AUTH'
+                };
+                
+                this.notifyListeners();
                 return;
               }
             } else {
@@ -223,10 +286,13 @@ class AuthService {
             console.error(`[AuthService] Fallback attempt ${attempt} failed:`, retryError);
             lastError = retryError;
             
-            // Wait before retrying (exponential backoff)
+            // Wait before retrying (exponential backoff with jitter)
             if (attempt < MAX_RETRIES) {
-              const delay = Math.pow(2, attempt) * 1000; // 2s, 4s, 8s
-              console.log(`[AuthService] Waiting ${delay}ms before next attempt`);
+              const baseDelay = Math.pow(2, attempt) * 1000; // 2s, 4s, 8s, 16s
+              const jitter = Math.random() * 1000; // Add up to 1s of random jitter
+              const delay = baseDelay + jitter;
+              
+              console.log(`[AuthService] Waiting ${Math.round(delay)}ms before next attempt`);
               await new Promise(resolve => setTimeout(resolve, delay));
             }
           }
@@ -236,11 +302,19 @@ class AuthService {
         throw lastError;
       } catch (fallbackError) {
         console.error('[AuthService] All fallback mechanisms failed:', fallbackError);
+        
+        // Mark network error for future recovery attempts
+        if (!navigator.onLine || fallbackError.message?.includes('network') || 
+            fallbackError.message?.includes('timeout') || fallbackError.originalError?.message?.includes('fetch')) {
+          this._networkErrorDetected = true;
+        }
+        
         // Even if there's an error, still mark initialization as complete
         this._currentState = AuthState.ERROR;
         this._error = {
-          message: 'Authentication check failed after multiple attempts. Please check your network connection and try refreshing the page.',
-          originalError: error
+          message: 'Authentication check failed. Please check your network connection and try refreshing the page.',
+          originalError: fallbackError,
+          code: 'AUTH_INIT_FAILED'
         };
       }
     } finally {
@@ -310,7 +384,7 @@ class AuthService {
     }
   }
   
-  // Persist session data to local storage with validation
+  // Persist session data to local storage with enhanced validation
   private saveSessionToStorage(user: User | null, session: Session | null, role?: string | null): void {
     try {
       if (user && session) {
@@ -634,6 +708,12 @@ class AuthService {
         originalError: error
       };
       
+      // Update network error detection flag if appropriate
+      if (!navigator.onLine || error.message?.includes('network') || 
+          error.message?.includes('timeout')) {
+        this._networkErrorDetected = true;
+      }
+      
       // If we can't refresh, assume session is invalid
       this._currentState = AuthState.UNAUTHENTICATED;
       this.saveSessionToStorage(null, null);
@@ -641,6 +721,35 @@ class AuthService {
       
       return false;
     }
+  }
+  
+  // New method to check cached authentication details
+  public hasCachedAuthenticationData(): boolean {
+    try {
+      const storedData = localStorage.getItem(AUTH_STORAGE_KEY);
+      if (!storedData) return false;
+      
+      const parsedData = JSON.parse(storedData) as AuthSession;
+      return !!parsedData.user?.id;
+    } catch (e) {
+      return false;
+    }
+  }
+  
+  // Expose a method for direct force refresh for components to use when needed
+  public async forceRefreshSession(): Promise<boolean> {
+    console.log('[AuthService] Force refreshing session');
+    return this.refreshSession(1);
+  }
+  
+  // Public method to force re-initialization (useful for recovery options)
+  public async resetAndReinitialize(): Promise<void> {
+    this._initialCheckComplete = false;
+    this._currentState = AuthState.INITIALIZING;
+    this._error = null;
+    this.notifyListeners();
+    
+    await this.performInitialSessionCheck();
   }
 }
 
