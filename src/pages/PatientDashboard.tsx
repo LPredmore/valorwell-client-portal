@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import NewLayout from '@/components/layout/NewLayout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -18,18 +19,37 @@ import { supabase } from '@/integrations/supabase/client';
 import { TimeZoneService } from '@/utils/timeZoneService';
 import { Appointment } from '@/types/appointment';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { useClinicianData } from '@/hooks/useClinicianData';
 
 const PatientDashboard = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('dashboard');
   const { clientStatus, authState, isLoading, clientProfile, userId } = useAuth();
   const [isBookingDialogOpen, setIsBookingDialogOpen] = useState(false);
+  const [loadingTimeoutReached, setLoadingTimeoutReached] = useState(false);
   
   // New states for appointments
   const [upcomingAppointments, setUpcomingAppointments] = useState<Appointment[]>([]);
   const [todayAppointments, setTodayAppointments] = useState<Appointment[]>([]);
   const [isLoadingAppointments, setIsLoadingAppointments] = useState(false);
   const [appointmentError, setAppointmentError] = useState<Error | null>(null);
+  
+  // Add state for clinician data
+  const { clinicianData, isLoading: isClinicianLoading } = useClinicianData(
+    clientProfile?.client_assigned_therapist || undefined
+  );
+  
+  // Set up loading timeout effect
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (isLoading) {
+        setLoadingTimeoutReached(true);
+      }
+    }, 10000); // Show timeout message after 10 seconds
+    
+    return () => clearTimeout(timer);
+  }, [isLoading]);
   
   // IMMEDIATE REDIRECTION: Run this effect first and with highest priority
   // This will run as soon as the component mounts, before any other effects
@@ -230,7 +250,7 @@ const PatientDashboard = () => {
         <Loader2 className="h-12 w-12 animate-spin text-blue-500 mb-4" />
         <p className="text-gray-600">Loading your dashboard...</p>
         
-        {showLoadingTimeout && (
+        {loadingTimeoutReached && (
           <div className="mt-6 text-center max-w-md px-4">
             <p className="text-amber-600 mb-2">This is taking longer than expected.</p>
             <p className="text-gray-600 mb-4">There might be an issue with your connection.</p>
@@ -383,14 +403,45 @@ const PatientDashboard = () => {
                 </CardHeader>
                 <CardContent className="pt-2">
                   <div className="flex items-start gap-4">
-                    <img 
-                      src="/lovable-uploads/d25ee8dc-45f2-4bb9-aaa0-8115fc74374e.png" 
-                      alt="Therapist" 
-                      className="w-32 h-32 object-cover rounded-md"
-                    />
+                    {/* Use Avatar component with clinician image */}
+                    {isClinicianLoading ? (
+                      <div className="w-32 h-32 flex items-center justify-center bg-gray-100 rounded-md">
+                        <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+                      </div>
+                    ) : (
+                      <Avatar className="w-32 h-32 border border-gray-200 rounded-md">
+                        {clinicianData?.clinician_image_url ? (
+                          <AvatarImage 
+                            src={clinicianData.clinician_image_url} 
+                            alt="Therapist" 
+                            className="object-cover w-full h-full rounded-md"
+                          />
+                        ) : (
+                          <AvatarFallback className="w-full h-full text-2xl bg-blue-100 text-blue-800 rounded-md">
+                            {clinicianData?.clinician_first_name?.[0] || ''}{clinicianData?.clinician_last_name?.[0] || ''}
+                          </AvatarFallback>
+                        )}
+                      </Avatar>
+                    )}
                     <div>
-                      <h3 className="font-semibold mb-2">About NotReal Therapist, LPC</h3>
-                      <p className="text-gray-700">I'm here to help people be awesome and cool</p>
+                      <h3 className="font-semibold mb-2">
+                        {isClinicianLoading ? (
+                          "Loading therapist information..."
+                        ) : clinicianData ? (
+                          `About ${clinicianData.clinician_first_name || ''} ${clinicianData.clinician_last_name || ''}, ${clinicianData.clinician_license_type || 'Therapist'}`
+                        ) : (
+                          "No assigned therapist"
+                        )}
+                      </h3>
+                      <p className="text-gray-700">
+                        {isClinicianLoading ? (
+                          <span className="text-gray-400">Loading bio...</span>
+                        ) : clinicianData?.clinician_bio ? (
+                          clinicianData.clinician_bio
+                        ) : (
+                          "No therapist bio available"
+                        )}
+                      </p>
                     </div>
                   </div>
                 </CardContent>
