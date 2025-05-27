@@ -24,6 +24,17 @@ import SignupLast from '@/components/signup/SignupLast';
 import { useAuth } from '@/context/NewAuthContext';
 import { parseDateString, calculateAge, formatDateForDB } from '@/utils/dateUtils';
 
+// Custom timezone options - only US timezones
+const customTimezoneOptions = [
+  { value: "America/New_York", label: "Eastern Time (ET) - New York" },
+  { value: "America/Chicago", label: "Central Time (CT) - Chicago" },
+  { value: "America/Denver", label: "Mountain Time (MT) - Denver" },
+  { value: "America/Los_Angeles", label: "Pacific Time (PT) - Los Angeles" },
+  { value: "America/Anchorage", label: "Alaska Time (AKT) - Anchorage" },
+  { value: "Pacific/Honolulu", label: "Hawaii-Aleutian Time (HST) - Honolulu" },
+  { value: "America/Phoenix", label: "Mountain Time - Arizona (no DST)" },
+];
+
 type ClientFormData = {
   client_first_name?: string;
   client_last_name?: string;
@@ -267,7 +278,7 @@ const ProfileSetup = () => {
       console.log(`[ProfileSetup] Time zone value before processing:`, value);
       // If the value is a label (like "Eastern Time (ET) - New York"), extract the IANA value
       if (value && typeof value === 'string') {
-        const tzOption = timezoneOptions.find(tz => tz.label === value);
+        const tzOption = customTimezoneOptions.find(tz => tz.label === value);
         if (tzOption) {
           valueToSave = tzOption.value; // Use the IANA identifier (e.g., "America/New_York")
           console.log(`[ProfileSetup] Converted time zone label to IANA value:`, valueToSave);
@@ -475,7 +486,7 @@ const ProfileSetup = () => {
         client_gender_identity: clientRecord.client_gender_identity || '',
         client_state: clientRecord.client_state || '',
         client_address: clientRecord.client_address || '', // Added address field
-        client_city: clientRecord.client_city || '', // Added city field
+        client_city: clientRecord.client_city || '', // Added city field 
         client_zip_code: clientRecord.client_zip_code || '', // Added zip code field
         client_time_zone: clientRecord.client_time_zone || '',
         client_vacoverage: clientRecord.client_vacoverage || '',
@@ -585,7 +596,7 @@ const ProfileSetup = () => {
         
         // If it's a label, convert to IANA value
         let ianaTimeZone = timeZoneValue;
-        const tzOption = timezoneOptions.find(tz => tz.label === timeZoneValue);
+        const tzOption = customTimezoneOptions.find(tz => tz.label === timeZoneValue);
         if (tzOption) {
           ianaTimeZone = tzOption.value;
           console.log(`[ProfileSetup] Step 2 Save - Converted time zone to IANA: ${ianaTimeZone}`);
@@ -852,23 +863,23 @@ const ProfileSetup = () => {
               onValueCommit={(name, value) => handleImmediateSave(name as keyof ProfileFormValues, value)}
             />
             
-            {/* Updated Time Zone field with explicit value and label mapping */}
+            {/* Updated Time Zone field with custom US-only timezone options */}
             <FormFieldWrapper 
               control={form.control} 
               name="client_time_zone" 
               label="Time Zone" 
               type="select" 
-              options={timezoneOptions.map(tz => tz.label)} 
+              options={customTimezoneOptions.map(tz => tz.label)} 
               valueMapper={(label) => {
                 // Convert label to IANA value
-                const option = timezoneOptions.find(tz => tz.label === label);
+                const option = customTimezoneOptions.find(tz => tz.label === label);
                 const value = option ? option.value : '';
                 console.log(`[ProfileSetup] Time zone valueMapper - label: ${label}, mapped to: ${value}`);
                 return value;
               }} 
               labelMapper={(value) => {
                 // Convert IANA value to label
-                const option = timezoneOptions.find(tz => tz.value === value);
+                const option = customTimezoneOptions.find(tz => tz.value === value);
                 const label = option ? option.label : value;
                 console.log(`[ProfileSetup] Time zone labelMapper - value: ${value}, mapped to: ${label}`);
                 return label;
