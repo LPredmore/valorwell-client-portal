@@ -1,4 +1,3 @@
-
 import React, { Suspense } from "react";
 import { Toaster } from "sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -19,7 +18,7 @@ import PatientDashboard from "./pages/PatientDashboard";
 import PatientDocuments from "./pages/PatientDocuments";
 import ProfileSetup from "./pages/ProfileSetup";
 import TherapistSelection from "./pages/TherapistSelection";
-import ResetPassword from "./pages/ResetPassword";
+import ResetPasswordEnhanced from "./pages/ResetPasswordEnhanced";
 import UpdatePassword from "./pages/UpdatePassword";
 import AuthDebugPage from "./pages/AuthDebugPage";
 import PatientProfile from "./pages/PatientProfile";
@@ -78,7 +77,7 @@ function App() {
                     <Route path="/" element={<Index />} />
                     <Route path="/login" element={<Login />} />
                     <Route path="/signup" element={<Signup />} />
-                    <Route path="/reset-password" element={<ResetPassword />} />
+                    <Route path="/reset-password" element={<ResetPasswordEnhanced />} />
                     <Route path="/update-password" element={<UpdatePassword />} />
                     
                     {/* Profile setup - accessible for all client roles including New */}

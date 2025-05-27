@@ -10,6 +10,7 @@ import { useAuth, AuthState } from '@/context/NewAuthContext';
 import { AlertCircle, Loader2, Bug } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { DebugUtils } from "@/utils/debugUtils";
+import ForgotPasswordDialogEnhanced from "@/components/auth/ForgotPasswordDialogEnhanced";
 
 const Login = () => {
   const navigate = useNavigate();
@@ -20,6 +21,7 @@ const Login = () => {
   const [error, setError] = useState<string | null>(null);
   const [loginTimeout, setLoginTimeout] = useState<NodeJS.Timeout | null>(null);
   const [showDebug, setShowDebug] = useState(false);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
   const sessionId = useRef(DebugUtils.generateSessionId()).current;
   
   // Reset form state when auth state changes
@@ -185,13 +187,20 @@ const Login = () => {
               />
             </div>
             
-            <div className="text-right">
+            <div className="flex justify-between items-center">
               <button 
                 type="button"
-                onClick={() => navigate("/reset-password")}
+                onClick={() => setShowForgotPassword(true)}
                 className="text-sm text-blue-500 hover:text-blue-700"
               >
                 Forgot password?
+              </button>
+              <button 
+                type="button"
+                onClick={() => navigate("/reset-password")}
+                className="text-sm text-green-600 hover:text-green-800 font-medium"
+              >
+                Enhanced Reset
               </button>
             </div>
             
@@ -253,15 +262,22 @@ const Login = () => {
             </button>
           </p>
           <p className="text-center text-sm text-gray-500">
+            Having trouble with password reset?{" "}
             <button 
               onClick={() => navigate("/reset-password")} 
-              className="text-blue-500 hover:text-blue-700 font-medium"
+              className="text-green-600 hover:text-green-800 font-medium"
             >
-              Reset password
+              Try Enhanced Reset
             </button>
           </p>
         </CardFooter>
       </Card>
+
+      {/* Enhanced Forgot Password Dialog */}
+      <ForgotPasswordDialogEnhanced
+        isOpen={showForgotPassword}
+        onOpenChange={setShowForgotPassword}
+      />
     </div>
   );
 };
