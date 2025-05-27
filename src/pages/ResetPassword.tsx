@@ -1,3 +1,4 @@
+
 import { useState, useRef, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
@@ -27,7 +28,6 @@ const ResetPassword = () => {
     };
   }, []);
 
-  // THIS IS THE ONLY handleResetPassword YOU NEED:
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
@@ -41,9 +41,8 @@ const ResetPassword = () => {
     try {
       setIsLoading(true);
 
-      // 👇 Use your preview client portal for the reset redirect
-      const redirectTo = "https://preview--valorwell-client-portal.lovable.app/update-password";
-      // (Change this to your production domain when you launch!)
+      // Use the correct production redirect URL
+      const redirectTo = "https://clients.valorwell.org/update-password";
 
       // Optional: timeout for slow network
       if (timeoutRef.current) {
@@ -59,7 +58,7 @@ const ResetPassword = () => {
         }
       }, 15000) as unknown as number;
 
-      // 🔥 The magic call
+      // The magic call
       const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
 
       // Clear timeout since we got a response

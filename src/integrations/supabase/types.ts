@@ -86,11 +86,59 @@ export type Database = {
           },
         ]
       }
+      appointment_templates: {
+        Row: {
+          color: string | null
+          created_at: string
+          default_notes: string | null
+          default_status: string
+          default_type: string
+          description: string | null
+          duration: number
+          id: string
+          is_default: boolean | null
+          name: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string
+          default_notes?: string | null
+          default_status?: string
+          default_type?: string
+          description?: string | null
+          duration: number
+          id?: string
+          is_default?: boolean | null
+          name: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          color?: string | null
+          created_at?: string
+          default_notes?: string | null
+          default_status?: string
+          default_type?: string
+          description?: string | null
+          duration?: number
+          id?: string
+          is_default?: boolean | null
+          name?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       appointments: {
         Row: {
           appointment_recurring: string | null
+          appointment_timezone: Database["public"]["Enums"]["time_zones"] | null
           billed_amount: number | null
           billing_notes: string | null
+          buffer_after: number | null
+          buffer_before: number | null
           claim_claimmd_batch_id: string | null
           claim_claimmd_id: string | null
           claim_last_submission_date: string | null
@@ -107,11 +155,16 @@ export type Database = {
           era_check_eft_number: string | null
           era_claimmd_id: string | null
           era_payment_date: string | null
+          flexibility_window: Json | null
+          google_calendar_event_id: string | null
           id: string
           insurance_adjustment_amount: number | null
           insurance_adjustment_details_json: Json | null
           insurance_paid_amount: number | null
+          is_flexible: boolean | null
+          last_real_time_update: string | null
           last_statement_to_patient_date: string | null
+          last_synced_at: string | null
           modifiers: string[] | null
           notes: string | null
           patient_paid_amount: number | null
@@ -119,19 +172,27 @@ export type Database = {
           patient_payment_status: string | null
           patient_responsibility_amount: number | null
           place_of_service_code: string | null
+          priority: number | null
+          real_time_update_source: string | null
           recurring_group_id: string | null
           requires_billing_review: boolean | null
           start_at: string
           status: string
           stripe_charge_ids: string[] | null
+          template_id: string | null
           type: string
           updated_at: string
           video_room_url: string | null
         }
         Insert: {
           appointment_recurring?: string | null
+          appointment_timezone?:
+            | Database["public"]["Enums"]["time_zones"]
+            | null
           billed_amount?: number | null
           billing_notes?: string | null
+          buffer_after?: number | null
+          buffer_before?: number | null
           claim_claimmd_batch_id?: string | null
           claim_claimmd_id?: string | null
           claim_last_submission_date?: string | null
@@ -148,11 +209,16 @@ export type Database = {
           era_check_eft_number?: string | null
           era_claimmd_id?: string | null
           era_payment_date?: string | null
+          flexibility_window?: Json | null
+          google_calendar_event_id?: string | null
           id?: string
           insurance_adjustment_amount?: number | null
           insurance_adjustment_details_json?: Json | null
           insurance_paid_amount?: number | null
+          is_flexible?: boolean | null
+          last_real_time_update?: string | null
           last_statement_to_patient_date?: string | null
+          last_synced_at?: string | null
           modifiers?: string[] | null
           notes?: string | null
           patient_paid_amount?: number | null
@@ -160,19 +226,27 @@ export type Database = {
           patient_payment_status?: string | null
           patient_responsibility_amount?: number | null
           place_of_service_code?: string | null
+          priority?: number | null
+          real_time_update_source?: string | null
           recurring_group_id?: string | null
           requires_billing_review?: boolean | null
           start_at: string
           status?: string
           stripe_charge_ids?: string[] | null
+          template_id?: string | null
           type: string
           updated_at?: string
           video_room_url?: string | null
         }
         Update: {
           appointment_recurring?: string | null
+          appointment_timezone?:
+            | Database["public"]["Enums"]["time_zones"]
+            | null
           billed_amount?: number | null
           billing_notes?: string | null
+          buffer_after?: number | null
+          buffer_before?: number | null
           claim_claimmd_batch_id?: string | null
           claim_claimmd_id?: string | null
           claim_last_submission_date?: string | null
@@ -189,11 +263,16 @@ export type Database = {
           era_check_eft_number?: string | null
           era_claimmd_id?: string | null
           era_payment_date?: string | null
+          flexibility_window?: Json | null
+          google_calendar_event_id?: string | null
           id?: string
           insurance_adjustment_amount?: number | null
           insurance_adjustment_details_json?: Json | null
           insurance_paid_amount?: number | null
+          is_flexible?: boolean | null
+          last_real_time_update?: string | null
           last_statement_to_patient_date?: string | null
+          last_synced_at?: string | null
           modifiers?: string[] | null
           notes?: string | null
           patient_paid_amount?: number | null
@@ -201,11 +280,14 @@ export type Database = {
           patient_payment_status?: string | null
           patient_responsibility_amount?: number | null
           place_of_service_code?: string | null
+          priority?: number | null
+          real_time_update_source?: string | null
           recurring_group_id?: string | null
           requires_billing_review?: boolean | null
           start_at?: string
           status?: string
           stripe_charge_ids?: string[] | null
+          template_id?: string | null
           type?: string
           updated_at?: string
           video_room_url?: string | null
@@ -223,6 +305,13 @@ export type Database = {
             columns: ["clinician_id"]
             isOneToOne: false
             referencedRelation: "clinicians"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointments_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "appointment_templates"
             referencedColumns: ["id"]
           },
         ]
@@ -1180,11 +1269,13 @@ export type Database = {
           clinician_temppassword: string | null
           clinician_time_granularity: string | null
           clinician_time_zone: string | null
-          clinician_timezone: string[] | null
+          clinician_timezone: Database["public"]["Enums"]["time_zones"][] | null
           clinician_treatment_approaches: string[] | null
           clinician_type: string | null
           created_at: string
           id: string
+          last_google_sync: string | null
+          profile_id: string | null
           updated_at: string
         }
         Insert: {
@@ -1273,11 +1364,15 @@ export type Database = {
           clinician_temppassword?: string | null
           clinician_time_granularity?: string | null
           clinician_time_zone?: string | null
-          clinician_timezone?: string[] | null
+          clinician_timezone?:
+            | Database["public"]["Enums"]["time_zones"][]
+            | null
           clinician_treatment_approaches?: string[] | null
           clinician_type?: string | null
           created_at?: string
           id: string
+          last_google_sync?: string | null
+          profile_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -1366,11 +1461,15 @@ export type Database = {
           clinician_temppassword?: string | null
           clinician_time_granularity?: string | null
           clinician_time_zone?: string | null
-          clinician_timezone?: string[] | null
+          clinician_timezone?:
+            | Database["public"]["Enums"]["time_zones"][]
+            | null
           clinician_treatment_approaches?: string[] | null
           clinician_type?: string | null
           created_at?: string
           id?: string
+          last_google_sync?: string | null
+          profile_id?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -1589,6 +1688,7 @@ export type Database = {
           details: Json | null
           id: number
           migration_name: string
+          status: string
         }
         Insert: {
           created_at?: string | null
@@ -1596,6 +1696,7 @@ export type Database = {
           details?: Json | null
           id?: number
           migration_name: string
+          status?: string
         }
         Update: {
           created_at?: string | null
@@ -1603,6 +1704,7 @@ export type Database = {
           details?: Json | null
           id?: number
           migration_name?: string
+          status?: string
         }
         Relationships: []
       }
@@ -1716,6 +1818,90 @@ export type Database = {
           practice_taxonomy?: string | null
           practice_zip?: string | null
           updated_at?: string
+        }
+        Relationships: []
+      }
+      real_time_notifications: {
+        Row: {
+          created_at: string
+          entity_id: string | null
+          entity_type: string | null
+          id: string
+          is_read: boolean | null
+          message: string
+          type: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string | null
+          id?: string
+          is_read?: boolean | null
+          message: string
+          type: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string | null
+          id?: string
+          is_read?: boolean | null
+          message?: string
+          type?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      scheduling_preferences: {
+        Row: {
+          allow_concurrent_appointments: boolean | null
+          auto_confirm_threshold: number | null
+          buffer_between_appointments: number | null
+          created_at: string
+          default_appointment_duration: number | null
+          enable_real_time_updates: boolean | null
+          id: string
+          max_daily_appointments: number | null
+          real_time_notification_preferences: Json | null
+          timezone: string
+          updated_at: string
+          user_id: string
+          working_hours: Json | null
+        }
+        Insert: {
+          allow_concurrent_appointments?: boolean | null
+          auto_confirm_threshold?: number | null
+          buffer_between_appointments?: number | null
+          created_at?: string
+          default_appointment_duration?: number | null
+          enable_real_time_updates?: boolean | null
+          id?: string
+          max_daily_appointments?: number | null
+          real_time_notification_preferences?: Json | null
+          timezone?: string
+          updated_at?: string
+          user_id: string
+          working_hours?: Json | null
+        }
+        Update: {
+          allow_concurrent_appointments?: boolean | null
+          auto_confirm_threshold?: number | null
+          buffer_between_appointments?: number | null
+          created_at?: string
+          default_appointment_duration?: number | null
+          enable_real_time_updates?: boolean | null
+          id?: string
+          max_daily_appointments?: number | null
+          real_time_notification_preferences?: Json | null
+          timezone?: string
+          updated_at?: string
+          user_id?: string
+          working_hours?: Json | null
         }
         Relationships: []
       }
@@ -2038,6 +2224,56 @@ export type Database = {
         }
         Relationships: []
       }
+      synced_events: {
+        Row: {
+          clinician_id: string
+          created_at: string | null
+          display_title: string | null
+          end_at: string
+          google_calendar_event_id: string | null
+          id: string
+          is_busy: boolean | null
+          original_description: string | null
+          original_title: string | null
+          start_at: string
+          updated_at: string | null
+        }
+        Insert: {
+          clinician_id: string
+          created_at?: string | null
+          display_title?: string | null
+          end_at: string
+          google_calendar_event_id?: string | null
+          id?: string
+          is_busy?: boolean | null
+          original_description?: string | null
+          original_title?: string | null
+          start_at: string
+          updated_at?: string | null
+        }
+        Update: {
+          clinician_id?: string
+          created_at?: string | null
+          display_title?: string | null
+          end_at?: string
+          google_calendar_event_id?: string | null
+          id?: string
+          is_busy?: boolean | null
+          original_description?: string | null
+          original_title?: string | null
+          start_at?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "synced_events_clinician_id_fkey"
+            columns: ["clinician_id"]
+            isOneToOne: false
+            referencedRelation: "clinicians"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       system_settings: {
         Row: {
           created_at: string | null
@@ -2187,6 +2423,33 @@ export type Database = {
           },
         ]
       }
+      user_profiles: {
+        Row: {
+          auth_provider: string
+          created_at: string | null
+          email: string | null
+          id: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          auth_provider?: string
+          created_at?: string | null
+          email?: string | null
+          id?: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          auth_provider?: string
+          created_at?: string | null
+          email?: string | null
+          id?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -2222,6 +2485,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      get_unread_notification_count: {
+        Args: { p_user_id: string }
+        Returns: number
+      }
       is_admin: {
         Args: Record<PropertyKey, never>
         Returns: boolean
@@ -2233,6 +2500,10 @@ export type Database = {
       is_clinician: {
         Args: { user_id: string }
         Returns: boolean
+      }
+      mark_notifications_as_read: {
+        Args: { p_user_id: string; p_notification_ids?: string[] }
+        Returns: number
       }
       standardize_uuid: {
         Args: { input_id: string }

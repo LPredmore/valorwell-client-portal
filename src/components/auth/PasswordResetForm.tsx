@@ -1,3 +1,4 @@
+
 import { useState, useRef } from "react";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
@@ -80,9 +81,8 @@ const PasswordResetForm = ({ onCancel }: PasswordResetFormProps) => {
         }
       }));
       
-      // Use the origin to build the proper redirect URL
-      const siteUrl = window.location.origin;
-      const redirectTo = `${siteUrl}/update-password`;
+      // Use the correct production redirect URL
+      const redirectTo = "https://clients.valorwell.org/update-password";
       
       console.log("[PasswordResetForm] Using redirect URL:", redirectTo);
       setDebugInfo(prev => ({
@@ -90,8 +90,6 @@ const PasswordResetForm = ({ onCancel }: PasswordResetFormProps) => {
         redirectUrl: redirectTo
       }));
       
-      // IMPORTANT: Removed the test email dependency completely
-      // Proceed directly with the actual password reset
       console.log("[PasswordResetForm] Calling supabase.auth.resetPasswordForEmail with:", {
         email: values.email,
         redirectTo: redirectTo
