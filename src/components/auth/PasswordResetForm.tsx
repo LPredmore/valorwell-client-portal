@@ -19,6 +19,7 @@ import {
   DialogFooter
 } from "@/components/ui/dialog";
 import { debugAuthOperation } from "@/debug/authDebugUtils";
+import { validateEmail, encodeEmailForAPI } from "@/utils/emailValidation";
 
 const resetPasswordSchema = z.object({
   email: z.string().email({ message: "Please enter a valid email address" }),
@@ -26,23 +27,6 @@ const resetPasswordSchema = z.object({
 
 type PasswordResetFormProps = {
   onCancel: () => void;
-};
-
-// Enhanced email encoding function to handle special characters
-const encodeEmailForRequest = (email: string): string => {
-  // Trim whitespace and convert to lowercase for consistency
-  const cleanEmail = email.trim().toLowerCase();
-  
-  // Log the original and processed email for debugging
-  console.log("[PasswordResetForm] Email encoding:", {
-    original: email,
-    cleaned: cleanEmail,
-    hasPlus: cleanEmail.includes('+'),
-    hasDots: cleanEmail.includes('.'),
-    length: cleanEmail.length
-  });
-  
-  return cleanEmail;
 };
 
 const PasswordResetForm = ({ onCancel }: PasswordResetFormProps) => {
@@ -91,7 +75,13 @@ const PasswordResetForm = ({ onCancel }: PasswordResetFormProps) => {
       setIsResettingPassword(true);
       
       // Enhanced email processing and validation
-      const processedEmail = encodeEmailForRequest(values.email);
+      const emailValidation = validateEmail(values.email);
+      if (!emailValidation.isValid) {
+        setResetError(emailValidation.message || "Invalid email address");
+        return;
+      }
+
+      const processedEmail = encodeEmailForAPI(values.email);
       
       console.log("[PasswordResetForm] Starting password reset flow for email:", {
         originalEmail: values.email,
@@ -106,13 +96,13 @@ const PasswordResetForm = ({ onCancel }: PasswordResetFormProps) => {
           originalEmail: values.email,
           processedEmail: processedEmail,
           emailValidation: {
-            isValid: resetPasswordSchema.safeParse({ email: processedEmail }).success,
+            isValid: emailValidation.isValid,
             hasSpecialChars: /[+.]/.test(processedEmail)
           }
         }
       }));
       
-      // Use the corrected redirect URL - note it's "client" not "clients"
+      // Use the corrected redirect URL for client portal
       const redirectTo = "https://client.valorwell.org/update-password";
       
       console.log("[PasswordResetForm] Using redirect URL:", redirectTo);
@@ -153,7 +143,6 @@ const PasswordResetForm = ({ onCancel }: PasswordResetFormProps) => {
           error: resetError ? {
             message: resetError.message,
             status: resetError.status,
-            statusText: resetError.statusText || 'Unknown',
             details: resetError
           } : null,
           timestamp: new Date().toISOString()

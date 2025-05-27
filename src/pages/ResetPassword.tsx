@@ -8,19 +8,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle, Loader2 } from "lucide-react";
-
-// Enhanced email encoding function to handle special characters
-const encodeEmailForRequest = (email: string): string => {
-  const cleanEmail = email.trim().toLowerCase();
-  console.log("[ResetPassword] Email encoding:", {
-    original: email,
-    cleaned: cleanEmail,
-    hasPlus: cleanEmail.includes('+'),
-    hasDots: cleanEmail.includes('.'),
-    length: cleanEmail.length
-  });
-  return cleanEmail;
-};
+import { validateEmail, encodeEmailForAPI } from "@/utils/emailValidation";
 
 const ResetPassword = () => {
   const navigate = useNavigate();
@@ -49,11 +37,13 @@ const ResetPassword = () => {
     setDebugInfo({});
 
     // Enhanced email validation
-    const processedEmail = encodeEmailForRequest(email);
-    if (!processedEmail || !processedEmail.includes('@')) {
-      setErrorMessage("Please enter a valid email address");
+    const emailValidation = validateEmail(email);
+    if (!emailValidation.isValid) {
+      setErrorMessage(emailValidation.message || "Please enter a valid email address");
       return;
     }
+
+    const processedEmail = encodeEmailForAPI(email);
 
     try {
       setIsLoading(true);
@@ -72,7 +62,7 @@ const ResetPassword = () => {
         }
       });
 
-      // Use the corrected redirect URL - note it's "client" not "clients"
+      // Use the corrected redirect URL for client portal
       const redirectTo = "https://client.valorwell.org/update-password";
 
       console.log("[ResetPassword] Configuration:", {
