@@ -28,6 +28,23 @@ type PasswordResetFormProps = {
   onCancel: () => void;
 };
 
+// Enhanced email encoding function to handle special characters
+const encodeEmailForRequest = (email: string): string => {
+  // Trim whitespace and convert to lowercase for consistency
+  const cleanEmail = email.trim().toLowerCase();
+  
+  // Log the original and processed email for debugging
+  console.log("[PasswordResetForm] Email encoding:", {
+    original: email,
+    cleaned: cleanEmail,
+    hasPlus: cleanEmail.includes('+'),
+    hasDots: cleanEmail.includes('.'),
+    length: cleanEmail.length
+  });
+  
+  return cleanEmail;
+};
+
 const PasswordResetForm = ({ onCancel }: PasswordResetFormProps) => {
   const [isResettingPassword, setIsResettingPassword] = useState(false);
   const [resetError, setResetError] = useState<string | null>(null);
@@ -72,36 +89,62 @@ const PasswordResetForm = ({ onCancel }: PasswordResetFormProps) => {
     
     try {
       setIsResettingPassword(true);
-      console.log("[PasswordResetForm] Starting password reset flow for email:", values.email);
+      
+      // Enhanced email processing and validation
+      const processedEmail = encodeEmailForRequest(values.email);
+      
+      console.log("[PasswordResetForm] Starting password reset flow for email:", {
+        originalEmail: values.email,
+        processedEmail: processedEmail,
+        timestamp: new Date().toISOString()
+      });
+      
       setDebugInfo(prev => ({
         ...prev,
         startReset: {
           timestamp: new Date().toISOString(),
-          email: values.email
+          originalEmail: values.email,
+          processedEmail: processedEmail,
+          emailValidation: {
+            isValid: resetPasswordSchema.safeParse({ email: processedEmail }).success,
+            hasSpecialChars: /[+.]/.test(processedEmail)
+          }
         }
       }));
       
-      // Use the correct production redirect URL
-      const redirectTo = "https://clients.valorwell.org/update-password";
+      // Use the corrected redirect URL - note it's "client" not "clients"
+      const redirectTo = "https://client.valorwell.org/update-password";
       
       console.log("[PasswordResetForm] Using redirect URL:", redirectTo);
+      console.log("[PasswordResetForm] Current origin for comparison:", window.location.origin);
+      
       setDebugInfo(prev => ({
         ...prev,
-        redirectUrl: redirectTo
+        redirectConfig: {
+          redirectTo: redirectTo,
+          currentOrigin: window.location.origin,
+          isProduction: !window.location.hostname.includes('localhost')
+        }
       }));
       
       console.log("[PasswordResetForm] Calling supabase.auth.resetPasswordForEmail with:", {
-        email: values.email,
-        redirectTo: redirectTo
+        email: processedEmail,
+        redirectTo: redirectTo,
+        options: { redirectTo }
       });
       
+      // Enhanced Supabase call with better error capture
       const { data, error: resetError } = await debugAuthOperation("resetPasswordForEmail", () =>
-        supabase.auth.resetPasswordForEmail(values.email, {
+        supabase.auth.resetPasswordForEmail(processedEmail, {
           redirectTo: redirectTo,
         })
       );
       
-      console.log("[PasswordResetForm] Reset password response:", { data, error: resetError });
+      console.log("[PasswordResetForm] Reset password response:", { 
+        data, 
+        error: resetError,
+        timestamp: new Date().toISOString()
+      });
       
       setDebugInfo(prev => ({
         ...prev,
@@ -109,8 +152,11 @@ const PasswordResetForm = ({ onCancel }: PasswordResetFormProps) => {
           data,
           error: resetError ? {
             message: resetError.message,
-            status: resetError.status
-          } : null
+            status: resetError.status,
+            statusText: resetError.statusText || 'Unknown',
+            details: resetError
+          } : null,
+          timestamp: new Date().toISOString()
         }
       }));
       
@@ -121,31 +167,59 @@ const PasswordResetForm = ({ onCancel }: PasswordResetFormProps) => {
       }
       
       if (resetError) {
-        console.error("[PasswordResetForm] Reset error:", resetError.message, resetError);
-        setResetError(resetError.message);
-        throw resetError;
+        console.error("[PasswordResetForm] Reset error:", {
+          message: resetError.message,
+          status: resetError.status,
+          fullError: resetError
+        });
+        setResetError(`Reset failed: ${resetError.message}`);
+        
+        // Provide more specific error messages
+        let userFriendlyMessage = "Failed to send password reset email.";
+        if (resetError.message.includes("rate limit")) {
+          userFriendlyMessage = "Too many requests. Please wait a few minutes before trying again.";
+        } else if (resetError.message.includes("invalid")) {
+          userFriendlyMessage = "Invalid email address. Please check and try again.";
+        } else if (resetError.message.includes("not found")) {
+          userFriendlyMessage = "No account found with this email address.";
+        }
+        
+        toast({
+          title: "Password reset failed",
+          description: userFriendlyMessage,
+          variant: "destructive",
+        });
+        return;
       }
       
-      console.log("[PasswordResetForm] Password reset email sent successfully");
+      console.log("[PasswordResetForm] Password reset email sent successfully for:", processedEmail);
       
       toast({
         title: "Password reset email sent",
-        description: "Please check your email for the password reset link.",
+        description: "Please check your email for the password reset link. Don't forget to check your spam folder.",
       });
 
       onCancel();
       resetForm.reset();
     } catch (error: any) {
-      console.error("[PasswordResetForm] Unexpected error:", error);
+      console.error("[PasswordResetForm] Unexpected error:", {
+        error,
+        message: error?.message,
+        stack: error?.stack,
+        timestamp: new Date().toISOString()
+      });
+      
       // Clear the timeout if there's an error
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
         timeoutRef.current = null;
       }
       
+      setResetError(`Unexpected error: ${error?.message || 'Unknown error occurred'}`);
+      
       toast({
         title: "Password reset failed",
-        description: error.message || "Failed to initiate password reset",
+        description: error.message || "Failed to initiate password reset. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -163,7 +237,12 @@ const PasswordResetForm = ({ onCancel }: PasswordResetFormProps) => {
             <FormItem>
               <FormLabel>Email</FormLabel>
               <FormControl>
-                <Input placeholder="Enter your email" {...field} />
+                <Input 
+                  placeholder="Enter your email" 
+                  {...field}
+                  type="email"
+                  autoComplete="email"
+                />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -172,15 +251,17 @@ const PasswordResetForm = ({ onCancel }: PasswordResetFormProps) => {
         
         {/* Display reset error if present */}
         {resetError && (
-          <p className="text-sm text-red-500">{resetError}</p>
+          <div className="p-3 bg-red-50 border border-red-200 text-red-800 rounded-md">
+            <p className="text-sm font-medium">{resetError}</p>
+          </div>
         )}
         
-        {/* Debug info in development mode */}
+        {/* Enhanced debug info in development mode */}
         {process.env.NODE_ENV === 'development' && Object.keys(debugInfo).length > 0 && (
           <div className="mt-2 p-2 bg-gray-100 rounded text-xs">
             <details>
-              <summary className="cursor-pointer font-medium">Debug Info</summary>
-              <pre className="mt-1 overflow-auto max-h-40">
+              <summary className="cursor-pointer font-medium">Debug Info (Development Only)</summary>
+              <pre className="mt-1 overflow-auto max-h-40 whitespace-pre-wrap">
                 {JSON.stringify(debugInfo, null, 2)}
               </pre>
             </details>
@@ -197,7 +278,7 @@ const PasswordResetForm = ({ onCancel }: PasswordResetFormProps) => {
             Cancel
           </Button>
           <Button type="submit" disabled={isResettingPassword}>
-            {isResettingPassword ? "Processing..." : "Continue"}
+            {isResettingPassword ? "Processing..." : "Send Reset Email"}
           </Button>
         </DialogFooter>
       </form>

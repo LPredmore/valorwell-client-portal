@@ -9,6 +9,19 @@ import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle, Loader2 } from "lucide-react";
 
+// Enhanced email encoding function to handle special characters
+const encodeEmailForRequest = (email: string): string => {
+  const cleanEmail = email.trim().toLowerCase();
+  console.log("[ResetPassword] Email encoding:", {
+    original: email,
+    cleaned: cleanEmail,
+    hasPlus: cleanEmail.includes('+'),
+    hasDots: cleanEmail.includes('.'),
+    length: cleanEmail.length
+  });
+  return cleanEmail;
+};
+
 const ResetPassword = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -17,6 +30,7 @@ const ResetPassword = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [debugInfo, setDebugInfo] = useState<any>({});
   const timeoutRef = useRef<number | null>(null);
 
   // Clean up timeout on unmount
@@ -32,8 +46,11 @@ const ResetPassword = () => {
     e.preventDefault();
     setErrorMessage(null);
     setSuccessMessage(null);
+    setDebugInfo({});
 
-    if (!email || !email.includes('@')) {
+    // Enhanced email validation
+    const processedEmail = encodeEmailForRequest(email);
+    if (!processedEmail || !processedEmail.includes('@')) {
       setErrorMessage("Please enter a valid email address");
       return;
     }
@@ -41,8 +58,37 @@ const ResetPassword = () => {
     try {
       setIsLoading(true);
 
-      // Use the correct production redirect URL
-      const redirectTo = "https://clients.valorwell.org/update-password";
+      console.log("[ResetPassword] Starting password reset for:", {
+        originalEmail: email,
+        processedEmail: processedEmail,
+        timestamp: new Date().toISOString()
+      });
+
+      setDebugInfo({
+        emailProcessing: {
+          original: email,
+          processed: processedEmail,
+          timestamp: new Date().toISOString()
+        }
+      });
+
+      // Use the corrected redirect URL - note it's "client" not "clients"
+      const redirectTo = "https://client.valorwell.org/update-password";
+
+      console.log("[ResetPassword] Configuration:", {
+        redirectTo,
+        currentOrigin: window.location.origin,
+        isProduction: !window.location.hostname.includes('localhost')
+      });
+
+      setDebugInfo(prev => ({
+        ...prev,
+        configuration: {
+          redirectTo,
+          currentOrigin: window.location.origin,
+          isProduction: !window.location.hostname.includes('localhost')
+        }
+      }));
 
       // Optional: timeout for slow network
       if (timeoutRef.current) {
@@ -58,8 +104,35 @@ const ResetPassword = () => {
         }
       }, 15000) as unknown as number;
 
-      // The magic call
-      const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
+      console.log("[ResetPassword] Calling Supabase resetPasswordForEmail");
+      
+      // The magic call with enhanced logging
+      const { data, error } = await supabase.auth.resetPasswordForEmail(processedEmail, { 
+        redirectTo 
+      });
+
+      console.log("[ResetPassword] Supabase response:", {
+        data,
+        error: error ? {
+          message: error.message,
+          status: error.status,
+          details: error
+        } : null,
+        timestamp: new Date().toISOString()
+      });
+
+      setDebugInfo(prev => ({
+        ...prev,
+        supabaseResponse: {
+          data,
+          error: error ? {
+            message: error.message,
+            status: error.status,
+            details: error
+          } : null,
+          timestamp: new Date().toISOString()
+        }
+      }));
 
       // Clear timeout since we got a response
       if (timeoutRef.current) {
@@ -68,15 +141,35 @@ const ResetPassword = () => {
       }
 
       if (error) {
-        setErrorMessage(error.message);
+        console.error("[ResetPassword] Error from Supabase:", error);
+        
+        // Provide more specific error messages
+        let userFriendlyMessage = error.message;
+        if (error.message.includes("rate limit")) {
+          userFriendlyMessage = "Too many requests. Please wait a few minutes before trying again.";
+        } else if (error.message.includes("invalid")) {
+          userFriendlyMessage = "Invalid email address. Please check and try again.";
+        } else if (error.message.includes("not found")) {
+          userFriendlyMessage = "No account found with this email address.";
+        }
+        
+        setErrorMessage(userFriendlyMessage);
         throw error;
       }
 
+      console.log("[ResetPassword] Success! Password reset email sent for:", processedEmail);
       setSuccessMessage("Password reset email sent successfully!");
+      
       toast("Password reset email sent", {
-        description: "Please check your email for the password reset link."
+        description: "Please check your email for the password reset link. Don't forget to check your spam folder."
       });
     } catch (error: any) {
+      console.error("[ResetPassword] Caught error:", {
+        error,
+        message: error?.message,
+        timestamp: new Date().toISOString()
+      });
+      
       toast("Failed to send reset email", {
         description: error.message || "There was a problem sending the reset email. Please try again."
       });
@@ -104,9 +197,22 @@ const ResetPassword = () => {
           {successMessage && (
             <div className="mb-4 p-3 bg-green-50 border border-green-200 text-green-800 rounded-md">
               <p className="text-sm font-medium">{successMessage}</p>
-              <p className="text-xs mt-1">Please check your email for further instructions.</p>
+              <p className="text-xs mt-1">Please check your email for further instructions. Don't forget to check your spam folder.</p>
             </div>
           )}
+          
+          {/* Enhanced debug info in development mode */}
+          {process.env.NODE_ENV === 'development' && Object.keys(debugInfo).length > 0 && (
+            <div className="mb-4 p-2 bg-gray-100 rounded text-xs">
+              <details>
+                <summary className="cursor-pointer font-medium">Debug Info (Development Only)</summary>
+                <pre className="mt-1 overflow-auto max-h-40 whitespace-pre-wrap">
+                  {JSON.stringify(debugInfo, null, 2)}
+                </pre>
+              </details>
+            </div>
+          )}
+          
           <form onSubmit={handleResetPassword} className="space-y-4">
             <div className="space-y-2">
               <label htmlFor="email" className="text-sm font-medium">Email</label>
@@ -118,6 +224,7 @@ const ResetPassword = () => {
                 placeholder="Enter your email address"
                 required
                 disabled={isLoading || !!successMessage}
+                autoComplete="email"
               />
             </div>
             <Button type="submit" className="w-full" disabled={isLoading || !!successMessage}>
