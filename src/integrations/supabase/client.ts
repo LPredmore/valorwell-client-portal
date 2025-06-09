@@ -1,8 +1,35 @@
+
 import { createClient } from '@supabase/supabase-js';
 
-// Get Supabase URL and anon key from environment
-const supabaseUrl = 'https://gqlkritspnhjxfejvgfg.supabase.co';
-const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdxbGtyaXRzcG5oanhmZWp2Z2ZnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDI3NjQ0NDUsImV4cCI6MjA1ODM0MDQ0NX0.BtnTfcjvHI55_fs_zor9ffQ9Aclg28RSfvgZrWpMuYs';
+// Get Supabase configuration from multiple sources
+const getSupabaseConfig = () => {
+  // First check for runtime configuration (from micro-frontend host)
+  const runtimeConfig = (window as any).__VALORWELL_SUPABASE_CONFIG__;
+  if (runtimeConfig) {
+    return {
+      url: runtimeConfig.url,
+      key: runtimeConfig.key
+    };
+  }
+
+  // Then check environment variables
+  const envUrl = import.meta.env.VITE_SUPABASE_URL;
+  const envKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+  if (envUrl && envKey) {
+    return {
+      url: envUrl,
+      key: envKey
+    };
+  }
+
+  // Fallback to hardcoded values for development
+  return {
+    url: 'https://gqlkritspnhjxfejvgfg.supabase.co',
+    key: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdxbGtyaXRzcG5oanhmZWp2Z2ZnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDI3NjQ0NDUsImV4cCI6MjA1ODM0MDQ0NX0.BtnTfcjvHI55_fs_zor9ffQ9Aclg28RSfvgZrWpMuYs'
+  };
+};
+
+const { url: supabaseUrl, key: supabaseKey } = getSupabaseConfig();
 
 // Create Supabase client
 export const supabase = createClient(supabaseUrl, supabaseKey, {

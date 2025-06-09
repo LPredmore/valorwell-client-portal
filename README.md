@@ -1,69 +1,171 @@
-# Welcome to your Lovable project
+
+# Valorwell Client Portal
+
+A React-based client portal application that can be run as a standalone app or consumed as a micro-frontend module.
 
 ## Project info
 
 **URL**: https://lovable.dev/projects/e3e17a11-5778-4ffa-9bb2-28525054bb7d
 
-## How can I edit this code?
+## Dual Mode Operation
 
-There are several ways of editing your application.
+This application supports two modes of operation:
 
-**Use Lovable**
-
-Simply visit the [Lovable Project](https://lovable.dev/projects/e3e17a11-5778-4ffa-9bb2-28525054bb7d) and start prompting.
-
-Changes made via Lovable will be committed automatically to this repo.
-
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
+### 1. Standalone Mode (Development)
+Run the portal as an independent application for development:
 
 ```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+# Install dependencies
+npm install
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
+# Start development server
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+The app will be available at `http://localhost:8080`
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+### 2. Micro-Frontend Module Mode
+Build the portal as a module for consumption by a shell application:
 
-**Use GitHub Codespaces**
+```sh
+# Install dependencies
+npm install
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+# Build as library/module
+npm run build:lib
+```
 
-## What technologies are used for this project?
+This outputs `dist/valorwell-portal.js` which can be consumed by a shell application.
 
-This project is built with .
+## Micro-Frontend Integration
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+### Consuming the Module
 
-## How can I deploy this project?
+```typescript
+import { ValorwellPortal } from './path/to/valorwell-portal.js';
 
-Simply open [Lovable](https://lovable.dev/projects/e3e17a11-5778-4ffa-9bb2-28525054bb7d) and click on Share -> Publish.
+// Basic usage
+<ValorwellPortal />
 
-## I want to use a custom domain - is that possible?
+// With configuration
+<ValorwellPortal 
+  basePath="/portal" 
+  supabaseUrl="https://your-project.supabase.co"
+  supabaseKey="your-anon-key"
+  onAuthStateChange={(user, session) => {
+    console.log('Auth state changed:', user, session);
+  }}
+/>
+```
 
-We don't support custom domains (yet). If you want to deploy your project under your own domain then we recommend using Netlify. Visit our docs for more details: [Custom domains](https://docs.lovable.dev/tips-tricks/custom-domain/)
+### Props
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `basePath` | `string` | `''` | Base path for routing (e.g., `/portal`) |
+| `supabaseUrl` | `string` | `undefined` | Supabase project URL |
+| `supabaseKey` | `string` | `undefined` | Supabase anon key |
+| `onAuthStateChange` | `function` | `undefined` | Callback for auth state changes |
+
+### Environment Variables
+
+Create a `.env` file based on `.env.example`:
+
+```sh
+cp .env.example .env
+```
+
+The following environment variables are supported:
+
+- `VITE_SUPABASE_URL` - Supabase project URL
+- `VITE_SUPABASE_ANON_KEY` - Supabase anonymous key
+
+## Configuration Priority
+
+The application resolves Supabase configuration in the following order:
+
+1. **Runtime props** (highest priority) - passed to `ValorwellPortal` component
+2. **Environment variables** - from `.env` file or environment
+3. **Fallback values** (lowest priority) - hardcoded development values
+
+## Development Workflow
+
+### Local Development
+```sh
+npm run dev
+```
+
+### Building for Production (Standalone)
+```sh
+npm run build
+```
+
+### Building as Module
+```sh
+npm run build:lib
+```
+
+### Type Checking
+```sh
+npm run type-check
+```
+
+## Technologies
+
+This project is built with:
+
+- **Vite** - Build tool and dev server
+- **TypeScript** - Type safety
+- **React** - UI framework
+- **React Router** - Client-side routing
+- **Supabase** - Backend and authentication
+- **shadcn-ui** - Component library
+- **Tailwind CSS** - Styling
+- **Tanstack Query** - Data fetching
+
+## Architecture
+
+### Standalone Mode
+```
+App.tsx (BrowserRouter + AuthProvider + Routes)
+├── Public Routes (/, /login, /signup)
+├── Protected Routes (/dashboard, /profile, etc.)
+└── Auth Protected Routes with role checks
+```
+
+### Module Mode
+```
+ValorwellPortal (exported component)
+├── Configurable basePath for routing
+├── Runtime Supabase configuration
+├── Auth state callbacks for shell integration
+└── Same route structure as standalone
+```
+
+## Authentication
+
+The portal uses Supabase authentication with:
+
+- Email/password login and signup
+- Password reset functionality
+- Role-based access control
+- Session persistence
+- Auth state synchronization with shell apps (in module mode)
+
+## Deployment
+
+### Standalone Deployment
+Deploy the built assets from `npm run build` to any static hosting service.
+
+### Module Deployment
+1. Build the module: `npm run build:lib`
+2. Publish the `dist/valorwell-portal.js` file
+3. Import and use in your shell application
+
+## Custom Domains
+
+For custom domains, refer to the [Lovable documentation](https://docs.lovable.dev/tips-tricks/custom-domain/).
+
+## Support
+
+For issues and questions, please refer to the project documentation or contact the development team.

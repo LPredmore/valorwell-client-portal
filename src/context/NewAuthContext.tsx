@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useEffect, useState, useMemo, useRef } from 'react';
 import AuthService, { AuthState, AuthError } from '@/services/AuthService';
 import { supabase } from '@/integrations/supabase/client';
@@ -45,7 +44,10 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 const CLIENT_DATA_LOADING_TIMEOUT = 10000; // 10 seconds
 
 // Provider component
-export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }) => {
+export const AuthProvider: React.FC<{
+  children: React.ReactNode;
+  onAuthStateChange?: (user: User | null, session: any) => void;
+}> = ({ children, onAuthStateChange }) => {
   const [authState, setAuthState] = useState<AuthState>(AuthService.currentState);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [authError, setAuthError] = useState<AuthError | null>(AuthService.error);
@@ -97,13 +99,18 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
       setAuthError(AuthService.error);
       setAuthInitialized(AuthService.isInitialized);
       
+      // Call the callback if provided
+      if (onAuthStateChange) {
+        onAuthStateChange(AuthService.currentUser, AuthService.currentSession);
+      }
+      
       if (newState === AuthState.AUTHENTICATED && AuthService.userId) {
         await loadClientData(AuthService.userId);
       } else if (newState === AuthState.UNAUTHENTICATED) {
         // Clear client data when logged out
         setClientProfile(null);
         setClientStatus(null);
-        setIsLoading(false); // Ensure we're not stuck in loading state when logged out
+        setIsLoading(false);
       }
     });
 
@@ -112,7 +119,7 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }
       removeListener();
       clearLoadingTimeout();
     };
-  }, [sessionId]);
+  }, [sessionId, onAuthStateChange]);
 
   // Load client data with retry mechanism
   const loadClientData = async (userId: string | null) => {

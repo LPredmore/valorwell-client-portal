@@ -86,6 +86,51 @@ export type Database = {
           },
         ]
       }
+      appointment_sync_mapping: {
+        Row: {
+          appointment_id: string
+          created_at: string | null
+          id: string
+          last_synced_at: string | null
+          nylas_calendar_id: string
+          nylas_event_id: string
+          sync_status: string | null
+        }
+        Insert: {
+          appointment_id: string
+          created_at?: string | null
+          id?: string
+          last_synced_at?: string | null
+          nylas_calendar_id: string
+          nylas_event_id: string
+          sync_status?: string | null
+        }
+        Update: {
+          appointment_id?: string
+          created_at?: string | null
+          id?: string
+          last_synced_at?: string | null
+          nylas_calendar_id?: string
+          nylas_event_id?: string
+          sync_status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "appointment_sync_mapping_appointment_id_fkey"
+            columns: ["appointment_id"]
+            isOneToOne: false
+            referencedRelation: "appointments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointment_sync_mapping_nylas_calendar_id_fkey"
+            columns: ["nylas_calendar_id"]
+            isOneToOne: false
+            referencedRelation: "nylas_calendars"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       appointment_templates: {
         Row: {
           color: string | null
@@ -140,11 +185,11 @@ export type Database = {
           buffer_after: number | null
           buffer_before: number | null
           claim_claimmd_batch_id: string | null
-          claim_claimmd_id: string | null
           claim_last_submission_date: string | null
           claim_response_json: Json | null
           claim_status: string | null
           claim_status_last_checked: string | null
+          claimid: string | null
           client_id: string
           clinician_id: string
           cpt_code: string | null
@@ -194,11 +239,11 @@ export type Database = {
           buffer_after?: number | null
           buffer_before?: number | null
           claim_claimmd_batch_id?: string | null
-          claim_claimmd_id?: string | null
           claim_last_submission_date?: string | null
           claim_response_json?: Json | null
           claim_status?: string | null
           claim_status_last_checked?: string | null
+          claimid?: string | null
           client_id: string
           clinician_id: string
           cpt_code?: string | null
@@ -248,11 +293,11 @@ export type Database = {
           buffer_after?: number | null
           buffer_before?: number | null
           claim_claimmd_batch_id?: string | null
-          claim_claimmd_id?: string | null
           claim_last_submission_date?: string | null
           claim_response_json?: Json | null
           claim_status?: string | null
           claim_status_last_checked?: string | null
+          claimid?: string | null
           client_id?: string
           clinician_id?: string
           cpt_code?: string | null
@@ -1474,6 +1519,233 @@ export type Database = {
         }
         Relationships: []
       }
+      CMS1500_claims: {
+        Row: {
+          accept_assign: string
+          appointment_id: string | null
+          bill_addr_1: string
+          bill_addr_2: string | null
+          bill_city: string
+          bill_name: string
+          bill_npi: string
+          bill_state: string
+          bill_taxid: string
+          bill_taxid_type: string
+          bill_taxonomy: string
+          bill_zip: string
+          charge: number
+          claim_md_batch_id: string | null
+          claim_md_id: string | null
+          created_at: string | null
+          diag_1: string | null
+          diag_10: string | null
+          diag_11: string | null
+          diag_12: string | null
+          diag_2: string | null
+          diag_3: string | null
+          diag_4: string | null
+          diag_5: string | null
+          diag_6: string | null
+          diag_7: string | null
+          diag_8: string | null
+          diag_9: string | null
+          diag_ref: string
+          from_date: string
+          id: string
+          ins_addr_1: string
+          ins_city: string
+          ins_dob: string
+          ins_group: string | null
+          ins_name_f: string
+          ins_name_l: string
+          ins_number: string
+          ins_state: string
+          ins_zip: string
+          last_status_check: string | null
+          last_submission: string | null
+          mod_1: string | null
+          mod_2: string | null
+          mod_3: string | null
+          mod_4: string | null
+          pat_addr_1: string
+          pat_city: string
+          pat_dob: string
+          pat_name_f: string
+          pat_name_l: string
+          pat_rel: string
+          pat_sex: string
+          pat_state: string
+          pat_zip: string
+          payerid: string
+          pcn: string
+          place_of_service: string
+          proc_code: string
+          prov_name_f: string
+          prov_name_l: string
+          prov_npi: string
+          prov_taxonomy: string | null
+          remote_claimid: string
+          response_json: Json | null
+          status: string | null
+          thru_date: string
+          total_charge: number
+          units: number
+          updated_at: string | null
+        }
+        Insert: {
+          accept_assign?: string
+          appointment_id?: string | null
+          bill_addr_1: string
+          bill_addr_2?: string | null
+          bill_city: string
+          bill_name: string
+          bill_npi: string
+          bill_state: string
+          bill_taxid: string
+          bill_taxid_type: string
+          bill_taxonomy: string
+          bill_zip: string
+          charge: number
+          claim_md_batch_id?: string | null
+          claim_md_id?: string | null
+          created_at?: string | null
+          diag_1?: string | null
+          diag_10?: string | null
+          diag_11?: string | null
+          diag_12?: string | null
+          diag_2?: string | null
+          diag_3?: string | null
+          diag_4?: string | null
+          diag_5?: string | null
+          diag_6?: string | null
+          diag_7?: string | null
+          diag_8?: string | null
+          diag_9?: string | null
+          diag_ref: string
+          from_date: string
+          id?: string
+          ins_addr_1: string
+          ins_city: string
+          ins_dob: string
+          ins_group?: string | null
+          ins_name_f: string
+          ins_name_l: string
+          ins_number: string
+          ins_state: string
+          ins_zip: string
+          last_status_check?: string | null
+          last_submission?: string | null
+          mod_1?: string | null
+          mod_2?: string | null
+          mod_3?: string | null
+          mod_4?: string | null
+          pat_addr_1: string
+          pat_city: string
+          pat_dob: string
+          pat_name_f: string
+          pat_name_l: string
+          pat_rel: string
+          pat_sex: string
+          pat_state: string
+          pat_zip: string
+          payerid: string
+          pcn: string
+          place_of_service: string
+          proc_code: string
+          prov_name_f: string
+          prov_name_l: string
+          prov_npi: string
+          prov_taxonomy?: string | null
+          remote_claimid: string
+          response_json?: Json | null
+          status?: string | null
+          thru_date: string
+          total_charge: number
+          units?: number
+          updated_at?: string | null
+        }
+        Update: {
+          accept_assign?: string
+          appointment_id?: string | null
+          bill_addr_1?: string
+          bill_addr_2?: string | null
+          bill_city?: string
+          bill_name?: string
+          bill_npi?: string
+          bill_state?: string
+          bill_taxid?: string
+          bill_taxid_type?: string
+          bill_taxonomy?: string
+          bill_zip?: string
+          charge?: number
+          claim_md_batch_id?: string | null
+          claim_md_id?: string | null
+          created_at?: string | null
+          diag_1?: string | null
+          diag_10?: string | null
+          diag_11?: string | null
+          diag_12?: string | null
+          diag_2?: string | null
+          diag_3?: string | null
+          diag_4?: string | null
+          diag_5?: string | null
+          diag_6?: string | null
+          diag_7?: string | null
+          diag_8?: string | null
+          diag_9?: string | null
+          diag_ref?: string
+          from_date?: string
+          id?: string
+          ins_addr_1?: string
+          ins_city?: string
+          ins_dob?: string
+          ins_group?: string | null
+          ins_name_f?: string
+          ins_name_l?: string
+          ins_number?: string
+          ins_state?: string
+          ins_zip?: string
+          last_status_check?: string | null
+          last_submission?: string | null
+          mod_1?: string | null
+          mod_2?: string | null
+          mod_3?: string | null
+          mod_4?: string | null
+          pat_addr_1?: string
+          pat_city?: string
+          pat_dob?: string
+          pat_name_f?: string
+          pat_name_l?: string
+          pat_rel?: string
+          pat_sex?: string
+          pat_state?: string
+          pat_zip?: string
+          payerid?: string
+          pcn?: string
+          place_of_service?: string
+          proc_code?: string
+          prov_name_f?: string
+          prov_name_l?: string
+          prov_npi?: string
+          prov_taxonomy?: string | null
+          remote_claimid?: string
+          response_json?: Json | null
+          status?: string | null
+          thru_date?: string
+          total_charge?: number
+          units?: number
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "claims_appointment_id_fkey"
+            columns: ["appointment_id"]
+            isOneToOne: false
+            referencedRelation: "appointments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       completed_appointments: {
         Row: {
           created_at: string
@@ -1707,6 +1979,144 @@ export type Database = {
           status?: string
         }
         Relationships: []
+      }
+      nylas_accounts: {
+        Row: {
+          access_token: string
+          clinician_id: string
+          created_at: string | null
+          email: string
+          expires_at: string | null
+          id: string
+          is_active: boolean | null
+          nylas_grant_id: string
+          provider: string
+          refresh_token: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          access_token: string
+          clinician_id: string
+          created_at?: string | null
+          email: string
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          nylas_grant_id: string
+          provider: string
+          refresh_token?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          access_token?: string
+          clinician_id?: string
+          created_at?: string | null
+          email?: string
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          nylas_grant_id?: string
+          provider?: string
+          refresh_token?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nylas_accounts_clinician_id_fkey"
+            columns: ["clinician_id"]
+            isOneToOne: false
+            referencedRelation: "clinicians"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      nylas_calendars: {
+        Row: {
+          calendar_description: string | null
+          calendar_name: string
+          created_at: string | null
+          id: string
+          is_primary: boolean | null
+          is_synced: boolean | null
+          nylas_account_id: string
+          nylas_calendar_id: string
+          sync_direction: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          calendar_description?: string | null
+          calendar_name: string
+          created_at?: string | null
+          id?: string
+          is_primary?: boolean | null
+          is_synced?: boolean | null
+          nylas_account_id: string
+          nylas_calendar_id: string
+          sync_direction?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          calendar_description?: string | null
+          calendar_name?: string
+          created_at?: string | null
+          id?: string
+          is_primary?: boolean | null
+          is_synced?: boolean | null
+          nylas_account_id?: string
+          nylas_calendar_id?: string
+          sync_direction?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nylas_calendars_nylas_account_id_fkey"
+            columns: ["nylas_account_id"]
+            isOneToOne: false
+            referencedRelation: "nylas_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      nylas_sync_status: {
+        Row: {
+          created_at: string | null
+          error_message: string | null
+          events_synced: number | null
+          id: string
+          last_sync_at: string | null
+          nylas_account_id: string
+          sync_direction: string
+          sync_status: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          error_message?: string | null
+          events_synced?: number | null
+          id?: string
+          last_sync_at?: string | null
+          nylas_account_id: string
+          sync_direction: string
+          sync_status?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          error_message?: string | null
+          events_synced?: number | null
+          id?: string
+          last_sync_at?: string | null
+          nylas_account_id?: string
+          sync_direction?: string
+          sync_status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nylas_sync_status_nylas_account_id_fkey"
+            columns: ["nylas_account_id"]
+            isOneToOne: false
+            referencedRelation: "nylas_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       phq9_assessments: {
         Row: {
@@ -2516,6 +2926,7 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "client" | "clinician"
+      appointment_status: "scheduled" | "documented" | "no show"
       client_gender_identity_type: "Male" | "Female" | "Other"
       client_gender_type: "Male" | "Female"
       client_relationship_type: "Self" | "Parent/Guardian" | "Spouse" | "Child"
@@ -2744,6 +3155,7 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "client", "clinician"],
+      appointment_status: ["scheduled", "documented", "no show"],
       client_gender_identity_type: ["Male", "Female", "Other"],
       client_gender_type: ["Male", "Female"],
       client_relationship_type: ["Self", "Parent/Guardian", "Spouse", "Child"],
