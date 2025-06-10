@@ -1,8 +1,9 @@
+
 import React, { Suspense } from "react";
 import { Toaster } from "sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/context/NewAuthContext";
 
 // Auth Components
@@ -29,16 +30,16 @@ import PastAppointments from "./pages/PastAppointments";
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      retry: 2,                // Limit to 2 retries
-      retryDelay: attempt => Math.min(1000 * 2 ** attempt, 30000), // Exponential backoff with max of 30 seconds
-      staleTime: 60 * 1000,    // 1 minute
-      gcTime: 5 * 60 * 1000,   // 5 minutes (updated from cacheTime)
-      refetchOnWindowFocus: false, // Don't refetch on window focus to prevent unnecessary requests
-      refetchOnReconnect: true, // Refetch when reconnecting to network
+      retry: 2,
+      retryDelay: attempt => Math.min(1000 * 2 ** attempt, 30000),
+      staleTime: 60 * 1000,
+      gcTime: 5 * 60 * 1000,
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: true,
     },
     mutations: {
-      retry: 1,                // Only retry mutations once
-      retryDelay: 1000,        // 1 second delay before retry
+      retry: 1,
+      retryDelay: 1000,
     }
   }
 });
@@ -52,16 +53,6 @@ const LoadingFallback = () => (
 );
 
 function App() {
-  // EXTENDED DEBUG: Log which routes are being rendered on app start
-  React.useEffect(() => {
-    console.log('[App] Initializing routes with proper protection:');
-    console.log('- /profile-setup: blockNewClients=false (allows new clients)');
-    console.log('- /patient-dashboard: blockNewClients=true (blocks new clients)');
-    console.log('- /patient-documents: blockNewClients=true (blocks new clients)');
-    console.log('- /patient-profile: blockNewClients=true (blocks new clients)');
-    console.log('- /patient-insurance: blockNewClients=true (blocks new clients)');
-  }, []);
-
   return (
     <React.StrictMode>
       <BrowserRouter>
@@ -70,7 +61,6 @@ function App() {
             <AuthProvider>
               <AuthMigrationHandler>
                 <TooltipProvider>
-                  {/* Sonner Toaster - the only toast component we need */}
                   <Toaster richColors position="top-right" />
                   <Routes>
                     {/* Public routes - No auth required */}
@@ -119,7 +109,7 @@ function App() {
                       </AuthProtectedRoute>
                     } />
                     
-                    {/* Debug routes - keep minimal diagnostic route */}
+                    {/* Debug routes */}
                     <Route path="/debug/auth-public" element={<AuthDebugPage />} />
                     
                     <Route path="*" element={<NotFound />} />
