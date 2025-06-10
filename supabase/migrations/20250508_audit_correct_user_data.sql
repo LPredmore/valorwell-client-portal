@@ -160,6 +160,7 @@ BEGIN
         user_rec.last_name,
         user_rec.phone,
         'client'::app_role,
+        'client'::public.app_role,
         user_rec.state,
         'New',
         user_rec.temp_password
@@ -185,24 +186,7 @@ BEGIN
     SELECT u.id, u.email, u.raw_user_meta_data
     FROM auth.users u
     WHERE (u.raw_user_meta_data->>'role' IS NULL OR u.raw_user_meta_data->>'role' NOT IN ('admin', 'clinician', 'client'))
-    AND NOT EXISTS (SELECT 1 FROM public.admins a WHERE a.id = u.id)
-    AND NOT EXISTS (SELECT 1 FROM public.clinicians c WHERE c.id = u.id)
-    AND NOT EXISTS (SELECT 1 FROM public.clients cl WHERE cl.id = u.id)
-  LOOP
-    -- Log users without valid roles
-    INSERT INTO public.migration_logs (migration_name, description, details)
-    VALUES (
-      '20250508_audit_correct_user_data',
-      'User found without valid role and not in any role table',
-      jsonb_build_object(
-        'user_id', user_rec.id,
-        'email', user_rec.email,
-        'raw_metadata', user_rec.raw_user_meta_data
-      )
-    );
-    
-    -- Default to client role if no valid role is found
-    BEGIN
+@@ -206,51 +206,51 @@ BEGIN
       -- Update user metadata to set a default role
       UPDATE auth.users
       SET raw_user_meta_data =
@@ -229,6 +213,7 @@ BEGIN
         user_rec.raw_user_meta_data->>'last_name',
         user_rec.raw_user_meta_data->>'phone',
         'client'::app_role,
+        'client'::public.app_role,
         'New'
       );
     EXCEPTION WHEN OTHERS THEN
