@@ -101,7 +101,7 @@ export const AuthProvider: React.FC<{
       
       // Call the callback if provided
       if (onAuthStateChange) {
-        onAuthStateChange(AuthService.currentUser, AuthService.currentSession);
+        onAuthStateChange(AuthService.currentUser, null);
       }
       
       if (newState === AuthState.AUTHENTICATED && AuthService.userId) {
