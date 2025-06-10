@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useEffect, useState, useMemo, useRef } from 'react';
 import AuthService, { AuthState, AuthError } from '@/services/AuthService';
 import { supabase } from '@/integrations/supabase/client';
@@ -99,9 +100,10 @@ export const AuthProvider: React.FC<{
       setAuthError(AuthService.error);
       setAuthInitialized(AuthService.isInitialized);
       
-      // Call the callback if provided
+      // Call the callback if provided - fix: get session from supabase directly since AuthService doesn't expose it
       if (onAuthStateChange) {
-        onAuthStateChange(AuthService.currentUser, AuthService.currentSession);
+        const { data: { session } } = await supabase.auth.getSession();
+        onAuthStateChange(AuthService.currentUser, session);
       }
       
       if (newState === AuthState.AUTHENTICATED && AuthService.userId) {

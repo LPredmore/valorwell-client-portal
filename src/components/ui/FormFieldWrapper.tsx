@@ -8,7 +8,7 @@ interface FormFieldWrapperProps {
   control: any;
   name: string;
   label: string;
-  type?: 'text' | 'email' | 'tel' | 'select';
+  type?: 'text' | 'email' | 'tel' | 'select' | 'date' | 'number';
   options?: string[];
   readOnly?: boolean;
   valueMapper?: (label: string) => string;
