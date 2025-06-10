@@ -151,6 +151,7 @@ BEGIN
         v_preferred_name,
         v_phone,
         'client'::app_role,
+        'client'::public.app_role,
         v_state,
         v_client_status, -- Use the client_status variable
         v_temp_password
@@ -176,31 +177,3 @@ BEGIN
     INSERT INTO public.migration_logs (
       migration_name, 
       description, 
-      details
-    ) VALUES (
-      'handle_new_user_trigger',
-      'Client user created successfully',
-      jsonb_build_object(
-        'user_id', NEW.id,
-        'email', NEW.email,
-        'client_status', v_client_status
-      )
-    );
-  END IF;
-  
-  RETURN NEW;
-END;
-$$;
-
--- Create the new trigger
-CREATE TRIGGER on_auth_user_created
-  AFTER INSERT ON auth.users
-  FOR EACH ROW EXECUTE PROCEDURE public.handle_new_user();
-
--- Log the creation of the new trigger
-INSERT INTO public.migration_logs (migration_name, description, details)
-VALUES (
-  '20250508_update_handle_new_user',
-  'Updated handle_new_user function and trigger with client status support',
-  jsonb_build_object('action', 'update_trigger', 'added_features', 'client_status')
-);
