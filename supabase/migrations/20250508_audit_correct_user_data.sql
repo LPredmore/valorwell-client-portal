@@ -231,6 +231,7 @@ BEGIN
     END;
   END LOOP;
 END$$;
+END $$;
 
 -- Log completion of the audit and correction process
 INSERT INTO public.migration_logs (migration_name, description, details)
