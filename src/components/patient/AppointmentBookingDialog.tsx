@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { format, addDays, isSameDay, parseISO } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
@@ -439,9 +438,9 @@ export const AppointmentBookingDialog: React.FC<AppointmentBookingDialogProps> =
         { zone: clientTimeZone }
       );
       
-      // Convert to UTC
+      // Convert to UTC - Change duration to 60 minutes
       const utcStart = appointmentDateTime.toUTC().toISO();
-      const utcEnd = appointmentDateTime.plus({ minutes: 30 }).toUTC().toISO();
+      const utcEnd = appointmentDateTime.plus({ minutes: 60 }).toUTC().toISO();
       
       if (!utcStart || !utcEnd) {
         throw new Error('Invalid date or time selected');
@@ -661,7 +660,7 @@ export const AppointmentBookingDialog: React.FC<AppointmentBookingDialogProps> =
               }
             </p>
             <p>
-              <strong>Duration:</strong> 30 minutes
+              <strong>Duration:</strong> 60 minutes
             </p>
           </div>
         )}
