@@ -63,13 +63,27 @@ const TherapistSelection = () => {
   return (
     <NewLayout>
       <div className="container mx-auto max-w-5xl px-4 py-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold mb-2">Select Your Therapist</h1>
-          <p className="text-gray-600">
-            {clientState 
-              ? `Showing therapists licensed in ${clientState} who can work with you.`
-              : 'Choose a therapist who you feel would be the best fit for your needs.'}
-          </p>
+        <div className="mb-8 flex justify-between items-start">
+          <div>
+            <h1 className="text-3xl font-bold mb-2">Select Your Therapist</h1>
+            <p className="text-gray-600">
+              {clientState 
+                ? `Showing therapists licensed in ${clientState} who can work with you.`
+                : 'Choose a therapist who you feel would be the best fit for your needs.'}
+            </p>
+          </div>
+          <Button 
+            onClick={handleSubmit} 
+            disabled={!selectedTherapistId || isSubmitting}
+            className="bg-blue-600 hover:bg-blue-700"
+          >
+            {isSubmitting ? (
+              <>
+                <Loader className="h-4 w-4 animate-spin mr-2" />
+                Processing...
+              </>
+            ) : "Confirm Selection"}
+          </Button>
         </div>
 
         {loading && (
@@ -115,21 +129,6 @@ const TherapistSelection = () => {
             ))}
           </div>
         )}
-
-        <div className="mt-8 flex justify-end">
-          <Button 
-            onClick={handleSubmit} 
-            disabled={!selectedTherapistId || isSubmitting}
-            className="bg-blue-600 hover:bg-blue-700"
-          >
-            {isSubmitting ? (
-              <>
-                <Loader className="h-4 w-4 animate-spin mr-2" />
-                Processing...
-              </>
-            ) : "Confirm Selection"}
-          </Button>
-        </div>
       </div>
     </NewLayout>
   );
