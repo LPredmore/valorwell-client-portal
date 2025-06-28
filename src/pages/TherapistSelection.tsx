@@ -90,10 +90,12 @@ const TherapistSelection = () => {
         )}
 
         {!loading && !error && therapists.length === 0 && (
-          <div className="bg-yellow-50 border border-yellow-200 rounded-md p-4 mb-6">
-            <h3 className="font-medium text-yellow-800">No therapists available</h3>
-            <p className="text-yellow-700 text-sm mt-1">
-              No therapists are currently available that match your criteria. This could be due to state licensing requirements, age restrictions, or availability status. Please contact support for assistance.
+          <div className="bg-blue-50 border border-blue-200 rounded-md p-6 mb-6">
+            <p className="text-gray-800 leading-relaxed">
+              We're truly sorry, but at this moment all of our clinicians who are in your state are booked up and not taking new clients. We understand how difficult it can be to wait for care—and especially when you're seeking support that's covered and accessible. You're not alone in this, and we're here to help you take the next step.
+            </p>
+            <p className="text-gray-800 leading-relaxed mt-4">
+              We are fighting to get reach more therapists and grow our team to keep up with the extraordinary need that we have encountered. If you know any clinicians that would be interested in working with us, please let them know about us. The best thing we can do is increase awareness that we exist.
             </p>
           </div>
         )}
