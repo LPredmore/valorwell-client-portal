@@ -18,6 +18,12 @@ interface FormFieldWrapperProps<T extends FieldValues> {
   options?: string[] | Option[];
   readOnly?: boolean;
   placeholder?: string;
+  required?: boolean;
+  maxLength?: number;
+  defaultValue?: string;
+  valueMapper?: (label: any) => string;
+  labelMapper?: (value: any) => any;
+  onValueCommit?: (name: any, value: any) => Promise<void> | void;
 }
 
 const FormFieldWrapper = <T extends FieldValues>({
@@ -27,7 +33,13 @@ const FormFieldWrapper = <T extends FieldValues>({
   type = 'text',
   options = [],
   readOnly = false,
-  placeholder
+  placeholder,
+  required = false,
+  maxLength,
+  defaultValue,
+  valueMapper,
+  labelMapper,
+  onValueCommit
 }: FormFieldWrapperProps<T>) => {
   return (
     <FormField
@@ -35,12 +47,17 @@ const FormFieldWrapper = <T extends FieldValues>({
       name={name}
       render={({ field }) => (
         <FormItem>
-          <FormLabel>{label}</FormLabel>
+          <FormLabel>{label}{required && ' *'}</FormLabel>
           <FormControl>
             {type === 'select' ? (
               <Select
-                value={field.value || ''}
-                onValueChange={field.onChange}
+                value={field.value || defaultValue || ''}
+                onValueChange={(value) => {
+                  field.onChange(value);
+                  if (onValueCommit) {
+                    onValueCommit(name, value);
+                  }
+                }}
                 disabled={readOnly}
               >
                 <SelectTrigger>
@@ -67,6 +84,7 @@ const FormFieldWrapper = <T extends FieldValues>({
                 readOnly={readOnly}
                 placeholder={placeholder}
                 className={readOnly ? 'bg-gray-50' : ''}
+                {...(maxLength && { maxLength })}
               />
             )}
           </FormControl>

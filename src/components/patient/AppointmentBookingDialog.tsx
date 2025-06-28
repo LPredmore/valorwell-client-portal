@@ -145,8 +145,7 @@ export const AppointmentBookingDialog: React.FC<AppointmentBookingDialogProps> =
   const clientTimeZone = useMemo(() => {
     return getEffectiveClientTimezone(
       clientData?.client_time_zone, // Database value takes priority
-      userTimeZone, // Prop fallback
-      getUserTimeZone() // Browser fallback
+      userTimeZone
     );
   }, [clientData?.client_time_zone, userTimeZone]);
 
