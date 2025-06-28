@@ -15,8 +15,9 @@ const TherapistSelection = () => {
   // Get client data from auth context
   const { clientProfile, isLoading: authLoading, refreshUserData } = useAuth();
   const clientState = clientProfile?.client_state || null;
+  const clientDateOfBirth = clientProfile?.client_date_of_birth || null;
 
-  // Use the simplified therapist selection hook
+  // Use the enhanced therapist selection hook with age filtering
   const { 
     therapists, 
     loading, 
@@ -26,7 +27,8 @@ const TherapistSelection = () => {
     selectTherapist,
     isSubmitting
   } = useSimpleTherapistSelection({
-    clientState
+    clientState,
+    clientDateOfBirth
   });
 
   const handleSubmit = async () => {
@@ -91,9 +93,7 @@ const TherapistSelection = () => {
           <div className="bg-yellow-50 border border-yellow-200 rounded-md p-4 mb-6">
             <h3 className="font-medium text-yellow-800">No therapists available</h3>
             <p className="text-yellow-700 text-sm mt-1">
-              {clientState 
-                ? `There are currently no therapists licensed in ${clientState}. Please contact support for assistance.`
-                : 'There are currently no therapists available. Please try again later or contact support for assistance.'}
+              No therapists are currently available that match your criteria. This could be due to state licensing requirements, age restrictions, or availability status. Please contact support for assistance.
             </p>
           </div>
         )}

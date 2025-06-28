@@ -179,7 +179,7 @@ export type Database = {
       appointments: {
         Row: {
           appointment_recurring: string | null
-          appointment_timezone: Database["public"]["Enums"]["time_zones"] | null
+          appointment_timezone: string | null
           billed_amount: number | null
           billing_notes: string | null
           buffer_after: number | null
@@ -231,9 +231,7 @@ export type Database = {
         }
         Insert: {
           appointment_recurring?: string | null
-          appointment_timezone?:
-            | Database["public"]["Enums"]["time_zones"]
-            | null
+          appointment_timezone?: string | null
           billed_amount?: number | null
           billing_notes?: string | null
           buffer_after?: number | null
@@ -285,9 +283,7 @@ export type Database = {
         }
         Update: {
           appointment_recurring?: string | null
-          appointment_timezone?:
-            | Database["public"]["Enums"]["time_zones"]
-            | null
+          appointment_timezone?: string | null
           billed_amount?: number | null
           billing_notes?: string | null
           buffer_after?: number | null
@@ -440,6 +436,107 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      availability_sync_status: {
+        Row: {
+          clinician_id: string
+          created_at: string | null
+          day_of_week: string
+          error_message: string | null
+          id: string
+          last_synced_at: string | null
+          nylas_event_id: string | null
+          slot_number: number
+          sync_status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          clinician_id: string
+          created_at?: string | null
+          day_of_week: string
+          error_message?: string | null
+          id?: string
+          last_synced_at?: string | null
+          nylas_event_id?: string | null
+          slot_number: number
+          sync_status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          clinician_id?: string
+          created_at?: string | null
+          day_of_week?: string
+          error_message?: string | null
+          id?: string
+          last_synced_at?: string | null
+          nylas_event_id?: string | null
+          slot_number?: number
+          sync_status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "availability_sync_status_clinician_id_fkey"
+            columns: ["clinician_id"]
+            isOneToOne: false
+            referencedRelation: "clinicians"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      calendar_sync_logs: {
+        Row: {
+          appointment_id: string | null
+          connection_id: string
+          created_at: string | null
+          error_message: string | null
+          external_event_id: string | null
+          id: string
+          operation: string
+          status: string
+          sync_data: Json | null
+          sync_type: string
+        }
+        Insert: {
+          appointment_id?: string | null
+          connection_id: string
+          created_at?: string | null
+          error_message?: string | null
+          external_event_id?: string | null
+          id?: string
+          operation: string
+          status?: string
+          sync_data?: Json | null
+          sync_type: string
+        }
+        Update: {
+          appointment_id?: string | null
+          connection_id?: string
+          created_at?: string | null
+          error_message?: string | null
+          external_event_id?: string | null
+          id?: string
+          operation?: string
+          status?: string
+          sync_data?: Json | null
+          sync_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "calendar_sync_logs_appointment_id_fkey"
+            columns: ["appointment_id"]
+            isOneToOne: false
+            referencedRelation: "appointments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "calendar_sync_logs_connection_id_fkey"
+            columns: ["connection_id"]
+            isOneToOne: false
+            referencedRelation: "nylas_connections"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       client_history: {
         Row: {
@@ -1229,7 +1326,9 @@ export type Database = {
       }
       clinicians: {
         Row: {
-          clinician_accepting_new_clients: string | null
+          clinician_accepting_new_clients:
+            | Database["public"]["Enums"]["Yes/No"]
+            | null
           clinician_availability_end_friday_1: string | null
           clinician_availability_end_friday_2: string | null
           clinician_availability_end_friday_3: string | null
@@ -1324,7 +1423,9 @@ export type Database = {
           updated_at: string
         }
         Insert: {
-          clinician_accepting_new_clients?: string | null
+          clinician_accepting_new_clients?:
+            | Database["public"]["Enums"]["Yes/No"]
+            | null
           clinician_availability_end_friday_1?: string | null
           clinician_availability_end_friday_2?: string | null
           clinician_availability_end_friday_3?: string | null
@@ -1421,7 +1522,9 @@ export type Database = {
           updated_at?: string
         }
         Update: {
-          clinician_accepting_new_clients?: string | null
+          clinician_accepting_new_clients?:
+            | Database["public"]["Enums"]["Yes/No"]
+            | null
           clinician_availability_end_friday_1?: string | null
           clinician_availability_end_friday_2?: string | null
           clinician_availability_end_friday_3?: string | null
@@ -1857,6 +1960,51 @@ export type Database = {
         }
         Relationships: []
       }
+      external_calendar_mappings: {
+        Row: {
+          appointment_id: string
+          connection_id: string
+          created_at: string | null
+          external_calendar_id: string
+          external_event_id: string
+          id: string
+          last_synced_at: string | null
+        }
+        Insert: {
+          appointment_id: string
+          connection_id: string
+          created_at?: string | null
+          external_calendar_id: string
+          external_event_id: string
+          id?: string
+          last_synced_at?: string | null
+        }
+        Update: {
+          appointment_id?: string
+          connection_id?: string
+          created_at?: string | null
+          external_calendar_id?: string
+          external_event_id?: string
+          id?: string
+          last_synced_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "external_calendar_mappings_appointment_id_fkey"
+            columns: ["appointment_id"]
+            isOneToOne: false
+            referencedRelation: "appointments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "external_calendar_mappings_connection_id_fkey"
+            columns: ["connection_id"]
+            isOneToOne: false
+            referencedRelation: "nylas_connections"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       icd10: {
         Row: {
           diagnosis_name: string
@@ -2076,6 +2224,135 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      nylas_connections: {
+        Row: {
+          access_token: string
+          calendar_ids: string[] | null
+          connector_id: string | null
+          created_at: string | null
+          email: string
+          grant_status: string | null
+          id: string
+          is_active: boolean | null
+          last_sync_at: string | null
+          provider: string
+          refresh_token: string | null
+          scopes: string[] | null
+          sync_preferences: Json | null
+          token_expires_at: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          access_token: string
+          calendar_ids?: string[] | null
+          connector_id?: string | null
+          created_at?: string | null
+          email: string
+          grant_status?: string | null
+          id: string
+          is_active?: boolean | null
+          last_sync_at?: string | null
+          provider?: string
+          refresh_token?: string | null
+          scopes?: string[] | null
+          sync_preferences?: Json | null
+          token_expires_at?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          access_token?: string
+          calendar_ids?: string[] | null
+          connector_id?: string | null
+          created_at?: string | null
+          email?: string
+          grant_status?: string | null
+          id?: string
+          is_active?: boolean | null
+          last_sync_at?: string | null
+          provider?: string
+          refresh_token?: string | null
+          scopes?: string[] | null
+          sync_preferences?: Json | null
+          token_expires_at?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      nylas_scheduler_configs: {
+        Row: {
+          clinician_id: string
+          config_data: Json
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          public_url: string | null
+          scheduler_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          clinician_id: string
+          config_data?: Json
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          public_url?: string | null
+          scheduler_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          clinician_id?: string
+          config_data?: Json
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          public_url?: string | null
+          scheduler_id?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      nylas_sync_logs: {
+        Row: {
+          completed_at: string | null
+          connection_id: string
+          created_at: string | null
+          direction: string
+          errors: Json | null
+          events_processed: number | null
+          id: string
+          started_at: string | null
+          status: string
+          sync_type: string
+        }
+        Insert: {
+          completed_at?: string | null
+          connection_id: string
+          created_at?: string | null
+          direction: string
+          errors?: Json | null
+          events_processed?: number | null
+          id?: string
+          started_at?: string | null
+          status: string
+          sync_type: string
+        }
+        Update: {
+          completed_at?: string | null
+          connection_id?: string
+          created_at?: string | null
+          direction?: string
+          errors?: Json | null
+          events_processed?: number | null
+          id?: string
+          started_at?: string | null
+          status?: string
+          sync_type?: string
+        }
+        Relationships: []
       }
       nylas_sync_status: {
         Row: {
@@ -2865,6 +3142,23 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      cancel_appointment_and_delete_mapping: {
+        Args: {
+          p_appointment_id: string
+          p_mapping_id: string
+          p_notes: string
+        }
+        Returns: undefined
+      }
+      check_blocked_time_integrity: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          check_type: string
+          status: string
+          count: number
+          message: string
+        }[]
+      }
       check_table_exists: {
         Args: { check_table_name: string }
         Returns: boolean
@@ -2873,9 +3167,32 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
+      create_appointment_and_mapping: {
+        Args: {
+          p_clinician_id: string
+          p_type: string
+          p_status: Database["public"]["Enums"]["appointment_status"]
+          p_start_at: string
+          p_end_at: string
+          p_notes: string
+          p_external_event_id: string
+          p_connection_id: string
+          p_sync_direction: string
+          p_last_sync_hash: string
+        }
+        Returns: undefined
+      }
       create_or_replace_check_table_exists_function: {
         Args: Record<PropertyKey, never>
         Returns: undefined
+      }
+      debug_auth_context: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          current_user_id: string
+          current_user_role: string
+          is_authenticated: boolean
+        }[]
       }
       debug_client_therapist_matching: {
         Args: { p_therapist_id: string }
@@ -2894,6 +3211,24 @@ export type Database = {
           record_id: string
         }
         Returns: boolean
+      }
+      get_clinician_availability_instances: {
+        Args: {
+          p_clinician_id: string
+          p_start_date: string
+          p_end_date: string
+          p_user_timezone?: string
+        }
+        Returns: {
+          day_of_week: string
+          start_time: string
+          end_time: string
+          timezone: string
+          slot_number: number
+          specific_date: string
+          utc_start_time: string
+          utc_end_time: string
+        }[]
       }
       get_unread_notification_count: {
         Args: { p_user_id: string }
@@ -2918,6 +3253,17 @@ export type Database = {
       standardize_uuid: {
         Args: { input_id: string }
         Returns: string
+      }
+      update_appointment_and_mapping: {
+        Args: {
+          p_appointment_id: string
+          p_start_at: string
+          p_end_at: string
+          p_notes: string
+          p_mapping_id: string
+          p_last_sync_hash: string
+        }
+        Returns: undefined
       }
       user_has_admin_role: {
         Args: { user_id: string }
@@ -3039,6 +3385,7 @@ export type Database = {
         | "Pacific/Honolulu"
         | "America/Phoenix"
       user_role: "user" | "admin"
+      "Yes/No": "Yes" | "No"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -3275,6 +3622,7 @@ export const Constants = {
         "America/Phoenix",
       ],
       user_role: ["user", "admin"],
+      "Yes/No": ["Yes", "No"],
     },
   },
 } as const

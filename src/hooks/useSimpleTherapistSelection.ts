@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { calculateAge } from '@/utils/dateUtils';
 
 export interface SimpleTherapist {
   id: string;
@@ -11,13 +12,16 @@ export interface SimpleTherapist {
   clinician_bio: string | null;
   clinician_image_url: string | null;
   clinician_licensed_states: string[] | null;
+  clinician_accepting_new_clients: "Yes" | "No" | null;
+  clinician_min_client_age: number | null;
 }
 
 interface UseSimpleTherapistSelectionProps {
   clientState: string | null;
+  clientDateOfBirth: string | Date | null;
 }
 
-export const useSimpleTherapistSelection = ({ clientState }: UseSimpleTherapistSelectionProps) => {
+export const useSimpleTherapistSelection = ({ clientState, clientDateOfBirth }: UseSimpleTherapistSelectionProps) => {
   const [therapists, setTherapists] = useState<SimpleTherapist[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -31,17 +35,29 @@ export const useSimpleTherapistSelection = ({ clientState }: UseSimpleTherapistS
         setLoading(true);
         setError(null);
         
-        // Query active clinicians from the database
+        // Query active clinicians who are accepting new clients
         const { data, error } = await supabase
           .from('clinicians')
-          .select('id, clinician_first_name, clinician_last_name, clinician_professional_name, clinician_bio, clinician_image_url, clinician_licensed_states')
-          .eq('clinician_status', 'Active');
+          .select(`
+            id, 
+            clinician_first_name, 
+            clinician_last_name, 
+            clinician_professional_name, 
+            clinician_bio, 
+            clinician_image_url, 
+            clinician_licensed_states,
+            clinician_accepting_new_clients,
+            clinician_min_client_age
+          `)
+          .eq('clinician_status', 'Active')
+          .eq('clinician_accepting_new_clients', 'Yes');
         
         if (error) throw error;
         
-        // Filter therapists by client state if provided
+        // Enhanced filtering with proper null handling
         let filteredTherapists = data || [];
         
+        // State filtering (existing logic)
         if (clientState && filteredTherapists.length > 0) {
           filteredTherapists = filteredTherapists.filter(therapist => 
             therapist.clinician_licensed_states && 
@@ -49,6 +65,21 @@ export const useSimpleTherapistSelection = ({ clientState }: UseSimpleTherapistS
               state.toLowerCase() === clientState.toLowerCase()
             )
           );
+        }
+        
+        // NEW: Age filtering with comprehensive null safety
+        if (clientDateOfBirth && filteredTherapists.length > 0) {
+          const clientAge = calculateAge(clientDateOfBirth);
+          
+          // Only filter if age calculation succeeded
+          if (clientAge !== null && !isNaN(clientAge)) {
+            filteredTherapists = filteredTherapists.filter(therapist => 
+              // Include therapist if they have no minimum age requirement
+              // OR if client meets the minimum age requirement
+              !therapist.clinician_min_client_age || 
+              clientAge >= therapist.clinician_min_client_age
+            );
+          }
         }
         
         setTherapists(filteredTherapists);
@@ -61,7 +92,7 @@ export const useSimpleTherapistSelection = ({ clientState }: UseSimpleTherapistS
     };
 
     fetchTherapists();
-  }, [clientState]);
+  }, [clientState, clientDateOfBirth]);
 
   // Select a therapist
   const selectTherapist = async (therapistId: string): Promise<boolean> => {
