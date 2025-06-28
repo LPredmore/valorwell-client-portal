@@ -6,6 +6,11 @@ import { X, Save, Edit } from 'lucide-react';
 import { Form } from '@/components/ui/form';
 import FormFieldWrapper from '@/components/ui/FormFieldWrapper';
 
+interface TimeZoneOption {
+  value: string;
+  label: string;
+}
+
 interface MyProfileProps {
   clientData: any | null;
   loading: boolean;
@@ -18,7 +23,7 @@ interface MyProfileProps {
   genderOptions: string[];
   genderIdentityOptions: string[];
   stateOptions: string[];
-  timeZoneOptions: string[];
+  timeZoneOptions: TimeZoneOption[];
 }
 
 const MyProfile: React.FC<MyProfileProps> = ({

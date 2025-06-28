@@ -7,6 +7,7 @@ import { TimeZoneService } from '@/utils/timeZoneService';
 import { DateTime } from 'luxon';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/NewAuthContext';
+import { useQuery } from '@tanstack/react-query';
 
 import { 
   Dialog, 
@@ -83,7 +84,7 @@ export const AppointmentBookingDialog: React.FC<AppointmentBookingDialogProps> =
   clientId,
   onAppointmentBooked,
   userTimeZone,
-  viewOnly = false // Default to false for backward compatibility
+  viewOnly = false
 }) => {
   // Tomorrow as default
   const tomorrow = useMemo(() => addDays(new Date(), 1), []);
@@ -115,15 +116,39 @@ export const AppointmentBookingDialog: React.FC<AppointmentBookingDialogProps> =
   const [authError, setAuthError] = useState<string | null>(null);
   const [loadingTimeout, setLoadingTimeout] = useState(false);
   
-  // Get user's timezone with proper prioritization
+  // Determine the effective client ID
+  const effectiveClientId = clientId || userId;
+  
+  // Fetch client's stored timezone from database
+  const { data: clientData, isLoading: clientDataLoading } = useQuery({
+    queryKey: ['client-timezone', effectiveClientId],
+    queryFn: async () => {
+      if (!effectiveClientId) return null;
+      
+      const { data, error } = await supabase
+        .from('clients')
+        .select('client_time_zone')
+        .eq('id', effectiveClientId)
+        .single();
+      
+      if (error) {
+        console.warn('Failed to fetch client timezone:', error);
+        return null;
+      }
+      
+      return data;
+    },
+    enabled: !!effectiveClientId && open,
+  });
+
+  // Get user's timezone with proper prioritization using database value
   const clientTimeZone = useMemo(() => {
-    // If clientId is provided, we should fetch their timezone from the database
-    // For now, use the effective timezone logic with userTimeZone as priority
     return getEffectiveClientTimezone(
-      userTimeZone,
-      getUserTimeZone()
+      clientData?.client_time_zone, // Database value takes priority
+      userTimeZone, // Prop fallback
+      getUserTimeZone() // Browser fallback
     );
-  }, [userTimeZone]);
+  }, [clientData?.client_time_zone, userTimeZone]);
 
   // Calculate days difference between selected date and today
   const daysDiff = useMemo(() => {
@@ -306,7 +331,7 @@ export const AppointmentBookingDialog: React.FC<AppointmentBookingDialogProps> =
     }
     
     // Logic to generate time slots based on availability blocks
-    const dayOfWeek = selectedDate.getDay(); // 0 for Sunday, 1 for Monday, etc.
+    const dayOfWeek = selectedDate.getDay();
     const availableBlocks = availabilityBlocks.filter(block => 
       block.day_of_week === dayOfWeek
     );
@@ -348,17 +373,21 @@ export const AppointmentBookingDialog: React.FC<AppointmentBookingDialogProps> =
             );
           });
           
+          // Convert availability time from clinician timezone to client timezone
+          // Assume clinician timezone is stored or default to America/New_York
+          const clinicianTimeZone = 'America/New_York'; // TODO: Get from clinician data
+          const convertedTime = convertAvailabilityTime(
+            timeStr,
+            clinicianTimeZone,
+            clientTimeZone,
+            selectedDate
+          );
+          
           // Add slot if not already booked
-          // Note: Time slots are already in the correct timezone context
           if (!isSlotBooked) {
             slots.push({
-              time: timeStr,
-              formattedTime: DateTime.fromObject({ 
-                hour, 
-                minute 
-              }, { 
-                zone: clientTimeZone 
-              }).toFormat('h:mm a'),
+              time: convertedTime.time,
+              formattedTime: convertedTime.formattedTime,
               available: true,
               timezone: clientTimeZone
             });
@@ -530,6 +559,9 @@ export const AppointmentBookingDialog: React.FC<AppointmentBookingDialogProps> =
     ? "View the therapist's available appointment slots."
     : "Select a date and time for your appointment.";
 
+  // Show loading if we're still fetching client data
+  const isLoadingClientData = clientDataLoading || userIsLoading || !authInitialized;
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
@@ -539,6 +571,14 @@ export const AppointmentBookingDialog: React.FC<AppointmentBookingDialogProps> =
             {dialogDescription}
           </DialogDescription>
         </DialogHeader>
+        
+        {/* Show client timezone info for debugging */}
+        {process.env.NODE_ENV === 'development' && (
+          <div className="text-xs text-gray-500 mb-2">
+            Debug: Using timezone {clientTimeZone} 
+            {clientData?.client_time_zone && ` (from database: ${clientData.client_time_zone})`}
+          </div>
+        )}
         
         {/* Minimum days notice alert - only show in booking mode */}
         {!viewOnly && (
@@ -572,8 +612,24 @@ export const AppointmentBookingDialog: React.FC<AppointmentBookingDialogProps> =
           <div>
             <h3 className="text-lg font-medium mb-2">Available Times</h3>
             
+            {/* Show loading spinner when loading client data or availability */}
+            {(isLoadingClientData || isLoading) && !authError && (
+              <div className="flex flex-col justify-center items-center h-40">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mb-2"></div>
+                <p className="text-sm text-gray-600">
+                  {isLoadingClientData
+                    ? "Loading your timezone preferences..."
+                    : "Loading available times..."}
+                </p>
+                {loadingTimeout && (
+                  <p className="text-xs text-amber-600 mt-2">
+                    This is taking longer than expected...
+                  </p>
+                )}
+              </div>
+            )}
+            
             {/* Show loading spinner when loading */}
-            {/* Show auth error if present */}
             {authError && (
               <div className="flex flex-col justify-center items-center h-40 p-4 bg-red-50 border border-red-200 rounded-md">
                 <div className="text-red-500 mb-2">
@@ -590,23 +646,6 @@ export const AppointmentBookingDialog: React.FC<AppointmentBookingDialogProps> =
                 >
                   Close
                 </button>
-              </div>
-            )}
-            
-            {/* Show loading spinner when loading */}
-            {isLoading && !authError && (
-              <div className="flex flex-col justify-center items-center h-40">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mb-2"></div>
-                <p className="text-sm text-gray-600">
-                  {userIsLoading || !authInitialized
-                    ? "Initializing authentication..."
-                    : "Loading available times..."}
-                </p>
-                {loadingTimeout && (
-                  <p className="text-xs text-amber-600 mt-2">
-                    This is taking longer than expected...
-                  </p>
-                )}
               </div>
             )}
             

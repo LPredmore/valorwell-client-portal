@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -42,8 +41,11 @@ const PatientProfile: React.FC = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   
-  // Use proper IANA timezone options
-  const timeZoneOptions = timezoneOptions.map(option => option.value);
+  // Use proper timezone options with user-friendly labels
+  const timeZoneOptions = timezoneOptions.map(option => ({
+    value: option.value,
+    label: option.label
+  }));
   
   const genderOptions = [
     'Male',
@@ -186,7 +188,7 @@ const PatientProfile: React.FC = () => {
           client_zip_code: formData.zipCode,
           client_gender: formData.gender,
           client_gender_identity: formData.genderIdentity,
-          client_time_zone: formData.timeZone, // This will now be an IANA identifier
+          client_time_zone: formData.timeZone, // This will be an IANA identifier
         })
         .eq('id', userId);
 
