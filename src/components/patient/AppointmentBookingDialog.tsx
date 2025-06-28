@@ -20,6 +20,7 @@ import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
+import { getEffectiveClientTimezone, convertAvailabilityTime } from '@/utils/timezoneValidation';
 
 // Types for appointment slots
 interface AppointmentSlot {
@@ -114,10 +115,13 @@ export const AppointmentBookingDialog: React.FC<AppointmentBookingDialogProps> =
   const [authError, setAuthError] = useState<string | null>(null);
   const [loadingTimeout, setLoadingTimeout] = useState(false);
   
-  // Get user's timezone
+  // Get user's timezone with proper prioritization
   const clientTimeZone = useMemo(() => {
-    return TimeZoneService.ensureIANATimeZone(
-      userTimeZone || getUserTimeZone() || TimeZoneService.DEFAULT_TIMEZONE
+    // If clientId is provided, we should fetch their timezone from the database
+    // For now, use the effective timezone logic with userTimeZone as priority
+    return getEffectiveClientTimezone(
+      userTimeZone,
+      getUserTimeZone()
     );
   }, [userTimeZone]);
 
@@ -345,6 +349,7 @@ export const AppointmentBookingDialog: React.FC<AppointmentBookingDialogProps> =
           });
           
           // Add slot if not already booked
+          // Note: Time slots are already in the correct timezone context
           if (!isSlotBooked) {
             slots.push({
               time: timeStr,

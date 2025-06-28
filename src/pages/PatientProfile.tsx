@@ -1,41 +1,81 @@
-
 import React, { useState, useEffect } from 'react';
-import Layout from '@/components/layout/Layout';
 import { useForm } from 'react-hook-form';
-import { useNavigate } from 'react-router-dom';
-import { getCurrentUser, getClientByUserId, updateClientProfile } from '@/integrations/supabase/client';
-import { useToast } from '@/components/ui/use-toast';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
+import Layout from '@/components/layout/Layout';
 import MyProfile from '@/components/patient/MyProfile';
+import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/context/NewAuthContext';
-import { getUserTimeZone, getTimeZoneDisplayName } from '@/utils/timeZoneUtils';
+import { timezoneOptions } from '@/utils/timezoneOptions';
+import { getEffectiveClientTimezone } from '@/utils/timezoneValidation';
+
+const formSchema = z.object({
+  firstName: z.string().min(2, {
+    message: "First name must be at least 2 characters.",
+  }),
+  lastName: z.string().min(2, {
+    message: "Last name must be at least 2 characters.",
+  }),
+  preferredName: z.string().optional(),
+  email: z.string().email({
+    message: "Please enter a valid email address.",
+  }),
+  phone: z.string().optional(),
+  dateOfBirth: z.string().optional(),
+  age: z.number().optional(),
+  address: z.string().optional(),
+  city: z.string().optional(),
+  state: z.string().optional(),
+  zipCode: z.string().optional(),
+  gender: z.string().optional(),
+  genderIdentity: z.string().optional(),
+  timeZone: z.string().optional(),
+});
 
 const PatientProfile: React.FC = () => {
-  const [loading, setLoading] = useState<boolean>(true);
-  const [isSaving, setIsSaving] = useState<boolean>(false);
-  const [clientData, setClientData] = useState<any>(null);
-  const [isEditing, setIsEditing] = useState<boolean>(false);
+  const { user, userId } = useAuth();
   const { toast } = useToast();
-  const navigate = useNavigate();
-  const { userId } = useAuth();
-
-  const genderOptions = ['Male', 'Female', 'Non-Binary', 'Other', 'Prefer not to say'];
-  const genderIdentityOptions = ['Male', 'Female', 'Trans Man', 'Trans Woman', 'Non-Binary', 'Other', 'Prefer not to say'];
+  const [clientData, setClientData] = useState<any | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [isEditing, setIsEditing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  
+  // Use proper IANA timezone options
+  const timeZoneOptions = timezoneOptions.map(option => option.value);
+  
+  const genderOptions = [
+    'Male',
+    'Female',
+    'Transgender Male',
+    'Transgender Female',
+    'Non-binary',
+    'Other',
+    'Prefer not to say'
+  ];
+  
+  const genderIdentityOptions = [
+    'Cisgender',
+    'Transgender',
+    'Non-binary',
+    'Genderqueer',
+    'Genderfluid',
+    'Agender',
+    'Two-Spirit',
+    'Other',
+    'Prefer not to say'
+  ];
+  
   const stateOptions = [
-    'Alabama', 'Alaska', 'Arizona', 'Arkansas', 'California', 'Colorado', 'Connecticut',
-    'Delaware', 'Florida', 'Georgia', 'Hawaii', 'Idaho', 'Illinois', 'Indiana', 'Iowa', 'Kansas',
-    'Kentucky', 'Louisiana', 'Maine', 'Maryland', 'Massachusetts', 'Michigan', 'Minnesota',
-    'Mississippi', 'Missouri', 'Montana', 'Nebraska', 'Nevada', 'New Hampshire', 'New Jersey',
-    'New Mexico', 'New York', 'North Carolina', 'North Dakota', 'Ohio', 'Oklahoma', 'Oregon',
-    'Pennsylvania', 'Rhode Island', 'South Carolina', 'South Dakota', 'Tennessee', 'Texas',
-    'Utah', 'Vermont', 'Virginia', 'Washington', 'West Virginia', 'Wisconsin', 'Wyoming'
-  ];
-  const timeZoneOptions = [
-    'Eastern Standard Time (EST)', 'Central Standard Time (CST)',
-    'Mountain Standard Time (MST)', 'Pacific Standard Time (PST)', 'Alaska Standard Time (AKST)',
-    'Hawaii-Aleutian Standard Time (HST)', 'Atlantic Standard Time (AST)'
+    'AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'FL', 'GA',
+    'HI', 'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD',
+    'MA', 'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ',
+    'NM', 'NY', 'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC',
+    'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY'
   ];
 
-  const form = useForm({
+  const form = useForm<z.infer<typeof formSchema>>({
+    resolver: zodResolver(formSchema),
     defaultValues: {
       firstName: '',
       lastName: '',
@@ -43,92 +83,85 @@ const PatientProfile: React.FC = () => {
       email: '',
       phone: '',
       dateOfBirth: '',
-      age: '',
+      age: 0,
+      address: '',
+      city: '',
+      state: '',
+      zipCode: '',
       gender: '',
       genderIdentity: '',
-      state: '',
-      address: '', // Added address field
-      city: '', // Added city field
-      zipCode: '', // Added zip code field
-      timeZone: ''
-    }
+      timeZone: getEffectiveClientTimezone(null), // Use effective timezone as default
+    },
   });
 
+  useEffect(() => {
+    // Set page title for accessibility
+    document.title = 'My Profile | Valorwell';
+    
+    // Log page view for debugging
+    console.log('PatientProfile page loaded');
+    
+    // Fetch client data on mount
+    fetchClientData();
+  }, [userId]);
+
   const fetchClientData = async () => {
+    if (!userId) {
+      console.warn('No user ID found, cannot fetch client data.');
+      setLoading(false);
+      return;
+    }
+    
     setLoading(true);
-
     try {
-      // Use userId from useAuth hook
-      if (!userId) {
-        toast({
-          title: "Authentication required",
-          description: "Please sign in to view your profile",
-          variant: "destructive"
-        });
-        navigate('/login');
-        return;
-      }
+      const { data, error } = await supabase
+        .from('clients')
+        .select('*')
+        .eq('id', userId)
+        .single();
 
-      console.log("Current user ID:", userId);
-      const { client, error: clientError } = await getClientByUserId(userId);
-      console.log("Retrieved client data:", client);
-
-      if (clientError || !client) {
+      if (error) {
+        console.error('Error fetching client data:', error);
         toast({
-          title: "Profile not found",
-          description: "We couldn't find your client profile",
-          variant: "destructive"
+          title: "Error",
+          description: "Failed to load profile data. Please try again.",
+          variant: "destructive",
         });
         return;
       }
 
-      setClientData(client);
+      if (data) {
+        // Populate form with client data
+        form.setValue('firstName', data.client_first_name || '');
+        form.setValue('lastName', data.client_last_name || '');
+        form.setValue('preferredName', data.client_preferred_name || '');
+        form.setValue('email', data.client_email || '');
+        form.setValue('phone', data.client_phone || '');
+        form.setValue('dateOfBirth', data.client_date_of_birth || '');
+        form.setValue('age', data.client_age || 0);
+        form.setValue('address', data.client_address || '');
+        form.setValue('city', data.client_city || '');
+        form.setValue('state', data.client_state || '');
+        form.setValue('zipCode', data.client_zip_code || '');
+        form.setValue('gender', data.client_gender || '');
+        form.setValue('genderIdentity', data.client_gender_identity || '');
+        form.setValue('timeZone', data.client_time_zone || getEffectiveClientTimezone(null));
 
-      let age = '';
-      if (client.client_date_of_birth) {
-        const dob = new Date(client.client_date_of_birth);
-        const today = new Date();
-        age = String(today.getFullYear() - dob.getFullYear());
-      }
-
-      let formattedDob = '';
-      if (client.client_date_of_birth) {
-        const dob = new Date(client.client_date_of_birth);
-        formattedDob = dob.toLocaleDateString('en-US', {
-          year: 'numeric',
-          month: 'long',
-          day: 'numeric'
+        setClientData(data);
+      } else {
+        console.warn('No client data found for user:', userId);
+        toast({
+          title: "Profile Not Found",
+          description: "No profile data found for your account.",
+          variant: "warning",
         });
       }
-
-      // Get user timezone if none exists in profile
-      const timeZone = client.client_time_zone || getUserTimeZone();
-      
-      // Format timezone for display if it exists
-      const displayTimeZone = timeZone ? getTimeZoneDisplayName(timeZone) : '';
-
-      form.reset({
-        firstName: client.client_first_name || '',
-        lastName: client.client_last_name || '',
-        preferredName: client.client_preferred_name || '',
-        email: client.client_email || '',
-        phone: client.client_phone || '',
-        dateOfBirth: formattedDob,
-        age: age,
-        gender: client.client_gender || '',
-        genderIdentity: client.client_gender_identity || '',
-        state: client.client_state || '',
-        address: client.client_address || '', // Added address field
-        city: client.client_city || '', // Added city field
-        zipCode: client.client_zip_code || '', // Added zip code field
-        timeZone: client.client_time_zone || timeZone
-      });
     } catch (error) {
-      console.error("Error fetching client data:", error);
+      console.error('Error fetching client data:', error);
       toast({
         title: "Error",
-        description: "Failed to load your profile data",
-        variant: "destructive"
+        description: "Failed to load profile data. Please try again.",
+        variant: "destructive",
       });
     } finally {
       setLoading(false);
@@ -136,56 +169,41 @@ const PatientProfile: React.FC = () => {
   };
 
   const handleSaveProfile = async () => {
-    if (!clientData) {
-      console.error("Cannot save: No client data available");
-      toast({
-        title: "Error",
-        description: "Unable to save profile: No client data available",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    console.log("Starting save process for client ID:", clientData.id);
     setIsSaving(true);
-
+    
     try {
-      const formValues = form.getValues();
-      console.log("Form values to save:", formValues);
+      const formData = form.getValues();
+      
+      const { error } = await supabase
+        .from('clients')
+        .update({
+          client_preferred_name: formData.preferredName,
+          client_phone: formData.phone,
+          client_address: formData.address,
+          client_city: formData.city,
+          client_state: formData.state,
+          client_zip_code: formData.zipCode,
+          client_gender: formData.gender,
+          client_gender_identity: formData.genderIdentity,
+          client_time_zone: formData.timeZone, // This will now be an IANA identifier
+        })
+        .eq('id', userId);
 
-      const updates = {
-        client_preferred_name: formValues.preferredName,
-        client_phone: formValues.phone,
-        client_gender: formValues.gender,
-        client_gender_identity: formValues.genderIdentity,
-        client_state: formValues.state,
-        client_address: formValues.address, // Added address field
-        client_city: formValues.city, // Added city field
-        client_zip_code: formValues.zipCode, // Added zip code field
-        client_time_zone: formValues.timeZone
-      };
+      if (error) throw error;
 
-      console.log("Sending updates to database:", updates);
-      const result = await updateClientProfile(clientData.id, updates);
-
-      if (result.success) {
-        console.log("Profile update successful");
-        toast({
-          title: "Success",
-          description: "Your profile has been updated successfully",
-        });
-        setIsEditing(false);
-        fetchClientData();
-      } else {
-        console.error("Profile update failed:", result.error);
-        throw new Error("Failed to update profile: " + JSON.stringify(result.error));
-      }
+      toast({
+        title: "Profile Updated",
+        description: "Your profile has been successfully updated.",
+      });
+      
+      setIsEditing(false);
+      fetchClientData(); // Refresh data
     } catch (error) {
-      console.error("Error saving profile:", error);
+      console.error('Error updating profile:', error);
       toast({
         title: "Error",
-        description: "Failed to save your profile",
-        variant: "destructive"
+        description: "Failed to update profile. Please try again.",
+        variant: "destructive",
       });
     } finally {
       setIsSaving(false);
@@ -193,37 +211,45 @@ const PatientProfile: React.FC = () => {
   };
 
   const handleCancelEdit = () => {
-    console.log("Edit cancelled");
     setIsEditing(false);
-    fetchClientData();
+    form.reset({
+      firstName: clientData?.client_first_name || '',
+      lastName: clientData?.client_last_name || '',
+      preferredName: clientData?.client_preferred_name || '',
+      email: clientData?.client_email || '',
+      phone: clientData?.client_phone || '',
+      dateOfBirth: clientData?.client_date_of_birth || '',
+      age: clientData?.client_age || 0,
+      address: clientData?.client_address || '',
+      city: clientData?.client_city || '',
+      state: clientData?.client_state || '',
+      zipCode: clientData?.client_zip_code || '',
+      gender: clientData?.client_gender || '',
+      genderIdentity: clientData?.client_gender_identity || '',
+      timeZone: clientData?.client_time_zone || getEffectiveClientTimezone(null),
+    });
   };
-
-  useEffect(() => {
-    console.log("PatientProfile component mounted");
-    fetchClientData();
-  }, [userId]);
 
   return (
     <Layout>
-      <div className="flex flex-col gap-6">
-        <div className="flex items-center justify-between">
-          <h1 className="text-3xl font-bold tracking-tight">My Profile</h1>
+      <div className="container mx-auto p-6">
+        <h1 className="text-2xl font-semibold mb-6">My Profile</h1>
+        <div className="grid grid-cols-1 gap-6">
+          <MyProfile
+            clientData={clientData}
+            loading={loading}
+            isEditing={isEditing}
+            setIsEditing={setIsEditing}
+            form={form}
+            isSaving={isSaving}
+            handleSaveProfile={handleSaveProfile}
+            handleCancelEdit={handleCancelEdit}
+            genderOptions={genderOptions}
+            genderIdentityOptions={genderIdentityOptions}
+            stateOptions={stateOptions}
+            timeZoneOptions={timeZoneOptions}
+          />
         </div>
-
-        <MyProfile 
-          clientData={clientData}
-          loading={loading}
-          isEditing={isEditing}
-          setIsEditing={setIsEditing}
-          form={form}
-          isSaving={isSaving}
-          handleSaveProfile={handleSaveProfile}
-          handleCancelEdit={handleCancelEdit}
-          genderOptions={genderOptions}
-          genderIdentityOptions={genderIdentityOptions}
-          stateOptions={stateOptions}
-          timeZoneOptions={timeZoneOptions}
-        />
       </div>
     </Layout>
   );
