@@ -3,8 +3,8 @@ import React from 'react';
 import { Calendar, Clock, UserCircle, Video, FileText, XCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { TimeZoneService } from '@/utils/timeZoneService';
 import { Appointment } from '@/types/appointment';
+import { formatInClientTimezone, getSafeTimezone, DATE_FORMATS } from '@/utils/dateFormatting';
 
 export interface AppointmentCardProps {
   appointment: Appointment;
@@ -25,15 +25,16 @@ export const AppointmentCard: React.FC<AppointmentCardProps> = ({
   onDocumentSession,
   onSessionDidNotOccur
 }) => {
-  // Format time for display in user's time zone directly from UTC timestamps
+  const safeTimezone = getSafeTimezone(userTimeZone);
+
+  // Format time for display in user's time zone using date-fns-tz
   const formatTimeDisplay = (utcTimestamp: string) => {
-    return TimeZoneService.formatUTCInTimezone(utcTimestamp, userTimeZone, 'h:mm a');
+    return formatInClientTimezone(utcTimestamp, safeTimezone, DATE_FORMATS.TIME_ONLY);
   };
   
   // Format date from UTC timestamp
   const formatDateDisplay = (utcTimestamp: string) => {
-    const localDate = TimeZoneService.fromUTC(utcTimestamp, userTimeZone);
-    return localDate.toFormat('EEEE, MMMM d, yyyy');
+    return formatInClientTimezone(utcTimestamp, safeTimezone, DATE_FORMATS.LONG_DATE);
   };
 
   if (onDocumentSession) {

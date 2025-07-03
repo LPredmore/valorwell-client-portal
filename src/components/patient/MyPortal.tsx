@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -14,6 +15,7 @@ import VideoChat from '@/components/video/VideoChat';
 import { TimeZoneService } from '@/utils/timeZoneService';
 import PHQ9Template from '@/components/templates/PHQ9Template';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { formatInClientTimezone, getSafeTimezone, DATE_FORMATS, convertToClientZone } from '@/utils/dateFormatting';
 
 interface Appointment {
   id: number;
@@ -55,9 +57,7 @@ const MyPortal: React.FC<MyPortalProps> = ({
 
   // Memoize client timezone to prevent recalculation on every render
   const clientTimeZone = useMemo(() => {
-    return TimeZoneService.ensureIANATimeZone(
-      clientData?.client_time_zone || getUserTimeZone()
-    );
+    return getSafeTimezone(clientData?.client_time_zone);
   }, [clientData?.client_time_zone]);
 
   useEffect(() => {
@@ -120,16 +120,14 @@ const MyPortal: React.FC<MyPortalProps> = ({
         console.log("Appointments data from Supabase:", data);
         
         if (data && data.length > 0) {
-          // Process appointments with TimeZoneService
+          // Process appointments with date-fns-tz
           const formattedAppointments = data.map(appointment => {
             try {
               // Convert UTC timestamps to client timezone and format for display
-              const startDateTime = TimeZoneService.fromUTC(appointment.start_at, clientTimeZone);
-              
               return {
                 id: appointment.id,
-                formattedDate: startDateTime.toFormat('MMMM d, yyyy'),
-                formattedTime: startDateTime.toFormat('h:mm a'),
+                formattedDate: formatInClientTimezone(appointment.start_at, clientTimeZone, DATE_FORMATS.DATE_ONLY),
+                formattedTime: formatInClientTimezone(appointment.start_at, clientTimeZone, DATE_FORMATS.TIME_ONLY),
                 type: appointment.type,
                 therapist: clinicianName || 'Your Therapist',
                 start_at: appointment.start_at,
@@ -179,9 +177,9 @@ const MyPortal: React.FC<MyPortalProps> = ({
     if (!appointment.start_at) return false;
     
     try {
-      const apptDate = TimeZoneService.fromUTC(appointment.start_at, clientTimeZone);
-      const today = TimeZoneService.today(clientTimeZone);
-      return TimeZoneService.isSameDay(apptDate, today);
+      const apptDate = convertToClientZone(appointment.start_at, clientTimeZone);
+      const today = new Date();
+      return apptDate.toDateString() === today.toDateString();
     } catch (error) {
       console.error('Error in isAppointmentToday:', error);
       return false;
@@ -403,41 +401,42 @@ const MyPortal: React.FC<MyPortalProps> = ({
               <h3 className="text-lg font-medium">No upcoming appointments</h3>
               <p className="text-sm text-gray-500 mt-1">Schedule a session with your therapist</p>
               <Button className="mt-4" onClick={() => setIsBookingOpen(true)}>
-                Book Appointment
+                <PlusCircle className="mr-2 h-4 w-4" />
+                Schedule Appointment
               </Button>
             </div>
           )}
         </CardContent>
-        <CardFooter className="flex justify-between">
-          
-        </CardFooter>
       </Card>
 
-      <AppointmentBookingDialog 
-        open={isBookingOpen} 
-        onOpenChange={setIsBookingOpen} 
-        clinicianId={clientData?.client_assigned_therapist || null} 
-        clinicianName={clinicianName} 
-        clientId={clientData?.id || null} 
+      {/* Appointment Booking Dialog */}
+      <AppointmentBookingDialog
+        open={isBookingOpen}
+        onOpenChange={setIsBookingOpen}
+        clinicianId={clientData?.client_assigned_therapist}
+        clinicianName={clinicianName}
+        clientId={clientData?.id}
         onAppointmentBooked={handleBookingComplete}
         userTimeZone={clientTimeZone}
       />
 
-      {showPHQ9 && (
-        <PHQ9Template 
-          onClose={() => setShowPHQ9(false)} 
-          clinicianName={clinicianName || "Your Therapist"} 
-          clientData={clientData} 
-          onComplete={handlePHQ9Complete} 
-          appointmentId={pendingAppointmentId}
+      {/* PHQ9 Assessment Dialog */}
+      {showPHQ9 && pendingAppointmentId && (
+        <PHQ9Template
+          appointmentId={pendingAppointmentId.toString()}
+          onComplete={handlePHQ9Complete}
+          onCancel={() => {
+            setShowPHQ9(false);
+            setPendingAppointmentId(null);
+          }}
         />
       )}
 
-      {videoRoomUrl && (
-        <VideoChat 
-          roomUrl={videoRoomUrl} 
-          isOpen={isVideoSessionOpen} 
-          onClose={handleCloseVideoSession} 
+      {/* Video Chat Component */}
+      {isVideoSessionOpen && videoRoomUrl && (
+        <VideoChat
+          roomUrl={videoRoomUrl}
+          onClose={handleCloseVideoSession}
         />
       )}
     </div>

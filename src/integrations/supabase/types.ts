@@ -484,6 +484,50 @@ export type Database = {
           },
         ]
       }
+      blocked_time: {
+        Row: {
+          clinician_id: string
+          created_at: string
+          end_at: string
+          id: string
+          label: string
+          notes: string | null
+          start_at: string
+          timezone: string
+          updated_at: string
+        }
+        Insert: {
+          clinician_id: string
+          created_at?: string
+          end_at: string
+          id?: string
+          label?: string
+          notes?: string | null
+          start_at: string
+          timezone?: string
+          updated_at?: string
+        }
+        Update: {
+          clinician_id?: string
+          created_at?: string
+          end_at?: string
+          id?: string
+          label?: string
+          notes?: string | null
+          start_at?: string
+          timezone?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "blocked_time_clinician_id_fkey"
+            columns: ["clinician_id"]
+            isOneToOne: false
+            referencedRelation: "clinicians"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       calendar_sync_logs: {
         Row: {
           appointment_id: string | null
@@ -2229,6 +2273,7 @@ export type Database = {
           connector_id: string | null
           created_at: string | null
           email: string
+          grant_id: string | null
           grant_status: string | null
           id: string
           is_active: boolean | null
@@ -2247,8 +2292,9 @@ export type Database = {
           connector_id?: string | null
           created_at?: string | null
           email: string
+          grant_id?: string | null
           grant_status?: string | null
-          id: string
+          id?: string
           is_active?: boolean | null
           last_sync_at?: string | null
           provider?: string
@@ -2265,6 +2311,7 @@ export type Database = {
           connector_id?: string | null
           created_at?: string | null
           email?: string
+          grant_id?: string | null
           grant_status?: string | null
           id?: string
           is_active?: boolean | null

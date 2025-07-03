@@ -8,6 +8,7 @@ import { useToast } from '@/hooks/use-toast';
 import { getUserTimeZone } from '@/utils/timeZoneUtils';
 import { TimeZoneService } from '@/utils/timeZoneService';
 import { DebugUtils } from '@/utils/debugUtils';
+import { formatInClientTimezone, getSafeTimezone, DATE_FORMATS } from '@/utils/dateFormatting';
 
 // Create a unique session ID for consistent debugging
 const DEBUG_SESSION = DebugUtils.generateSessionId();
@@ -148,16 +149,10 @@ const MyAppointments: React.FC<MyAppointmentsProps> = ({ pastAppointments: initi
         console.log(`[${DEBUG_SESSION}] Client data retrieved:`, client);
         safeSetState(setClientData, client);
         
-        // Get timezone from client data or default to browser
-        if (client?.client_time_zone) {
-          const safeTimezone = TimeZoneService.ensureIANATimeZone(client.client_time_zone);
-          console.log(`[${DEBUG_SESSION}] Setting client timezone from database: ${client.client_time_zone} → ${safeTimezone}`);
-          safeSetState(setClientTimeZone, safeTimezone);
-        } else {
-          const browserTimezone = getUserTimeZone();
-          console.log(`[${DEBUG_SESSION}] No client timezone found, using browser timezone: ${browserTimezone}`);
-          safeSetState(setClientTimeZone, TimeZoneService.ensureIANATimeZone(browserTimezone));
-        }
+        // Get safe timezone from client data
+        const safeTimezone = getSafeTimezone(client?.client_time_zone);
+        console.log(`[${DEBUG_SESSION}] Setting client timezone: ${client?.client_time_zone} → ${safeTimezone}`);
+        safeSetState(setClientTimeZone, safeTimezone);
         
         // Fetch clinician name if assigned
         if (client?.client_assigned_therapist) {
@@ -251,13 +246,11 @@ const MyAppointments: React.FC<MyAppointmentsProps> = ({ pastAppointments: initi
           
           const formattedAppointments = data.map(appointment => {
             try {
-              // Format using TimeZoneService for consistency
-              const startDateTime = TimeZoneService.fromUTC(appointment.start_at, clientTimeZone);
-              
+              // Use date-fns-tz for consistent formatting
               return {
                 id: appointment.id,
-                formattedDate: startDateTime.toFormat('MMMM d, yyyy'),
-                formattedTime: startDateTime.toFormat('h:mm a'),
+                formattedDate: formatInClientTimezone(appointment.start_at, clientTimeZone, DATE_FORMATS.DATE_ONLY),
+                formattedTime: formatInClientTimezone(appointment.start_at, clientTimeZone, DATE_FORMATS.TIME_ONLY),
                 type: appointment.type || 'Appointment',
                 therapist: clinicianName || 'Your Therapist',
                 status: appointment.status,
@@ -375,4 +368,3 @@ const MyAppointments: React.FC<MyAppointmentsProps> = ({ pastAppointments: initi
 };
 
 export default MyAppointments;
-
