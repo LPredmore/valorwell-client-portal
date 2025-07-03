@@ -7,7 +7,6 @@ import { Calendar, Loader2, Clock, AlertCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/NewAuthContext';
 import { toast } from 'sonner';
-import AppointmentBookingDialog from '@/components/patient/AppointmentBookingDialog';
 import { supabase, getOrCreateVideoRoom } from '@/integrations/supabase/client';
 import { TimeZoneService } from '@/utils/timeZoneService';
 import { Appointment } from '@/types/appointment';
@@ -28,7 +27,6 @@ const PatientDashboard = () => {
     clientProfile,
     userId
   } = useAuth();
-  const [isBookingDialogOpen, setIsBookingDialogOpen] = useState(false);
   const [loadingTimeoutReached, setLoadingTimeoutReached] = useState(false);
 
   // New states for appointments
@@ -215,17 +213,6 @@ const PatientDashboard = () => {
     };
     fetchAppointments();
   }, [userId, clientProfile, clientTimeZone]);
-
-  // Handle booking dialog
-  const handleOpenBookingDialog = () => {
-    setIsBookingDialogOpen(true);
-  };
-  const handleBookingComplete = () => {
-    toast.success("Appointment booked successfully!");
-    setIsBookingDialogOpen(false);
-    // Refresh appointments after booking
-    window.location.reload(); // Simple refresh for now
-  };
 
   // Format time for display in user's time zone
   const formatAppointmentTime = (utcTimestamp: string) => {
@@ -464,13 +451,10 @@ const PatientDashboard = () => {
               
               {/* Therapist Information */}
               <Card>
-                <CardHeader className="pb-2 flex flex-row items-center justify-between">
+                <CardHeader className="pb-2">
                   <div>
                     <CardTitle className="text-lg">Your Therapist</CardTitle>
                   </div>
-                  <Button variant="outline" size="sm" onClick={handleOpenBookingDialog}>
-                    Book New Appointment
-                  </Button>
                 </CardHeader>
                 <CardContent className="pt-2">
                   <div className="flex items-start gap-4">
@@ -541,10 +525,7 @@ const PatientDashboard = () => {
                     <div className="flex flex-col items-center justify-center py-8 text-center">
                       <Calendar className="h-16 w-16 text-gray-300 mb-4" />
                       <h3 className="text-lg font-medium">No upcoming appointments</h3>
-                      <p className="text-sm text-gray-500 mt-1">Schedule a session with your therapist</p>
-                      <Button className="mt-4" onClick={handleOpenBookingDialog}>
-                        Book Appointment
-                      </Button>
+                      <p className="text-sm text-gray-500 mt-1">Your scheduled sessions will appear here</p>
                     </div>
                   )}
                 </CardContent>
@@ -554,17 +535,6 @@ const PatientDashboard = () => {
         </Tabs>
       </div>
       
-      {/* Appointment Booking Dialog */}
-      <AppointmentBookingDialog 
-        open={isBookingDialogOpen} 
-        onOpenChange={setIsBookingDialogOpen} 
-        clinicianId={clientProfile?.client_assigned_therapist || null} 
-        clinicianName={null} // We could fetch this if needed 
-        clientId={userId} 
-        onAppointmentBooked={handleBookingComplete} 
-        userTimeZone={clientTimeZone} 
-      />
-
       {/* PHQ9 Assessment Dialog */}
       {showPHQ9 && (
         <PHQ9Template 
@@ -605,6 +575,8 @@ const PatientDashboard = () => {
           onClose={handleCloseVideoSession} 
         />
       )}
-    </NewLayout>;
+    </NewLayout>
+  );
 };
+
 export default PatientDashboard;
