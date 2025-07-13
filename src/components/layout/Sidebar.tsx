@@ -4,7 +4,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import { User, FileText, Settings, Home, LogOut, UserCheck, CalendarCheck, Shield } from 'lucide-react';
+import { User, FileText, Settings, Home, LogOut, UserCheck, Shield } from 'lucide-react';
 import { useAuth } from '@/context/NewAuthContext';
 
 // Function to determine if a route is active
@@ -35,10 +35,6 @@ const Sidebar = () => {
     name: 'Documents',
     path: '/patient-documents',
     icon: FileText
-  }, {
-    name: 'Past Appointments',
-    path: '/past-appointments',
-    icon: CalendarCheck
   }, {
     name: 'Insurance',
     path: '/patient-insurance',

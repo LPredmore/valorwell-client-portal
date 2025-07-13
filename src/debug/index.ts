@@ -1,40 +1,59 @@
-import { DebugUtils, loadDebugModule } from './debugUtils';
+import DebugUtils, { isDebugEnabled, loadDebugModule } from './debugUtils';
+import { debugAuthOperation } from './authDebugUtils';
 import { testAuthFixes, verifyAuthInitializedFlag } from './authFixesTest';
 
-// Re-export the main debug utility
-export { DebugUtils, loadDebugModule };
+/**
+ * Consolidated debug utilities for the application
+ * This module provides specialized debug utilities for different parts of the application
+ */
 
-// Export specialized debug utilities for different parts of the application
-export const AppointmentDebug = {
-  analyzeAppointment: DebugUtils.analyzeAppointment.bind(DebugUtils),
-  visualizeAppointment: DebugUtils.visualizeAppointment.bind(DebugUtils),
-  visualizeAppointmentBlock: DebugUtils.visualizeAppointmentBlock.bind(DebugUtils),
-  trackTimezoneConversion: DebugUtils.trackTimezoneConversion.bind(DebugUtils),
-  checkForDSTTransition: (utcStart: any, utcEnd: any, timezone: string) =>
-    DebugUtils.VERBOSE ? false : false, // Private method, exposed as a stub
-};
+// Export core debug utilities
+export { DebugUtils, isDebugEnabled, loadDebugModule };
 
-export const CalendarDebug = {
-  logHookParameterMismatch: DebugUtils.logHookParameterMismatch.bind(DebugUtils),
-  validateHookParameters: DebugUtils.validateHookParameters.bind(DebugUtils),
-  visualizeAvailabilityBlock: DebugUtils.visualizeAvailabilityBlock.bind(DebugUtils),
-  compareDataStructures: DebugUtils.compareDataStructures.bind(DebugUtils),
-};
-
+// Export auth debug utilities
 export const AuthDebug = {
-  log: (message: string, data?: any) => DebugUtils.log('AuthDebug', message, data),
-  error: (message: string, error?: any) => DebugUtils.error('AuthDebug', message, error),
-  warn: (message: string, data?: any) => DebugUtils.warn('AuthDebug', message, data),
-  info: (message: string, data?: any) => DebugUtils.info('AuthDebug', message, data),
-  compareDataStructures: (expected: any, actual: any) =>
-    DebugUtils.compareDataStructures('AuthDebug', expected, actual),
-  // Add authentication fixes test functions
+  log: (message: string, data?: any) => DebugUtils.log('Auth', message, data),
+  error: (message: string, error?: any) => DebugUtils.error('Auth', message, error),
+  warn: (message: string, data?: any) => DebugUtils.warn('Auth', message, data),
+  info: (message: string, data?: any) => DebugUtils.info('Auth', message, data),
+  operation: debugAuthOperation,
   testAuthFixes,
   verifyAuthInitializedFlag
 };
 
-// Helper to conditionally enable debug features based on environment
-export const isDebugEnabled = process.env.NODE_ENV === 'development';
+// Export general utilities
+export const GeneralDebug = {
+  compareDataStructures: (expected: any, actual: any, context = 'DataComparison') => {
+    DebugUtils.log(context, 'Comparing data structures');
+    
+    if (JSON.stringify(expected) === JSON.stringify(actual)) {
+      DebugUtils.log(context, 'Data structures match');
+      return true;
+    } else {
+      DebugUtils.warn(context, 'Data structures do not match', {
+        expected,
+        actual,
+        diff: {
+          expectedKeys: Object.keys(expected || {}),
+          actualKeys: Object.keys(actual || {})
+        }
+      });
+      return false;
+    }
+  },
+  
+  validateParameters: (hookName: string, params: any, requiredParams: string[]) => {
+    const missingParams = requiredParams.filter(param => !(param in params));
+    
+    if (missingParams.length > 0) {
+      DebugUtils.error(hookName, `Missing required parameters: ${missingParams.join(', ')}`, params);
+      return false;
+    }
+    
+    DebugUtils.log(hookName, 'All required parameters present', params);
+    return true;
+  }
+};
 
 // Helper to conditionally log based on environment
 export function debugLog(context: string, message: string, data?: any): void {
@@ -42,3 +61,5 @@ export function debugLog(context: string, message: string, data?: any): void {
     DebugUtils.log(context, message, data);
   }
 }
+
+export default DebugUtils;

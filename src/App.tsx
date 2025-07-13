@@ -24,7 +24,7 @@ import UpdatePassword from "./pages/UpdatePassword";
 import AuthDebugPage from "./pages/AuthDebugPage";
 import PatientProfile from "./pages/PatientProfile";
 import PatientInsurance from "./pages/PatientInsurance";
-import PastAppointments from "./pages/PastAppointments";
+
 
 // Create a query client with improved error handling and retry logic
 const queryClient = new QueryClient({
@@ -96,11 +96,6 @@ function App() {
                     <Route path="/patient-insurance" element={
                       <AuthProtectedRoute allowedRoles={["client"]} blockNewClients={true}>
                         <PatientInsurance />
-                      </AuthProtectedRoute>
-                    } />
-                    <Route path="/past-appointments" element={
-                      <AuthProtectedRoute allowedRoles={["client"]} blockNewClients={true}>
-                        <PastAppointments />
                       </AuthProtectedRoute>
                     } />
                     <Route path="/therapist-selection" element={
