@@ -8,7 +8,7 @@ import AppointmentCard from './AppointmentCard';
 import PHQ9Template from '@/components/templates/PHQ9Template';
 import { getSafeTimezone } from '@/utils/dateFormatting';
 import { startOfDay, endOfDay, addDays } from 'date-fns';
-import { formatInTimeZone } from 'date-fns-tz';
+import { formatInTimeZone, fromZonedTime } from 'date-fns-tz';
 const DashboardTab = () => {
   const {
     user
@@ -31,15 +31,15 @@ const DashboardTab = () => {
       const safeTimezone = getSafeTimezone(timezone);
       const now = new Date();
       
-      // Get today's date range in client timezone
-      const todayStart = startOfDay(now);
-      const todayEnd = endOfDay(now);
-      const tomorrowStart = addDays(todayStart, 1);
+      // Get today's date range in client timezone, then convert to UTC
+      const todayStartInClientTZ = startOfDay(now);
+      const todayEndInClientTZ = endOfDay(now);
+      const tomorrowStartInClientTZ = addDays(todayStartInClientTZ, 1);
       
       // Convert to UTC for database query
-      const todayStartUTC = formatInTimeZone(todayStart, safeTimezone, "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'");
-      const todayEndUTC = formatInTimeZone(todayEnd, safeTimezone, "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'");
-      const tomorrowStartUTC = formatInTimeZone(tomorrowStart, safeTimezone, "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'");
+      const todayStartUTC = fromZonedTime(todayStartInClientTZ, safeTimezone).toISOString();
+      const todayEndUTC = fromZonedTime(todayEndInClientTZ, safeTimezone).toISOString();
+      const tomorrowStartUTC = fromZonedTime(tomorrowStartInClientTZ, safeTimezone).toISOString();
 
       // Fetch today's appointments
       const { data: todayData, error: todayError } = await supabase
