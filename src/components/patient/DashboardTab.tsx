@@ -22,6 +22,7 @@ const DashboardTab = () => {
   const [sessionLoading, setSessionLoading] = useState<string | null>(null);
   const [phq9Open, setPHQ9Open] = useState(false);
   const [currentAppointmentId, setCurrentAppointmentId] = useState<string>('');
+  const [cancelLoading, setCancelLoading] = useState<string | null>(null);
 
   // Fetch appointments
   const fetchAppointments = async (clientId: string, timezone: string) => {
@@ -124,6 +125,40 @@ const DashboardTab = () => {
     }
     setPHQ9Open(false);
     setCurrentAppointmentId('');
+  };
+
+  // Check if appointment is more than 24 hours away
+  const isMoreThan24HoursAway = (appointmentStartTime: string) => {
+    const appointmentDate = new Date(appointmentStartTime);
+    const now = new Date();
+    const diffInHours = (appointmentDate.getTime() - now.getTime()) / (1000 * 60 * 60);
+    return diffInHours > 24;
+  };
+
+  // Handle appointment cancellation
+  const handleCancelAppointment = async (appointmentId: string) => {
+    setCancelLoading(appointmentId);
+    
+    try {
+      const { error } = await supabase
+        .from('appointments')
+        .update({ status: 'cancelled' })
+        .eq('id', appointmentId);
+      
+      if (error) throw error;
+      
+      toast.success('Appointment cancelled successfully');
+      
+      // Refresh appointments
+      if (clientData) {
+        await fetchAppointments(clientData.id, clientData.client_time_zone);
+      }
+    } catch (error) {
+      console.error('Error cancelling appointment:', error);
+      toast.error('Failed to cancel appointment');
+    } finally {
+      setCancelLoading(null);
+    }
   };
   useEffect(() => {
     const fetchClientData = async () => {
@@ -261,6 +296,9 @@ const DashboardTab = () => {
                   isToday={false}
                   onStartSession={handleStartSession}
                   isSessionLoading={false}
+                  showCancelButton={isMoreThan24HoursAway(appointment.start_at)}
+                  onCancelAppointment={handleCancelAppointment}
+                  isCancelLoading={cancelLoading === appointment.id}
                 />
               ))}
             </div>
