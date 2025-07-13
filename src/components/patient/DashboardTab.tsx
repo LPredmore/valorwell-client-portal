@@ -8,7 +8,7 @@ import AppointmentCard from './AppointmentCard';
 import PHQ9Template from '@/components/templates/PHQ9Template';
 import { getSafeTimezone } from '@/utils/dateFormatting';
 import { startOfDay, endOfDay, addDays } from 'date-fns';
-import { formatInTimeZone, fromZonedTime } from 'date-fns-tz';
+import { formatInTimeZone } from 'date-fns-tz';
 const DashboardTab = () => {
   const {
     user
@@ -22,7 +22,6 @@ const DashboardTab = () => {
   const [sessionLoading, setSessionLoading] = useState<string | null>(null);
   const [phq9Open, setPHQ9Open] = useState(false);
   const [currentAppointmentId, setCurrentAppointmentId] = useState<string>('');
-  const [cancelLoading, setCancelLoading] = useState<string | null>(null);
 
   // Fetch appointments
   const fetchAppointments = async (clientId: string, timezone: string) => {
@@ -31,15 +30,15 @@ const DashboardTab = () => {
       const safeTimezone = getSafeTimezone(timezone);
       const now = new Date();
       
-      // Get today's date range in client timezone, then convert to UTC
-      const todayStartInClientTZ = startOfDay(now);
-      const todayEndInClientTZ = endOfDay(now);
-      const tomorrowStartInClientTZ = addDays(todayStartInClientTZ, 1);
+      // Get today's date range in client timezone
+      const todayStart = startOfDay(now);
+      const todayEnd = endOfDay(now);
+      const tomorrowStart = addDays(todayStart, 1);
       
       // Convert to UTC for database query
-      const todayStartUTC = fromZonedTime(todayStartInClientTZ, safeTimezone).toISOString();
-      const todayEndUTC = fromZonedTime(todayEndInClientTZ, safeTimezone).toISOString();
-      const tomorrowStartUTC = fromZonedTime(tomorrowStartInClientTZ, safeTimezone).toISOString();
+      const todayStartUTC = formatInTimeZone(todayStart, safeTimezone, "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'");
+      const todayEndUTC = formatInTimeZone(todayEnd, safeTimezone, "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'");
+      const tomorrowStartUTC = formatInTimeZone(tomorrowStart, safeTimezone, "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'");
 
       // Fetch today's appointments
       const { data: todayData, error: todayError } = await supabase
@@ -125,40 +124,6 @@ const DashboardTab = () => {
     }
     setPHQ9Open(false);
     setCurrentAppointmentId('');
-  };
-
-  // Check if appointment is more than 24 hours away
-  const isMoreThan24HoursAway = (appointmentStartTime: string) => {
-    const appointmentDate = new Date(appointmentStartTime);
-    const now = new Date();
-    const diffInHours = (appointmentDate.getTime() - now.getTime()) / (1000 * 60 * 60);
-    return diffInHours > 24;
-  };
-
-  // Handle appointment cancellation
-  const handleCancelAppointment = async (appointmentId: string) => {
-    setCancelLoading(appointmentId);
-    
-    try {
-      const { error } = await supabase
-        .from('appointments')
-        .update({ status: 'cancelled' })
-        .eq('id', appointmentId);
-      
-      if (error) throw error;
-      
-      toast.success('Appointment cancelled successfully');
-      
-      // Refresh appointments
-      if (clientData) {
-        await fetchAppointments(clientData.id, clientData.client_time_zone);
-      }
-    } catch (error) {
-      console.error('Error cancelling appointment:', error);
-      toast.error('Failed to cancel appointment');
-    } finally {
-      setCancelLoading(null);
-    }
   };
   useEffect(() => {
     const fetchClientData = async () => {
@@ -296,9 +261,6 @@ const DashboardTab = () => {
                   isToday={false}
                   onStartSession={handleStartSession}
                   isSessionLoading={false}
-                  showCancelButton={isMoreThan24HoursAway(appointment.start_at)}
-                  onCancelAppointment={handleCancelAppointment}
-                  isCancelLoading={cancelLoading === appointment.id}
                 />
               ))}
             </div>
