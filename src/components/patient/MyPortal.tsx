@@ -429,6 +429,11 @@ const MyPortal: React.FC<MyPortalProps> = ({
             setShowPHQ9(false);
             setPendingAppointmentId(null);
           }}
+          onClose={() => {
+            setShowPHQ9(false);
+            setPendingAppointmentId(null);
+          }}
+          clinicianName="Clinician"
         />
       )}
 
@@ -436,6 +441,7 @@ const MyPortal: React.FC<MyPortalProps> = ({
       {isVideoSessionOpen && videoRoomUrl && (
         <VideoChat
           roomUrl={videoRoomUrl}
+          isOpen={isVideoSessionOpen}
           onClose={handleCloseVideoSession}
         />
       )}

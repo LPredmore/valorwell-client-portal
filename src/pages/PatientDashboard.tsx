@@ -14,8 +14,12 @@ interface Appointment {
   id: string;
   start_at: string;
   end_at: string;
-  video_url: string;
+  video_room_url: string;
   notes: string;
+  client_id: string;
+  clinician_id: string;
+  type: string;
+  status: string;
   // Add other properties as needed
 }
 
@@ -201,9 +205,10 @@ const PatientDashboard = () => {
                 <AppointmentCard
                   key={appointment.id}
                   appointment={appointment}
-                  clientTimezone={clientData?.client_time_zone}
-                  onJoinVideo={handleJoinVideoSession}
-                  showJoinButton={true}
+                  timeZoneDisplay={clientData?.client_time_zone || 'UTC'}
+                  userTimeZone={clientData?.client_time_zone || 'UTC'}
+                  showStartButton={true}
+                  onStartSession={() => handleJoinVideoSession(appointment.video_room_url || '')}
                 />
               ))}
             </div>
@@ -219,9 +224,9 @@ const PatientDashboard = () => {
                 <AppointmentCard
                   key={appointment.id}
                   appointment={appointment}
-                  clientTimezone={clientData?.client_time_zone}
-                  onJoinVideo={handleJoinVideoSession}
-                  showJoinButton={false}
+                  timeZoneDisplay={clientData?.client_time_zone || 'UTC'}
+                  userTimeZone={clientData?.client_time_zone || 'UTC'}
+                  showStartButton={false}
                 />
               ))}
             </div>

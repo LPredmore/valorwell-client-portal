@@ -27,6 +27,7 @@ interface PHQ9TemplateProps {
   clientData?: ClientDetails | null;
   onComplete?: () => void; // Callback for when assessment is completed
   appointmentId?: string | number; // New prop for appointment ID
+  onCancel?: () => void; // Add this prop
 }
 
 // PHQ-9 questions
