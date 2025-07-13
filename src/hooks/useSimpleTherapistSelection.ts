@@ -10,6 +10,7 @@ export interface SimpleTherapist {
   clinician_last_name: string | null;
   clinician_professional_name: string | null;
   clinician_bio: string | null;
+  clinician_email: string | null;
   clinician_image_url: string | null;
   clinician_licensed_states: string[] | null;
   clinician_accepting_new_clients: "Yes" | "No" | null;
@@ -44,6 +45,7 @@ export const useSimpleTherapistSelection = ({ clientState, clientDateOfBirth }: 
             clinician_last_name, 
             clinician_professional_name, 
             clinician_bio, 
+            clinician_email,
             clinician_image_url, 
             clinician_licensed_states,
             clinician_accepting_new_clients,

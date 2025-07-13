@@ -68,7 +68,7 @@ const TherapistCard = ({
           )}
           <div className="ml-auto flex items-center gap-2 text-gray-600 bg-gray-50 px-3 py-2 rounded">
             <Mail className="h-4 w-4" />
-            <span className="text-sm">Contact for Availability: {email}</span>
+            <span className="text-sm">Email for Availability: {email}</span>
           </div>
         </div>
       </CardContent>

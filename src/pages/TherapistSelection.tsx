@@ -123,7 +123,7 @@ const TherapistSelection = () => {
                 name={therapist.clinician_professional_name || `${therapist.clinician_first_name || ''} ${therapist.clinician_last_name || ''}`.trim()}
                 bio={therapist.clinician_bio}
                 imageUrl={therapist.clinician_image_url}
-                email={therapist.clinician_bio || 'Contact clinic for email'}
+                email={therapist.clinician_email || 'Contact clinic for email'}
                 isSelected={selectedTherapistId === therapist.id}
                 onSelect={setSelectedTherapistId}
               />
