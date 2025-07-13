@@ -15,15 +15,12 @@ import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
-import PatientDashboard from "./pages/PatientDashboard";
-import PatientDocuments from "./pages/PatientDocuments";
 import ProfileSetup from "./pages/ProfileSetup";
 import TherapistSelection from "./pages/TherapistSelection";
 import ResetPasswordEnhanced from "./pages/ResetPasswordEnhanced";
 import UpdatePassword from "./pages/UpdatePassword";
 import AuthDebugPage from "./pages/AuthDebugPage";
-import PatientProfile from "./pages/PatientProfile";
-import PatientInsurance from "./pages/PatientInsurance";
+import PatientPortal from "./pages/PatientPortal";
 
 
 // Create a query client with improved error handling and retry logic
@@ -77,30 +74,37 @@ function App() {
                       </AuthProtectedRoute>
                     } />
                     
-                    {/* Protected routes - Block New clients */}
+                    {/* Main Patient Portal - Block New clients */}
+                    <Route path="/patient-portal" element={
+                      <AuthProtectedRoute allowedRoles={["client"]} blockNewClients={true}>
+                        <PatientPortal />
+                      </AuthProtectedRoute>
+                    } />
+                    
+                    {/* Legacy route redirects - redirect old routes to the new portal */}
                     <Route path="/patient-dashboard" element={
                       <AuthProtectedRoute allowedRoles={["client"]} blockNewClients={true}>
-                        <PatientDashboard />
+                        <PatientPortal />
                       </AuthProtectedRoute>
                     } />
                     <Route path="/patient-documents" element={
                       <AuthProtectedRoute allowedRoles={["client"]} blockNewClients={true}>
-                        <PatientDocuments />
+                        <PatientPortal />
                       </AuthProtectedRoute>
                     } />
                     <Route path="/patient-profile" element={
                       <AuthProtectedRoute allowedRoles={["client"]} blockNewClients={true}>
-                        <PatientProfile />
+                        <PatientPortal />
                       </AuthProtectedRoute>
                     } />
                     <Route path="/patient-insurance" element={
                       <AuthProtectedRoute allowedRoles={["client"]} blockNewClients={true}>
-                        <PatientInsurance />
+                        <PatientPortal />
                       </AuthProtectedRoute>
                     } />
                     <Route path="/therapist-selection" element={
                       <AuthProtectedRoute allowedRoles={["client"]}>
-                        <TherapistSelection />
+                        <PatientPortal />
                       </AuthProtectedRoute>
                     } />
                     

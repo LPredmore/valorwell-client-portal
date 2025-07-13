@@ -22,27 +22,11 @@ const Sidebar = () => {
     logout
   } = useAuth();
 
-  // Navigation items specific to patients
+  // Navigation items specific to patients - now simplified to single portal entry
   const navItems = [{
-    name: 'Dashboard',
-    path: '/patient-dashboard',
+    name: 'Patient Portal',
+    path: '/patient-portal',
     icon: Home
-  }, {
-    name: 'My Profile',
-    path: '/patient-profile',
-    icon: User
-  }, {
-    name: 'Documents',
-    path: '/patient-documents',
-    icon: FileText
-  }, {
-    name: 'Insurance',
-    path: '/patient-insurance',
-    icon: Shield
-  }, {
-    name: 'Therapist Selection',
-    path: '/therapist-selection',
-    icon: UserCheck
   }];
 
   // Handle logout
