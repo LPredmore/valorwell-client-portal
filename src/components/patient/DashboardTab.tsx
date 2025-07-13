@@ -3,11 +3,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useAuth } from '@/context/NewAuthContext';
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import TherapistInfoCard from '@/components/therapist/TherapistInfoCard';
 
 const DashboardTab = () => {
   const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(true);
   const [clientData, setClientData] = useState<any>(null);
+  const [therapistData, setTherapistData] = useState<any>(null);
 
   useEffect(() => {
     const fetchClientData = async () => {
@@ -30,6 +32,21 @@ const DashboardTab = () => {
           toast.error("Failed to load client data.");
         } else {
           setClientData(client);
+          
+          // If client has an assigned therapist, fetch therapist data
+          if (client?.client_assigned_therapist) {
+            const { data: therapist, error: therapistError } = await supabase
+              .from('clinicians')
+              .select('*')
+              .eq('id', client.client_assigned_therapist)
+              .single();
+            
+            if (therapistError) {
+              console.error("Error fetching therapist data:", therapistError);
+            } else {
+              setTherapistData(therapist);
+            }
+          }
         }
       } finally {
         setIsLoading(false);
@@ -84,6 +101,16 @@ const DashboardTab = () => {
           </p>
         </CardContent>
       </Card>
+
+      {/* Assigned Therapist Section */}
+      {therapistData && (
+        <TherapistInfoCard
+          name={therapistData.clinician_professional_name || `${therapistData.clinician_first_name || ''} ${therapistData.clinician_last_name || ''}`.trim()}
+          bio={therapistData.clinician_bio}
+          imageUrl={therapistData.clinician_image_url}
+          email={therapistData.clinician_email || 'Contact clinic for email'}
+        />
+      )}
     </div>
   );
 };
