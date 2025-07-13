@@ -12,7 +12,7 @@ const Index = () => {
   // Auto-redirect authenticated users
   useEffect(() => {
     if (authState === AuthState.AUTHENTICATED) {
-      navigate('/patient-dashboard');
+      navigate('/patient-portal');
     }
   }, [authState, navigate]);
 
