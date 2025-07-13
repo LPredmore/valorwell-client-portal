@@ -7,12 +7,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import NewLayout from "@/components/layout/NewLayout";
 import { formatInClientTimezone } from "@/utils/dateFormatting";
-
 const PatientDashboard = () => {
-  const { user } = useAuth();
+  const {
+    user
+  } = useAuth();
   const [isLoading, setIsLoading] = useState(true);
   const [clientData, setClientData] = useState<any>(null);
-
   useEffect(() => {
     const fetchClientData = async () => {
       setIsLoading(true);
@@ -23,61 +23,49 @@ const PatientDashboard = () => {
         }
 
         // Fetch client data
-        const { data: client, error: clientError } = await supabase
-          .from('clients')
-          .select('*')
-          .eq('id', user.id)
-          .single();
-
+        const {
+          data: client,
+          error: clientError
+        } = await supabase.from('clients').select('*').eq('id', user.id).single();
         if (clientError) {
           console.error("Error fetching client data:", clientError);
           toast.error("Failed to load client data.");
         } else {
           setClientData(client);
         }
-
       } finally {
         setIsLoading(false);
       }
     };
-
     fetchClientData();
   }, [user]);
-
   if (!user) {
-    return (
-      <NewLayout>
+    return <NewLayout>
         <div className="flex items-center justify-center min-h-screen">
           <div className="text-center">
             <h1 className="text-2xl font-bold mb-4">Please log in</h1>
             <p className="text-muted-foreground">You need to be logged in to view your dashboard.</p>
           </div>
         </div>
-      </NewLayout>
-    );
+      </NewLayout>;
   }
-
   if (isLoading) {
-    return (
-      <NewLayout>
+    return <NewLayout>
         <div className="flex items-center justify-center min-h-screen">
           <div className="text-center">
             <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-gray-900 mx-auto"></div>
             <p className="mt-4 text-lg">Loading your dashboard...</p>
           </div>
         </div>
-      </NewLayout>
-    );
+      </NewLayout>;
   }
-
-  return (
-    <NewLayout>
+  return <NewLayout>
       <div className="container mx-auto px-4 py-8">
         <div className="mb-8">
           <h1 className="text-3xl font-bold mb-2">
             Welcome back{clientData?.client_first_name ? `, ${clientData.client_first_name}` : ''}!
           </h1>
-          <p className="text-muted-foreground">Here's an overview of your health journey.</p>
+          
         </div>
 
         {/* Quick Links */}
@@ -135,8 +123,6 @@ const PatientDashboard = () => {
           </CardContent>
         </Card>
       </div>
-    </NewLayout>
-  );
+    </NewLayout>;
 };
-
 export default PatientDashboard;
