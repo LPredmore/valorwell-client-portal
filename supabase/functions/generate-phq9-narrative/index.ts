@@ -95,8 +95,11 @@ serve(async (req) => {
     console.log("DeepSeek API response received");
     
     // Extract the generated narrative from the API response
-    const narrative = data.choices[0]?.message?.content?.trim() || 
+    const rawNarrative = data.choices[0]?.message?.content?.trim() || 
       `Patient scored ${total_score} on the PHQ-9 assessment, indicating ${interpretation}.`;
+    
+    // Clean the narrative to remove unwanted formatting
+    const narrative = cleanNarrative(rawNarrative);
 
       // Return the generated narrative
       return { 
@@ -138,6 +141,48 @@ serve(async (req) => {
     );
   }
 });
+
+// Helper function to clean AI-generated narrative text
+function cleanNarrative(text: string): string {
+  if (!text) return text;
+  
+  let cleaned = text;
+  
+  // Remove common prefixes (case-insensitive)
+  const prefixPatterns = [
+    /^\*\*Clinical Narrative:\*\*\s*/i,
+    /^\*\*Clinical Assessment:\*\*\s*/i,
+    /^Clinical Narrative:\s*/i,
+    /^Clinical Assessment:\s*/i,
+    /^\*\*Assessment:\*\*\s*/i,
+    /^Assessment:\s*/i
+  ];
+  
+  for (const pattern of prefixPatterns) {
+    cleaned = cleaned.replace(pattern, '');
+  }
+  
+  // Remove word count suffixes
+  const suffixPatterns = [
+    /\s*\*\(Word count:.*?\)\*\s*$/i,
+    /\s*\(Word count:.*?\)\s*$/i,
+    /\s*\*\(.*?sentences\)\*\s*$/i,
+    /\s*\(.*?sentences\)\s*$/i
+  ];
+  
+  for (const pattern of suffixPatterns) {
+    cleaned = cleaned.replace(pattern, '');
+  }
+  
+  // Remove excessive markdown formatting
+  cleaned = cleaned.replace(/\*\*(.*?)\*\*/g, '$1'); // Remove bold formatting
+  cleaned = cleaned.replace(/\*(.*?)\*/g, '$1'); // Remove italic formatting
+  
+  // Clean up extra whitespace
+  cleaned = cleaned.trim();
+  
+  return cleaned;
+}
 
 // Helper function to interpret PHQ-9 scores
 function getScoreInterpretation(score: number): string {
