@@ -65,6 +65,9 @@ const TherapistSelectionTab = () => {
               ? `Showing therapists licensed in ${clientState} who can work with you.`
               : 'Choose a therapist who you feel would be the best fit for your needs.'}
           </p>
+          <p className="text-muted-foreground mt-3">
+            Our care team is constantly growing. As we hire more clinicians, they will show up here and you will be notified. We personally believe that your care should be in your hands. And you should be able to select your own therapist. Please reach out to the clinician of your choosing to discuss scheduling.
+          </p>
         </div>
         <Button 
           onClick={handleSubmit} 
