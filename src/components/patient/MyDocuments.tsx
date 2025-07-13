@@ -10,6 +10,7 @@ import { getCurrentUser, fetchClientHistoryData, DocumentAssignment } from '@/in
 import { useDocuments } from '@/hooks/useDocuments';
 import { getDocumentDownloadURLWithRetry } from '@/utils/enhancedFetching';
 import ClientHistoryViewDialog from './ClientHistoryViewDialog';
+import InformedConsentViewDialog from './InformedConsentViewDialog';
 
 type MyDocumentsProps = {
   clientId?: string;
@@ -28,6 +29,9 @@ const MyDocuments: React.FC<MyDocumentsProps> = ({
   const [isHistoryDialogOpen, setIsHistoryDialogOpen] = useState(false);
   const [historyData, setHistoryData] = useState<any>(null);
   const [isHistoryLoading, setIsHistoryLoading] = useState(false);
+  const [isConsentDialogOpen, setIsConsentDialogOpen] = useState(false);
+  const [consentData, setConsentData] = useState<any>(null);
+  const [isConsentLoading, setIsConsentLoading] = useState(false);
   
   const { 
     documents, 
@@ -110,6 +114,13 @@ const MyDocuments: React.FC<MyDocumentsProps> = ({
         return;
       }
       
+      // For Informed Consent documents, use the special dialog instead of PDF
+      if (document.document_type === 'informed_consent' || 
+          (document.document_title && document.document_title.toLowerCase().includes('informed consent'))) {
+        await fetchInformedConsentForm(document);
+        return;
+      }
+      
       // For completed assignments as documents
       if (document.document_type === 'assigned_document' && document.assignment) {
         console.log('Viewing completed assignment document:', document.assignment);
@@ -117,6 +128,22 @@ const MyDocuments: React.FC<MyDocumentsProps> = ({
         if (document.document_title.toLowerCase().includes('client history')) {
           await fetchClientHistoryForm(userId || document.assignment.client_id);
           return;
+        }
+        
+        // For informed consent assignments, use the special dialog
+        if (document.document_title.toLowerCase().includes('informed consent')) {
+          // Find the matching clinical document
+          const matchingDoc = documents.find(doc => 
+            doc.document_type === 'informed_consent'
+          );
+          
+          if (matchingDoc) {
+            await fetchInformedConsentForm(matchingDoc);
+            return;
+          } else {
+            toast.info("Informed consent document not found");
+            return;
+          }
         }
         
         // For other assignments, try to find a matching clinical document
@@ -179,6 +206,28 @@ const MyDocuments: React.FC<MyDocumentsProps> = ({
       toast.error("Failed to load client history");
     } finally {
       setIsHistoryLoading(false);
+    }
+  };
+
+  const fetchInformedConsentForm = async (document: any) => {
+    try {
+      setIsConsentLoading(true);
+      
+      // For informed consent, we just need the document date
+      // since the content is static
+      const consentData = {
+        document_date: document.document_date,
+        client_name: document.client_name
+      };
+      
+      console.log('Preparing informed consent data:', consentData);
+      setConsentData(consentData);
+      setIsConsentDialogOpen(true);
+    } catch (error) {
+      console.error('Exception preparing informed consent data:', error);
+      toast.error("Failed to load informed consent");
+    } finally {
+      setIsConsentLoading(false);
     }
   };
 
@@ -299,6 +348,13 @@ const MyDocuments: React.FC<MyDocumentsProps> = ({
         onClose={() => setIsHistoryDialogOpen(false)}
         data={historyData}
         isLoading={isHistoryLoading}
+      />
+      
+      <InformedConsentViewDialog 
+        isOpen={isConsentDialogOpen}
+        onClose={() => setIsConsentDialogOpen(false)}
+        data={consentData}
+        isLoading={isConsentLoading}
       />
     </>
   );
