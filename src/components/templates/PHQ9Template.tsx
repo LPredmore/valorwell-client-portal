@@ -19,7 +19,7 @@ import { useForm } from "react-hook-form";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { X } from "lucide-react";
-import { savePHQ9Assessment } from "@/integrations/supabase/client";
+import { savePHQ9AssessmentSync, generatePHQ9NarrativeAsync } from "@/integrations/supabase/client";
 
 interface PHQ9TemplateProps {
   onClose: () => void;
@@ -114,8 +114,16 @@ const PHQ9Template: React.FC<PHQ9TemplateProps> = ({
           appointment_id: appointmentId // Include the appointment ID if provided
         };
         
-        // Save the assessment to the database and generate AI analysis
-        const result = await savePHQ9Assessment(assessmentData);
+        // Save the assessment to the database (sync) and trigger background AI generation
+        const result = await savePHQ9AssessmentSync(assessmentData);
+        
+        // Start background narrative generation (fire and forget)
+        if (result.success) {
+          generatePHQ9NarrativeAsync(result.data.id, assessmentData).catch(error => {
+            console.error('Background narrative generation failed:', error);
+            // This doesn't affect the main flow
+          });
+        }
         
         if (!result.success) {
           console.error('Failed to save PHQ-9 assessment:', result.error);
@@ -129,7 +137,7 @@ const PHQ9Template: React.FC<PHQ9TemplateProps> = ({
           console.log('PHQ-9 assessment saved successfully:', result.data);
           toast({
             title: "Assessment Saved",
-            description: "PHQ-9 assessment has been saved and AI analysis has been generated.",
+            description: "PHQ-9 assessment has been saved. AI analysis is being generated in the background.",
           });
         }
       } else {

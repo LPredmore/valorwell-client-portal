@@ -286,12 +286,11 @@ export const updateClientProfile = async (clientId: string, profileData: any) =>
   }
 };
 
-// Function to save PHQ-9 assessment
-export const savePHQ9Assessment = async (assessmentData: any) => {
+// Function to save PHQ-9 assessment synchronously (immediate save, no AI generation)
+export const savePHQ9AssessmentSync = async (assessmentData: any) => {
   try {
-    console.log('Saving PHQ-9 assessment data:', assessmentData);
+    console.log('Saving PHQ-9 assessment data (sync):', assessmentData);
     
-    // First save the assessment data to get the ID
     const { data, error } = await supabase
       .from('phq9_assessments')
       .insert(assessmentData)
@@ -303,43 +302,75 @@ export const savePHQ9Assessment = async (assessmentData: any) => {
     }
     
     const savedAssessment = data[0];
-    console.log('PHQ-9 assessment saved successfully:', savedAssessment);
-
-    // Now call the edge function to generate a narrative
-    try {
-      console.log('Calling generate-phq9-narrative edge function');
-      const { data: narrativeData, error: narrativeError } = await supabase.functions.invoke(
-        'generate-phq9-narrative',
-        {
-          body: { assessmentData }
-        }
-      );
-
-      if (narrativeError) {
-        console.error('Error generating PHQ-9 narrative:', narrativeError);
-      } else if (narrativeData?.success && narrativeData?.narrative) {
-        console.log('Generated PHQ-9 narrative:', narrativeData.narrative);
-        
-        // Update the assessment record with the generated narrative
-        const { error: updateError } = await supabase
-          .from('phq9_assessments')
-          .update({ phq9_narrative: narrativeData.narrative })
-          .eq('id', savedAssessment.id);
-
-        if (updateError) {
-          console.error('Error updating PHQ-9 assessment with narrative:', updateError);
-        } else {
-          console.log('PHQ-9 assessment updated with narrative successfully');
-          // Update the saved assessment with the narrative for the return value
-          savedAssessment.phq9_narrative = narrativeData.narrative;
-        }
-      }
-    } catch (narrativeGenError) {
-      console.error('Exception in PHQ-9 narrative generation:', narrativeGenError);
-      // Narrative generation failed, but we've still saved the assessment data
-    }
+    console.log('PHQ-9 assessment saved successfully (sync):', savedAssessment);
 
     return { success: true, data: savedAssessment };
+  } catch (error) {
+    console.error('Exception while saving PHQ-9 assessment:', error);
+    return { success: false, error };
+  }
+};
+
+// Function to generate PHQ-9 narrative asynchronously (background processing)
+export const generatePHQ9NarrativeAsync = async (assessmentId: string, assessmentData: any) => {
+  try {
+    console.log('Starting background PHQ-9 narrative generation for assessment:', assessmentId);
+    
+    const { data: narrativeData, error: narrativeError } = await supabase.functions.invoke(
+      'generate-phq9-narrative',
+      {
+        body: { assessmentData }
+      }
+    );
+
+    if (narrativeError) {
+      console.error('Error generating PHQ-9 narrative (async):', narrativeError);
+      return { success: false, error: narrativeError };
+    } 
+    
+    if (narrativeData?.success && narrativeData?.narrative) {
+      console.log('Generated PHQ-9 narrative (async):', narrativeData.narrative);
+      
+      // Update the assessment record with the generated narrative
+      const { error: updateError } = await supabase
+        .from('phq9_assessments')
+        .update({ phq9_narrative: narrativeData.narrative })
+        .eq('id', assessmentId);
+
+      if (updateError) {
+        console.error('Error updating PHQ-9 assessment with narrative (async):', updateError);
+        return { success: false, error: updateError };
+      } else {
+        console.log('PHQ-9 assessment updated with narrative successfully (async)');
+        return { success: true, data: { narrative: narrativeData.narrative } };
+      }
+    }
+
+    return { success: false, error: 'No narrative generated' };
+  } catch (error) {
+    console.error('Exception in PHQ-9 narrative generation (async):', error);
+    return { success: false, error };
+  }
+};
+
+// Legacy function for backward compatibility (now uses the new separated flow)
+export const savePHQ9Assessment = async (assessmentData: any) => {
+  try {
+    // Save the assessment synchronously first
+    const saveResult = await savePHQ9AssessmentSync(assessmentData);
+    
+    if (!saveResult.success) {
+      return saveResult;
+    }
+
+    // Generate narrative asynchronously in background (fire and forget)
+    const assessmentId = saveResult.data.id;
+    generatePHQ9NarrativeAsync(assessmentId, assessmentData).catch(error => {
+      console.error('Background narrative generation failed:', error);
+      // This doesn't affect the main flow
+    });
+
+    return saveResult;
   } catch (error) {
     console.error('Exception while saving PHQ-9 assessment:', error);
     return { success: false, error };

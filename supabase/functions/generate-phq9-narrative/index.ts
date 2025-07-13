@@ -17,6 +17,8 @@ serve(async (req) => {
   }
 
   try {
+    // Use background task processing for long-running AI generation
+    const processRequest = async () => {
     const { assessmentData } = await req.json();
     
     // Validate the input data
@@ -96,17 +98,30 @@ serve(async (req) => {
     const narrative = data.choices[0]?.message?.content?.trim() || 
       `Patient scored ${total_score} on the PHQ-9 assessment, indicating ${interpretation}.`;
 
-    // Return the generated narrative
-    return new Response(
-      JSON.stringify({ 
+      // Return the generated narrative
+      return { 
         success: true, 
         narrative,
         interpretation
-      }),
-      {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
-    );
+      };
+    };
+
+    // Start background processing if supported
+    if (typeof EdgeRuntime !== 'undefined' && EdgeRuntime.waitUntil) {
+      EdgeRuntime.waitUntil(processRequest());
+      // Return immediate response
+      return new Response(
+        JSON.stringify({ success: true, message: "Processing started" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    } else {
+      // Fallback: process synchronously
+      const result = await processRequest();
+      return new Response(
+        JSON.stringify(result),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
   } catch (error) {
     console.error("Error in generate-phq9-narrative function:", error);
     
