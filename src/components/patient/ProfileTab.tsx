@@ -57,7 +57,6 @@ const ProfileTab: React.FC = () => {
   ];
   
   const genderIdentityOptions = [
-    '',
     'Male',
     'Female',
     'Cisgender',
@@ -72,7 +71,6 @@ const ProfileTab: React.FC = () => {
   ];
   
   const stateOptions = [
-    '',
     'Alabama', 'Alaska', 'Arizona', 'Arkansas', 'California', 'Colorado', 'Connecticut', 'Delaware', 'Florida', 'Georgia',
     'Hawaii', 'Idaho', 'Illinois', 'Indiana', 'Iowa', 'Kansas', 'Kentucky', 'Louisiana', 'Maine', 'Maryland',
     'Massachusetts', 'Michigan', 'Minnesota', 'Mississippi', 'Missouri', 'Montana', 'Nebraska', 'Nevada', 'New Hampshire', 'New Jersey',
