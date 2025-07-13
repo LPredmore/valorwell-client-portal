@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
-import { DocumentAssignment, updateDocumentStatus, saveDocumentSubmission } from '@/integrations/supabase/client';
+import { DocumentAssignment, updateDocumentStatus } from '@/integrations/supabase/client';
 import ClientHistoryTemplate from '@/components/templates/ClientHistoryTemplate';
 import InformedConsentTemplate from '@/components/templates/InformedConsentTemplate';
 import { handleFormSubmission, CLINICAL_DOCUMENTS_BUCKET } from '@/utils/formSubmissionUtils';
@@ -36,30 +36,32 @@ const DocumentFormRenderer: React.FC<DocumentFormRendererProps> = ({
       console.log('[DocumentFormRenderer] Client ID:', clientId);
       console.log('[DocumentFormRenderer] Assignment:', assignment);
       
-      // Update the assignment status
-      const newStatus = isDraft ? 'in_progress' : 'completed';
-      const { success: statusUpdateSuccess, error: statusUpdateError } = await updateDocumentStatus(assignment.id, newStatus);
-      
-      if (!statusUpdateSuccess) {
-        throw new Error(`Failed to update document status: ${statusUpdateError?.message || 'Unknown error'}`);
-      }
-      
-      // If completed, save to clinical_documents
-      if (!isDraft) {
-        // Generate the proper document type based on the assignment name
+      if (isDraft) {
+        // For draft saves, only update the assignment status
+        const { success: statusUpdateSuccess, error: statusUpdateError } = await updateDocumentStatus(assignment.id, 'in_progress');
+        
+        if (!statusUpdateSuccess) {
+          throw new Error(`Failed to update document status: ${statusUpdateError?.message || 'Unknown error'}`);
+        }
+        
+        toast.success("Progress saved successfully");
+        onSave();
+      } else {
+        // For completion, let handleFormSubmission handle everything
         const documentType = getDocumentType(assignment.document_name);
         
-        // Create the document info object with proper client ID
         const documentInfo = {
           clientId: clientId,
           documentType: documentType,
           documentDate: new Date(),
           documentTitle: assignment.document_name,
-          createdBy: clientId // Using clientId instead of the string 'client'
+          createdBy: clientId
         };
         
         if (formData.formElementId) {
-          // Use the formSubmissionUtils helper to generate and upload PDF
+          toast.loading("Generating document...", { id: 'pdf-generation' });
+          
+          // handleFormSubmission does everything: PDF generation, database insert, status update
           const result = await handleFormSubmission(
             formData.formElementId,
             documentInfo,
@@ -67,48 +69,22 @@ const DocumentFormRenderer: React.FC<DocumentFormRendererProps> = ({
             formData
           );
           
+          toast.dismiss('pdf-generation');
+          
           if (!result.success) {
-            throw new Error(`Failed to generate PDF: ${result.message}`);
+            throw new Error(`Failed to generate document: ${result.message}`);
           }
           
-          formData.pdf_path = result.filePath;
-          
-          // Log the file path for debugging
-          console.log(`[DocumentFormRenderer] Document PDF generated at path: ${result.filePath} in bucket: ${CLINICAL_DOCUMENTS_BUCKET}`);
+          console.log(`[DocumentFormRenderer] Document completed successfully at path: ${result.filePath}`);
+          toast.success("Document successfully completed!");
+          onComplete();
         } else {
-          console.warn('[DocumentFormRenderer] Form has no formElementId to capture');
+          throw new Error('Form has no content to capture');
         }
-        
-        // Save the document record
-        const documentData = {
-          client_id: clientId,
-          document_type: documentType,
-          document_title: assignment.document_name,
-          document_date: new Date().toISOString().split('T')[0],
-          file_path: formData.pdf_path || '', // Use the file path from PDF generation
-          created_by: clientId // Using clientId instead of the string 'client'
-        };
-        
-        // Validate document data before saving
-        if (!documentData.file_path) {
-          console.error('[DocumentFormRenderer] Missing file_path in document data');
-          throw new Error('Document file path is missing');
-        }
-        
-        const { success: documentSaveSuccess, error: documentSaveError } = await saveDocumentSubmission(documentData);
-        
-        if (!documentSaveSuccess) {
-          throw new Error(`Failed to save document data: ${documentSaveError?.message || 'Unknown error'}`);
-        }
-        
-        toast.success("Document successfully completed!");
-        onComplete();
-      } else {
-        toast.success("Progress saved successfully");
-        onSave();
       }
     } catch (error: any) {
       console.error('[DocumentFormRenderer] Error saving document:', error);
+      toast.dismiss('pdf-generation');
       toast.error(`Error: ${error.message || 'Failed to save document'}`);
     } finally {
       setIsSubmitting(false);
@@ -275,6 +251,11 @@ const DocumentFormRenderer: React.FC<DocumentFormRendererProps> = ({
         >
           Cancel
         </Button>
+        {isSubmitting && (
+          <div className="text-sm text-muted-foreground">
+            Processing document...
+          </div>
+        )}
       </CardFooter>
     </Card>
   );
