@@ -2,8 +2,19 @@ import React, { useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, Clock, Video } from 'lucide-react';
+import { Calendar, Clock, Video, X } from 'lucide-react';
 import { formatInClientTimezone, getSafeTimezone } from '@/utils/dateFormatting';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 interface AppointmentCardProps {
   appointment: {
@@ -18,6 +29,9 @@ interface AppointmentCardProps {
   isToday?: boolean;
   onStartSession: (appointmentId: string) => void;
   isSessionLoading?: boolean;
+  showCancelButton?: boolean;
+  onCancelAppointment?: (appointmentId: string) => void;
+  isCancelLoading?: boolean;
 }
 
 const AppointmentCard: React.FC<AppointmentCardProps> = ({
@@ -25,7 +39,10 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
   clientTimezone,
   isToday = false,
   onStartSession,
-  isSessionLoading = false
+  isSessionLoading = false,
+  showCancelButton = false,
+  onCancelAppointment,
+  isCancelLoading = false
 }) => {
   const safeTimezone = getSafeTimezone(clientTimezone);
   
@@ -81,8 +98,8 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
             </div>
           </div>
 
-          {isToday && appointment.status?.toLowerCase() === 'scheduled' && (
-            <div className="ml-4">
+          <div className="ml-4 flex items-center gap-2">
+            {isToday && appointment.status?.toLowerCase() === 'scheduled' && (
               <Button
                 onClick={() => onStartSession(appointment.id)}
                 disabled={isSessionLoading}
@@ -91,8 +108,41 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
                 <Video className="h-4 w-4" />
                 {isSessionLoading ? 'Starting...' : 'Start Session'}
               </Button>
-            </div>
-          )}
+            )}
+            
+            {showCancelButton && appointment.status?.toLowerCase() === 'scheduled' && onCancelAppointment && (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={isCancelLoading}
+                    className="flex items-center gap-2"
+                  >
+                    <X className="h-4 w-4" />
+                    {isCancelLoading ? 'Cancelling...' : 'Cancel'}
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Cancel Appointment</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Are you sure you want to cancel this appointment? This action cannot be undone.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>No, keep appointment</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={() => onCancelAppointment(appointment.id)}
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    >
+                      Yes, cancel appointment
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
+          </div>
         </div>
       </CardContent>
     </Card>

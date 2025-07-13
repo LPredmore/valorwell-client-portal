@@ -7,7 +7,7 @@ import TherapistInfoCard from '@/components/therapist/TherapistInfoCard';
 import AppointmentCard from './AppointmentCard';
 import PHQ9Template from '@/components/templates/PHQ9Template';
 import { getSafeTimezone } from '@/utils/dateFormatting';
-import { startOfDay, endOfDay, addDays } from 'date-fns';
+import { startOfDay, endOfDay, addDays, parseISO } from 'date-fns';
 import { formatInTimeZone } from 'date-fns-tz';
 const DashboardTab = () => {
   const {
@@ -20,6 +20,7 @@ const DashboardTab = () => {
   const [futureAppointments, setFutureAppointments] = useState<any[]>([]);
   const [appointmentsLoading, setAppointmentsLoading] = useState(false);
   const [sessionLoading, setSessionLoading] = useState<string | null>(null);
+  const [cancelLoading, setCancelLoading] = useState<string | null>(null);
   const [phq9Open, setPHQ9Open] = useState(false);
   const [currentAppointmentId, setCurrentAppointmentId] = useState<string>('');
 
@@ -124,6 +125,47 @@ const DashboardTab = () => {
     }
     setPHQ9Open(false);
     setCurrentAppointmentId('');
+  };
+
+  // Check if appointment is more than 24 hours away
+  const isMoreThan24HoursAway = (appointmentStart: string): boolean => {
+    try {
+      const appointmentDate = parseISO(appointmentStart);
+      const now = new Date();
+      const hoursUntilAppointment = (appointmentDate.getTime() - now.getTime()) / (1000 * 60 * 60);
+      return hoursUntilAppointment > 24;
+    } catch (error) {
+      console.error('Error calculating appointment time difference:', error);
+      return false;
+    }
+  };
+
+  // Handle appointment cancellation
+  const handleCancelAppointment = async (appointmentId: string) => {
+    setCancelLoading(appointmentId);
+    
+    try {
+      const { error } = await supabase
+        .from('appointments')
+        .update({ status: 'cancelled' })
+        .eq('id', appointmentId);
+
+      if (error) {
+        console.error('Error cancelling appointment:', error);
+        toast.error('Failed to cancel appointment');
+      } else {
+        toast.success('Appointment cancelled successfully');
+        // Refresh appointments
+        if (clientData) {
+          fetchAppointments(clientData.id, clientData.client_time_zone);
+        }
+      }
+    } catch (error) {
+      console.error('Exception cancelling appointment:', error);
+      toast.error('Failed to cancel appointment');
+    } finally {
+      setCancelLoading(null);
+    }
   };
   useEffect(() => {
     const fetchClientData = async () => {
@@ -261,6 +303,9 @@ const DashboardTab = () => {
                   isToday={false}
                   onStartSession={handleStartSession}
                   isSessionLoading={false}
+                  showCancelButton={isMoreThan24HoursAway(appointment.start_at)}
+                  onCancelAppointment={handleCancelAppointment}
+                  isCancelLoading={cancelLoading === appointment.id}
                 />
               ))}
             </div>
