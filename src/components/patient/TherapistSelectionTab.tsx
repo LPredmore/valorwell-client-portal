@@ -14,8 +14,9 @@ const TherapistSelectionTab = () => {
   const { clientProfile, isLoading: authLoading, refreshUserData } = useAuth();
   const clientState = clientProfile?.client_state || null;
   const clientDateOfBirth = clientProfile?.client_date_of_birth || null;
+  const clientChampva = clientProfile?.client_champva || null;
 
-  // Use the enhanced therapist selection hook with age filtering
+  // Use the enhanced therapist selection hook with CHAMPVA filtering
   const { 
     therapists, 
     loading, 
@@ -26,7 +27,8 @@ const TherapistSelectionTab = () => {
     isSubmitting
   } = useSimpleTherapistSelection({
     clientState,
-    clientDateOfBirth
+    clientDateOfBirth,
+    clientChampva
   });
 
   const handleSubmit = async () => {
@@ -101,12 +103,26 @@ const TherapistSelectionTab = () => {
 
       {!loading && !error && therapists.length === 0 && (
         <div className="bg-primary/10 border border-primary/20 rounded-md p-6 mb-6">
-          <p className="text-foreground leading-relaxed">
-            We're truly sorry, but at this moment all of our clinicians who are in your state are booked up and not taking new clients. We understand how difficult it can be to wait for care—and especially when you're seeking support that's covered and accessible. You're not alone in this, and we're here to help you take the next step.
-          </p>
-          <p className="text-foreground leading-relaxed mt-4">
-            We are fighting to get reach more therapists and grow our team to keep up with the extraordinary need that we have encountered. If you know any clinicians that would be interested in working with us, please let them know about us. The best thing we can do is increase awareness that we exist.
-          </p>
+          {!clientChampva || clientChampva.trim() === '' ? (
+            <div>
+              <h3 className="font-medium text-foreground mb-2">CHAMPVA Insurance Required</h3>
+              <p className="text-foreground leading-relaxed">
+                At this time, we are only able to provide services to clients who have CHAMPVA insurance coverage. Please ensure your CHAMPVA insurance information is complete in your profile to access our therapist selection.
+              </p>
+              <p className="text-foreground leading-relaxed mt-4">
+                If you have CHAMPVA insurance but it's not showing in your profile, please contact our support team to update your insurance information.
+              </p>
+            </div>
+          ) : (
+            <div>
+              <p className="text-foreground leading-relaxed">
+                We're truly sorry, but at this moment all of our clinicians who are in your state are booked up and not taking new clients. We understand how difficult it can be to wait for care—and especially when you're seeking support that's covered and accessible. You're not alone in this, and we're here to help you take the next step.
+              </p>
+              <p className="text-foreground leading-relaxed mt-4">
+                We are fighting to get reach more therapists and grow our team to keep up with the extraordinary need that we have encountered. If you know any clinicians that would be interested in working with us, please let them know about us. The best thing we can do is increase awareness that we exist.
+              </p>
+            </div>
+          )}
         </div>
       )}
 

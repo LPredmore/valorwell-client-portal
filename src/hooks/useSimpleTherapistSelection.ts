@@ -20,9 +20,10 @@ export interface SimpleTherapist {
 interface UseSimpleTherapistSelectionProps {
   clientState: string | null;
   clientDateOfBirth: string | Date | null;
+  clientChampva?: string | null;
 }
 
-export const useSimpleTherapistSelection = ({ clientState, clientDateOfBirth }: UseSimpleTherapistSelectionProps) => {
+export const useSimpleTherapistSelection = ({ clientState, clientDateOfBirth, clientChampva }: UseSimpleTherapistSelectionProps) => {
   const [therapists, setTherapists] = useState<SimpleTherapist[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -84,6 +85,17 @@ export const useSimpleTherapistSelection = ({ clientState, clientDateOfBirth }: 
           }
         }
         
+        // CHAMPVA filtering - only show therapists if client has CHAMPVA insurance
+        if (filteredTherapists.length > 0) {
+          const hasChampva = clientChampva && clientChampva.trim() !== '';
+          console.log('[TherapistSelection] CHAMPVA filtering:', { clientChampva, hasChampva });
+          
+          if (!hasChampva) {
+            console.log('[TherapistSelection] No CHAMPVA insurance - showing no therapists');
+            filteredTherapists = [];
+          }
+        }
+        
         setTherapists(filteredTherapists);
       } catch (err) {
         console.error('Error fetching therapists:', err);
@@ -94,7 +106,7 @@ export const useSimpleTherapistSelection = ({ clientState, clientDateOfBirth }: 
     };
 
     fetchTherapists();
-  }, [clientState, clientDateOfBirth]);
+  }, [clientState, clientDateOfBirth, clientChampva]);
 
   // Select a therapist
   const selectTherapist = async (therapistId: string): Promise<boolean> => {
