@@ -235,7 +235,7 @@ const DashboardTab = () => {
   return <div className="space-y-6">
       <div className="mb-8">
         <h2 className="text-3xl font-bold mb-2">
-          Welcome back{clientData?.client_first_name ? `, ${clientData.client_first_name}` : ''}!
+          Welcome back{clientData?.client_preferred_name || clientData?.client_first_name ? `, ${clientData.client_preferred_name || clientData.client_first_name}` : ''}!
         </h2>
       </div>
 
