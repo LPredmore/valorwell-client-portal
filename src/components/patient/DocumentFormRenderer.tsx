@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
-import { DocumentAssignment, updateDocumentStatus } from '@/integrations/supabase/client';
+import { DocumentAssignment, updateDocumentStatus, saveClientHistoryOptimized } from '@/integrations/supabase/client';
 import ClientHistoryTemplate from '@/components/templates/ClientHistoryTemplate';
 import InformedConsentTemplate from '@/components/templates/InformedConsentTemplate';
 import { handleFormSubmission, CLINICAL_DOCUMENTS_BUCKET } from '@/utils/formSubmissionUtils';
@@ -47,45 +47,82 @@ const DocumentFormRenderer: React.FC<DocumentFormRendererProps> = ({
         toast.success("Progress saved successfully");
         onSave();
       } else {
-        // For completion, let handleFormSubmission handle everything
-        const documentType = getDocumentType(assignment.document_name);
-        
-        const documentInfo = {
-          clientId: clientId,
-          documentType: documentType,
-          documentDate: new Date(),
-          documentTitle: assignment.document_name,
-          createdBy: clientId
-        };
-        
-        if (formData.formElementId) {
-          toast.loading("Generating document...", { id: 'pdf-generation' });
+        // Handle Client History forms with optimized data storage
+        if (assignment.document_name === 'Client History Form') {
+          console.log('[DocumentFormRenderer] Processing Client History with optimized storage');
           
-          // handleFormSubmission does everything: PDF generation, database insert, status update
-          const result = await handleFormSubmission(
-            formData.formElementId,
-            documentInfo,
-            assignment.document_name,
-            formData
-          );
-          
-          toast.dismiss('pdf-generation');
+          const result = await saveClientHistoryOptimized(formData);
           
           if (!result.success) {
-            throw new Error(`Failed to generate document: ${result.message}`);
+            // Handle specific file size errors
+            const errorMessage = result.error?.message || result.error;
+            if (errorMessage?.includes('payload') || errorMessage?.includes('too large') || errorMessage?.includes('size')) {
+              throw new Error('Form data is too large. Please reduce the amount of text in your responses and try again.');
+            }
+            throw new Error(`Failed to save client history: ${errorMessage}`);
           }
           
-          console.log(`[DocumentFormRenderer] Document completed successfully at path: ${result.filePath}`);
-          toast.success("Document successfully completed!");
+          // Update assignment status to completed
+          const { success: statusSuccess } = await updateDocumentStatus(assignment.id, 'completed');
+          if (!statusSuccess) {
+            console.warn('Failed to update assignment status, but form was saved successfully');
+          }
+          
+          console.log('[DocumentFormRenderer] Client History saved successfully');
+          toast.success("Client History form submitted successfully!");
           onComplete();
         } else {
-          throw new Error('Form has no content to capture');
+          // For other document types, use the existing PDF generation process
+          const documentType = getDocumentType(assignment.document_name);
+          
+          const documentInfo = {
+            clientId: clientId,
+            documentType: documentType,
+            documentDate: new Date(),
+            documentTitle: assignment.document_name,
+            createdBy: clientId
+          };
+          
+          if (formData.formElementId) {
+            toast.loading("Generating document...", { id: 'pdf-generation' });
+            
+            const result = await handleFormSubmission(
+              formData.formElementId,
+              documentInfo,
+              assignment.document_name,
+              formData
+            );
+            
+            toast.dismiss('pdf-generation');
+            
+            if (!result.success) {
+              // Handle specific file size errors
+              const errorMessage = result.message || '';
+              if (errorMessage.includes('file_size_limit') || errorMessage.includes('too large') || errorMessage.includes('size')) {
+                throw new Error('Generated document is too large. Please reduce the amount of content and try again.');
+              }
+              throw new Error(`Failed to generate document: ${result.message}`);
+            }
+            
+            console.log(`[DocumentFormRenderer] Document completed successfully at path: ${result.filePath}`);
+            toast.success("Document successfully completed!");
+            onComplete();
+          } else {
+            throw new Error('Form has no content to capture');
+          }
         }
       }
     } catch (error: any) {
       console.error('[DocumentFormRenderer] Error saving document:', error);
       toast.dismiss('pdf-generation');
-      toast.error(`Error: ${error.message || 'Failed to save document'}`);
+      
+      // Provide user-friendly error messages
+      let errorMessage = error.message || 'Failed to save document';
+      if (errorMessage.includes('PayloadTooLargeError') || errorMessage.includes('413') || errorMessage.includes('too large')) {
+        errorMessage = 'Form data is too large. Please reduce the amount of text in your responses and try again.';
+      }
+      
+      toast.error(`Error: ${errorMessage}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -213,7 +250,14 @@ const DocumentFormRenderer: React.FC<DocumentFormRendererProps> = ({
         return (
           <ClientHistoryTemplate 
             onClose={onCancel}
-            onSubmit={(data) => handleSave(data, false)}
+            onSubmit={async (data) => {
+              try {
+                await handleSave(data, false);
+                return { success: true };
+              } catch (error: any) {
+                return { success: false, error: error.message };
+              }
+            }}
             clientData={clientData}
           />
         );

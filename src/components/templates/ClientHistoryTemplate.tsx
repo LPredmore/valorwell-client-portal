@@ -13,9 +13,23 @@ import { FileText, X, ChevronLeft, Save, Plus } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { ClientDetails } from '@/types/client';
 
+// Add payload size monitoring helpers
+const getPayloadSize = (data: any): number => {
+  const jsonString = JSON.stringify(data);
+  return new Blob([jsonString]).size;
+};
+
+const formatBytes = (bytes: number): string => {
+  if (bytes === 0) return '0 Bytes';
+  const k = 1024;
+  const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+};
+
 interface ClientHistoryTemplateProps {
   onClose: () => void;
-  onSubmit: (data: any) => void;
+  onSubmit: (data: any) => Promise<{ success: boolean; error?: any }>;
   clientData?: ClientDetails | null;
 }
 
@@ -192,19 +206,147 @@ const ClientHistoryTemplate: React.FC<ClientHistoryTemplateProps> = ({ onClose, 
   
   const formattedDOB = clientData?.client_date_of_birth || '';
   
-  const handleSubmit = (formData: any) => {
-    const submissionData = {
-      ...formData,
-      formElementId: 'client-history-form-content',
-      fullName: fullName,
-      dateOfBirth: formattedDOB,
-      age: clientData?.client_age?.toString() || '',
-      state: clientData?.client_state || '',
-      phoneNumber: clientData?.client_phone || '',
-      email: clientData?.client_email || '',
-    };
-    
-    onSubmit(submissionData);
+  const handleSubmit = async (formData: any) => {
+    try {
+      // Clean and optimize the data structure
+      const optimizedData = {
+        // Core client info (keep minimal)
+        client_id: clientData?.id,
+        formElementId: 'client-history-form-content',
+        fullName: fullName,
+        dateOfBirth: formattedDOB,
+        age: clientData?.client_age?.toString() || '',
+        state: clientData?.client_state || '',
+        phoneNumber: clientData?.client_phone || '',
+        email: clientData?.client_email || '',
+        
+        // Form responses (clean empty values)
+        responses: {
+          currentIssues: (document.getElementById('currentIssues') as HTMLTextAreaElement)?.value?.trim() || '',
+          progressionOfIssues: (document.getElementById('progressionOfIssues') as HTMLTextAreaElement)?.value?.trim() || '',
+          relationshipProblems: (document.getElementById('relationshipProblems') as HTMLTextAreaElement)?.value?.trim() || '',
+          counselingGoals: (document.getElementById('counselingGoals') as HTMLTextAreaElement)?.value?.trim() || '',
+          personalStrengths: (document.getElementById('strengths') as HTMLTextAreaElement)?.value?.trim() || '',
+          hobbies: (document.getElementById('hobbies') as HTMLTextAreaElement)?.value?.trim() || '',
+          educationLevel: (document.getElementById('education') as HTMLSelectElement)?.value || '',
+          occupationDetails: (document.getElementById('occupation') as HTMLTextAreaElement)?.value?.trim() || '',
+          sleepHours: (document.getElementById('sleepHours') as HTMLInputElement)?.value || '',
+        },
+        
+        // Emergency contact (clean empty values)
+        emergency: {
+          name: (document.getElementById('emergencyName') as HTMLInputElement)?.value?.trim() || '',
+          phone: (document.getElementById('emergencyPhone') as HTMLInputElement)?.value?.trim() || '',
+          relationship: (document.getElementById('emergencyRelationship') as HTMLInputElement)?.value?.trim() || '',
+        },
+        
+        // Arrays (filter out empty entries)
+        selectedSymptoms: selectedSymptoms.filter(Boolean),
+        selectedChildhoodExperiences: selectedChildhoodExperiences.filter(Boolean),
+        selectedMedicalConditions: selectedMedicalConditions.filter(Boolean),
+        
+        // Family (only include non-empty entries)
+        family: family.filter(member => 
+          member.name?.trim() || member.relationshipType?.trim()
+        ).map(member => ({
+          relationshipType: member.relationshipType?.trim() || '',
+          name: member.name?.trim() || '',
+          personality: member.personality?.trim() || '',
+          relationshipGrowing: member.relationshipGrowing?.trim() || '',
+          relationshipNow: member.relationshipNow?.trim() || ''
+        })),
+        
+        // Household (only include non-empty entries) 
+        household: currentHousehold.filter(member => 
+          member.name?.trim() || member.relationshipType?.trim()
+        ).map(member => ({
+          relationshipType: member.relationshipType?.trim() || '',
+          name: member.name?.trim() || '',
+          personality: member.personality?.trim() || '',
+          relationshipNow: member.relationshipNow?.trim() || ''
+        })),
+        
+        // Treatments (only include non-empty entries)
+        treatments: treatments.filter(treatment => 
+          treatment.provider?.trim() || treatment.reason?.trim()
+        ).map(treatment => ({
+          year: treatment.year?.trim() || '',
+          reason: treatment.reason?.trim() || '',
+          length: treatment.length?.trim() || '',
+          provider: treatment.provider?.trim() || ''
+        })),
+        
+        // Medications (only include non-empty entries)
+        medications: medications.filter(med => 
+          med.name?.trim() || med.purpose?.trim()
+        ).map(med => ({
+          name: med.name?.trim() || '',
+          purpose: med.purpose?.trim() || '',
+          duration: med.duration?.trim() || ''
+        })),
+        
+        // Past spouses (only include non-empty entries)
+        pastSpouses: showPastSpouses ? pastSpouses.filter(spouse => 
+          spouse.name?.trim() || spouse.personality?.trim()
+        ).map(spouse => ({
+          name: spouse.name?.trim() || '',
+          personality: spouse.personality?.trim() || '',
+          relationship: spouse.relationship?.trim() || ''
+        })) : [],
+        
+        // Flags
+        isMarried,
+        showPastSpouses,
+        showTreatments,
+        showMedications,
+        sameHousehold,
+        
+        // Signature
+        signature: (document.getElementById('signature') as HTMLInputElement)?.value?.trim() || '',
+        
+        // Timestamp
+        submissionDate: new Date().toISOString()
+      };
+
+      // Check payload size before sending
+      const payloadSize = getPayloadSize(optimizedData);
+      console.log(`Form payload size: ${formatBytes(payloadSize)}`);
+      
+      if (payloadSize > 50 * 1024 * 1024) { // 50MB check
+        toast({
+          title: "Form Too Large",
+          description: `Form data (${formatBytes(payloadSize)}) exceeds size limit. Please reduce the amount of text in your responses.`,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (payloadSize > 10 * 1024 * 1024) { // 10MB warning
+        toast({
+          title: "Large Form Detected",
+          description: `Form data is ${formatBytes(payloadSize)}. Submitting...`,
+        });
+      }
+      
+      const result = await onSubmit(optimizedData);
+      
+      if (result?.success) {
+        toast({
+          title: "Success",
+          description: "Client History form submitted successfully!",
+        });
+      } else {
+        throw new Error(result?.error || 'Submission failed');
+      }
+      
+    } catch (error) {
+      console.error('Form submission error:', error);
+      toast({
+        title: "Submission Error",
+        description: "There was a problem submitting your form. Please try reducing the amount of text and try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   return (

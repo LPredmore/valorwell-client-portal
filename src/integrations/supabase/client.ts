@@ -582,6 +582,141 @@ export const createUser = async (userData: any): Promise<{ success: boolean; dat
 };
 
 // Function to save document submission
+// Add this new function to handle client history submissions more efficiently
+export const saveClientHistoryOptimized = async (historyData: any): Promise<{ success: boolean; data?: any; error?: any }> => {
+  try {
+    console.log('Saving optimized client history data:', {
+      client_id: historyData.client_id,
+      payloadSize: JSON.stringify(historyData).length,
+      familyCount: historyData.family?.length || 0,
+      medicationCount: historyData.medications?.length || 0
+    });
+    
+    // Split the data into manageable chunks for storage
+    const mainData = {
+      client_id: historyData.client_id,
+      current_issues: historyData.responses?.currentIssues,
+      progression_of_issues: historyData.responses?.progressionOfIssues,
+      relationship_problems: historyData.responses?.relationshipProblems,
+      counseling_goals: historyData.responses?.counselingGoals,
+      personal_strengths: historyData.responses?.personalStrengths,
+      hobbies: historyData.responses?.hobbies,
+      education_level: historyData.responses?.educationLevel,
+      occupation_details: historyData.responses?.occupationDetails,
+      sleep_hours: historyData.responses?.sleepHours,
+      emergency_name: historyData.emergency?.name,
+      emergency_phone: historyData.emergency?.phone,
+      emergency_relationship: historyData.emergency?.relationship,
+      selected_symptoms: JSON.stringify(historyData.selectedSymptoms || []),
+      selected_childhood_experiences: JSON.stringify(historyData.selectedChildhoodExperiences || []),
+      selected_medical_conditions: JSON.stringify(historyData.selectedMedicalConditions || []),
+      is_married: historyData.isMarried,
+      has_past_spouses: historyData.showPastSpouses,
+      has_received_mental_health_treatment: historyData.showTreatments,
+      takes_medications: historyData.showMedications,
+      is_family_same_as_household: historyData.sameHousehold,
+      signature: historyData.signature,
+      submission_date: historyData.submissionDate,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+
+    // Save main history data
+    const { data: savedHistory, error: historyError } = await supabase
+      .from('client_history')
+      .insert(mainData)
+      .select()
+      .single();
+
+    if (historyError) {
+      console.error('Error saving client history:', historyError);
+      return { success: false, error: historyError };
+    }
+
+    const historyId = savedHistory.id;
+
+    // Save related data in separate tables to avoid large payloads
+    const promises = [];
+
+    // Save family data
+    if (historyData.family?.length > 0) {
+      const familyData = historyData.family.map((member: any) => ({
+        history_id: historyId,
+        relationship_type: member.relationshipType,
+        name: member.name,
+        personality: member.personality,
+        relationship_growing: member.relationshipGrowing,
+        relationship_now: member.relationshipNow
+      }));
+      promises.push(supabase.from('client_history_family').insert(familyData));
+    }
+
+    // Save household data
+    if (historyData.household?.length > 0) {
+      const householdData = historyData.household.map((member: any) => ({
+        history_id: historyId,
+        relationship_type: member.relationshipType,
+        name: member.name,
+        personality: member.personality,
+        relationship_now: member.relationshipNow
+      }));
+      promises.push(supabase.from('client_history_household').insert(householdData));
+    }
+
+    // Save treatments data
+    if (historyData.treatments?.length > 0) {
+      const treatmentsData = historyData.treatments.map((treatment: any) => ({
+        history_id: historyId,
+        year: treatment.year,
+        reason: treatment.reason,
+        length: treatment.length,
+        provider: treatment.provider
+      }));
+      promises.push(supabase.from('client_history_treatments').insert(treatmentsData));
+    }
+
+    // Save medications data
+    if (historyData.medications?.length > 0) {
+      const medicationsData = historyData.medications.map((medication: any) => ({
+        history_id: historyId,
+        name: medication.name,
+        purpose: medication.purpose,
+        duration: medication.duration
+      }));
+      promises.push(supabase.from('client_history_medications').insert(medicationsData));
+    }
+
+    // Save past spouses data
+    if (historyData.pastSpouses?.length > 0) {
+      const spousesData = historyData.pastSpouses.map((spouse: any) => ({
+        history_id: historyId,
+        name: spouse.name,
+        personality: spouse.personality,
+        relationship: spouse.relationship
+      }));
+      promises.push(supabase.from('client_history_spouses').insert(spousesData));
+    }
+
+    // Execute all related data saves
+    if (promises.length > 0) {
+      const results = await Promise.allSettled(promises);
+      const failures = results.filter(result => result.status === 'rejected');
+      
+      if (failures.length > 0) {
+        console.warn('Some related data failed to save:', failures);
+        // Continue anyway - main data was saved successfully
+      }
+    }
+
+    console.log('Client history saved successfully with ID:', historyId);
+    return { success: true, data: savedHistory };
+
+  } catch (error) {
+    console.error('Exception while saving client history:', error);
+    return { success: false, error };
+  }
+};
+
 export const saveDocumentSubmission = async (documentData: any): Promise<{ success: boolean; data?: any; error?: any }> => {
   try {
     console.log('Saving document submission:', documentData);
