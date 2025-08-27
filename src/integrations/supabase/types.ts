@@ -7,46 +7,13 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instanciate createClient with right options
+  // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "12.2.3 (519615d)"
   }
   public: {
     Tables: {
-      admins: {
-        Row: {
-          admin_email: string
-          admin_first_name: string | null
-          admin_last_name: string | null
-          admin_phone: string | null
-          admin_status: string | null
-          created_at: string
-          id: string
-          updated_at: string
-        }
-        Insert: {
-          admin_email: string
-          admin_first_name?: string | null
-          admin_last_name?: string | null
-          admin_phone?: string | null
-          admin_status?: string | null
-          created_at?: string
-          id: string
-          updated_at?: string
-        }
-        Update: {
-          admin_email?: string
-          admin_first_name?: string | null
-          admin_last_name?: string | null
-          admin_phone?: string | null
-          admin_status?: string | null
-          created_at?: string
-          id?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
       api_logs: {
         Row: {
           client_context: Json | null
@@ -1647,27 +1614,6 @@ export type Database = {
           clinician_availability_start_wednesday_1: string | null
           clinician_availability_start_wednesday_2: string | null
           clinician_availability_start_wednesday_3: string | null
-          clinician_availability_timezone_friday_1: string | null
-          clinician_availability_timezone_friday_2: string | null
-          clinician_availability_timezone_friday_3: string | null
-          clinician_availability_timezone_monday_1: string | null
-          clinician_availability_timezone_monday_2: string | null
-          clinician_availability_timezone_monday_3: string | null
-          clinician_availability_timezone_saturday_1: string | null
-          clinician_availability_timezone_saturday_2: string | null
-          clinician_availability_timezone_saturday_3: string | null
-          clinician_availability_timezone_sunday_1: string | null
-          clinician_availability_timezone_sunday_2: string | null
-          clinician_availability_timezone_sunday_3: string | null
-          clinician_availability_timezone_thursday_1: string | null
-          clinician_availability_timezone_thursday_2: string | null
-          clinician_availability_timezone_thursday_3: string | null
-          clinician_availability_timezone_tuesday_1: string | null
-          clinician_availability_timezone_tuesday_2: string | null
-          clinician_availability_timezone_tuesday_3: string | null
-          clinician_availability_timezone_wednesday_1: string | null
-          clinician_availability_timezone_wednesday_2: string | null
-          clinician_availability_timezone_wednesday_3: string | null
           clinician_bio: string | null
           clinician_calendar_end_time: string | null
           clinician_calendar_start_time: string | null
@@ -1747,27 +1693,6 @@ export type Database = {
           clinician_availability_start_wednesday_1?: string | null
           clinician_availability_start_wednesday_2?: string | null
           clinician_availability_start_wednesday_3?: string | null
-          clinician_availability_timezone_friday_1?: string | null
-          clinician_availability_timezone_friday_2?: string | null
-          clinician_availability_timezone_friday_3?: string | null
-          clinician_availability_timezone_monday_1?: string | null
-          clinician_availability_timezone_monday_2?: string | null
-          clinician_availability_timezone_monday_3?: string | null
-          clinician_availability_timezone_saturday_1?: string | null
-          clinician_availability_timezone_saturday_2?: string | null
-          clinician_availability_timezone_saturday_3?: string | null
-          clinician_availability_timezone_sunday_1?: string | null
-          clinician_availability_timezone_sunday_2?: string | null
-          clinician_availability_timezone_sunday_3?: string | null
-          clinician_availability_timezone_thursday_1?: string | null
-          clinician_availability_timezone_thursday_2?: string | null
-          clinician_availability_timezone_thursday_3?: string | null
-          clinician_availability_timezone_tuesday_1?: string | null
-          clinician_availability_timezone_tuesday_2?: string | null
-          clinician_availability_timezone_tuesday_3?: string | null
-          clinician_availability_timezone_wednesday_1?: string | null
-          clinician_availability_timezone_wednesday_2?: string | null
-          clinician_availability_timezone_wednesday_3?: string | null
           clinician_bio?: string | null
           clinician_calendar_end_time?: string | null
           clinician_calendar_start_time?: string | null
@@ -1849,27 +1774,6 @@ export type Database = {
           clinician_availability_start_wednesday_1?: string | null
           clinician_availability_start_wednesday_2?: string | null
           clinician_availability_start_wednesday_3?: string | null
-          clinician_availability_timezone_friday_1?: string | null
-          clinician_availability_timezone_friday_2?: string | null
-          clinician_availability_timezone_friday_3?: string | null
-          clinician_availability_timezone_monday_1?: string | null
-          clinician_availability_timezone_monday_2?: string | null
-          clinician_availability_timezone_monday_3?: string | null
-          clinician_availability_timezone_saturday_1?: string | null
-          clinician_availability_timezone_saturday_2?: string | null
-          clinician_availability_timezone_saturday_3?: string | null
-          clinician_availability_timezone_sunday_1?: string | null
-          clinician_availability_timezone_sunday_2?: string | null
-          clinician_availability_timezone_sunday_3?: string | null
-          clinician_availability_timezone_thursday_1?: string | null
-          clinician_availability_timezone_thursday_2?: string | null
-          clinician_availability_timezone_thursday_3?: string | null
-          clinician_availability_timezone_tuesday_1?: string | null
-          clinician_availability_timezone_tuesday_2?: string | null
-          clinician_availability_timezone_tuesday_3?: string | null
-          clinician_availability_timezone_wednesday_1?: string | null
-          clinician_availability_timezone_wednesday_2?: string | null
-          clinician_availability_timezone_wednesday_3?: string | null
           clinician_bio?: string | null
           clinician_calendar_end_time?: string | null
           clinician_calendar_start_time?: string | null
@@ -3608,6 +3512,18 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      audit_email_sync_status: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          auth_email: string
+          clinician_email: string
+          clinician_id: string
+          last_auth_update: string
+          last_clinician_update: string
+          mismatch_duration: unknown
+          sync_status: string
+        }[]
+      }
       cancel_appointment_and_delete_mapping: {
         Args: {
           p_appointment_id: string
@@ -3617,16 +3533,16 @@ export type Database = {
         Returns: undefined
       }
       categorize_error: {
-        Args: { error_message: string; endpoint: string; status: string }
+        Args: { endpoint: string; error_message: string; status: string }
         Returns: Database["public"]["Enums"]["error_category"]
       }
       check_blocked_time_integrity: {
         Args: Record<PropertyKey, never>
         Returns: {
           check_type: string
-          status: string
           count: number
           message: string
+          status: string
         }[]
       }
       check_error_thresholds: {
@@ -3644,15 +3560,15 @@ export type Database = {
       create_appointment_and_mapping: {
         Args: {
           p_clinician_id: string
-          p_type: string
-          p_status: Database["public"]["Enums"]["appointment_status"]
-          p_start_at: string
-          p_end_at: string
-          p_notes: string
-          p_external_event_id: string
           p_connection_id: string
-          p_sync_direction: string
+          p_end_at: string
+          p_external_event_id: string
           p_last_sync_hash: string
+          p_notes: string
+          p_start_at: string
+          p_status: Database["public"]["Enums"]["appointment_status"]
+          p_sync_direction: string
+          p_type: string
         }
         Returns: undefined
       }
@@ -3679,10 +3595,10 @@ export type Database = {
       }
       debug_rls_check: {
         Args: {
-          schema_name: string
-          table_name: string
           operation: string
           record_id: string
+          schema_name: string
+          table_name: string
         }
         Returns: boolean
       }
@@ -3704,32 +3620,32 @@ export type Database = {
       get_clinician_availability_instances: {
         Args: {
           p_clinician_id: string
-          p_start_date: string
           p_end_date: string
+          p_start_date: string
           p_user_timezone?: string
         }
         Returns: {
           day_of_week: string
-          start_time: string
           end_time: string
-          timezone: string
           slot_number: number
           specific_date: string
-          utc_start_time: string
+          start_time: string
+          timezone: string
           utc_end_time: string
+          utc_start_time: string
         }[]
       }
       get_filtered_clinical_documents: {
         Args: { p_client_id: string }
         Returns: {
-          id: string
           client_id: string
-          document_title: string
-          document_type: string
-          document_date: string
-          file_path: string
           created_at: string
           created_by: string
+          document_date: string
+          document_title: string
+          document_type: string
+          file_path: string
+          id: string
         }[]
       }
       get_unread_notification_count: {
@@ -3748,8 +3664,20 @@ export type Database = {
         Args: { user_id: string }
         Returns: boolean
       }
+      log_email_update_operation: {
+        Args: {
+          additional_data?: Json
+          clinician_id: string
+          correlation_id?: string
+          new_email: string
+          old_email: string
+          operation_type: string
+          source_component: string
+        }
+        Returns: undefined
+      }
       mark_notifications_as_read: {
-        Args: { p_user_id: string; p_notification_ids?: string[] }
+        Args: { p_notification_ids?: string[]; p_user_id: string }
         Returns: number
       }
       parse_claimmd_date: {
@@ -3763,22 +3691,22 @@ export type Database = {
       update_appointment_and_mapping: {
         Args: {
           p_appointment_id: string
-          p_start_at: string
           p_end_at: string
-          p_notes: string
-          p_mapping_id: string
           p_last_sync_hash: string
+          p_mapping_id: string
+          p_notes: string
+          p_start_at: string
         }
         Returns: undefined
       }
       update_batch_performance_metrics: {
         Args: {
+          p_average_response_time_ms: number
           p_batch_date: string
-          p_total_claims: number
-          p_successful_claims: number
           p_failed_claims: number
           p_processing_time_minutes: number
-          p_average_response_time_ms: number
+          p_successful_claims: number
+          p_total_claims: number
         }
         Returns: undefined
       }
@@ -3790,13 +3718,22 @@ export type Database = {
         Args: { user_id: string }
         Returns: boolean
       }
+      validate_clinician_email_consistency: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          auth_email: string
+          clinician_email: string
+          clinician_id: string
+          status: string
+        }[]
+      }
       validate_timezone_integrity: {
         Args: Record<PropertyKey, never>
         Returns: {
           check_type: string
-          status: string
           count: number
           message: string
+          status: string
         }[]
       }
     }
