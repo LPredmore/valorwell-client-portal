@@ -23,23 +23,15 @@ const TherapistSelection = () => {
     therapists, 
     loading, 
     error, 
-    selectedTherapistId,
-    setSelectedTherapistId, 
-    selectTherapist,
-    isSubmitting
+    selectTherapist
   } = useSimpleTherapistSelection({
     clientState,
     clientDateOfBirth,
     clientChampva
   });
 
-  const handleSubmit = async () => {
-    if (!selectedTherapistId) {
-      toast.error("Please select a therapist to continue");
-      return;
-    }
-    
-    const success = await selectTherapist(selectedTherapistId);
+  const handleTherapistSelection = async (therapistId: string) => {
+    const success = await selectTherapist(therapistId);
     if (success) {
       // Refresh the user data to get the updated status
       await refreshUserData();
@@ -65,27 +57,13 @@ const TherapistSelection = () => {
   return (
     <NewLayout>
       <div className="container mx-auto max-w-5xl px-4 py-8">
-        <div className="mb-8 flex justify-between items-start">
-          <div>
-            <h1 className="text-3xl font-bold mb-2">Select Your Therapist</h1>
-            <p className="text-gray-600">
-              {clientState 
-                ? `Showing therapists licensed in ${clientState} who can work with you.`
-                : 'Choose a therapist who you feel would be the best fit for your needs.'}
-            </p>
-          </div>
-          <Button 
-            onClick={handleSubmit} 
-            disabled={!selectedTherapistId || isSubmitting}
-            className="bg-blue-600 hover:bg-blue-700"
-          >
-            {isSubmitting ? (
-              <>
-                <Loader className="h-4 w-4 animate-spin mr-2" />
-                Processing...
-              </>
-            ) : "Confirm Selection"}
-          </Button>
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold mb-2">Select Your Therapist</h1>
+          <p className="text-gray-600">
+            {clientState 
+              ? `Showing therapists licensed in ${clientState} who can work with you.`
+              : 'Choose a therapist who you feel would be the best fit for your needs.'}
+          </p>
         </div>
 
         {loading && (
@@ -140,8 +118,7 @@ const TherapistSelection = () => {
                 bio={therapist.clinician_bio}
                 imageUrl={therapist.clinician_image_url}
                 email={therapist.clinician_email || 'Contact clinic for email'}
-                isSelected={selectedTherapistId === therapist.id}
-                onSelect={setSelectedTherapistId}
+                onSelectTherapist={handleTherapistSelection}
               />
             ))}
           </div>

@@ -1,7 +1,8 @@
 
 import React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
-import { User, Mail } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { User, Mail, Loader } from 'lucide-react';
 
 export interface TherapistCardProps {
   id: string;
@@ -9,8 +10,8 @@ export interface TherapistCardProps {
   bio: string | null;
   imageUrl: string | null;
   email: string;
-  isSelected: boolean;
-  onSelect: (id: string) => void;
+  onSelectTherapist: (id: string) => Promise<void>;
+  isSubmitting?: boolean;
 }
 
 const TherapistCard = ({
@@ -19,15 +20,11 @@ const TherapistCard = ({
   bio,
   imageUrl,
   email,
-  isSelected,
-  onSelect,
+  onSelectTherapist,
+  isSubmitting = false,
 }: TherapistCardProps) => {
   return (
-    <Card 
-      onClick={() => onSelect(id)}
-      className={`cursor-pointer transition-all mb-6 w-full ${isSelected 
-        ? 'ring-2 ring-blue-500 bg-blue-50' 
-        : 'hover:bg-gray-50'}`}
+    <Card className="transition-all mb-6 w-full hover:bg-gray-50"
     >
       <CardContent className="p-6 flex flex-col">
         <div className="flex items-center mb-6">
@@ -61,15 +58,22 @@ const TherapistCard = ({
         </div>
 
         <div className="flex items-center justify-between mt-4">
-          {isSelected && (
-            <div className="flex items-center text-blue-600">
-              <span className="font-medium">✓ Selected</span>
-            </div>
-          )}
-          <div className="ml-auto flex items-center gap-2 text-gray-600 bg-gray-50 px-3 py-2 rounded">
+          <div className="flex items-center gap-2 text-gray-600 bg-gray-50 px-3 py-2 rounded">
             <Mail className="h-4 w-4" />
             <span className="text-sm">Email for Availability: {email}</span>
           </div>
+          <Button 
+            onClick={() => onSelectTherapist(id)}
+            disabled={isSubmitting}
+            className="ml-4"
+          >
+            {isSubmitting ? (
+              <>
+                <Loader className="h-4 w-4 animate-spin mr-2" />
+                Selecting...
+              </>
+            ) : "Select This Therapist"}
+          </Button>
         </div>
       </CardContent>
     </Card>

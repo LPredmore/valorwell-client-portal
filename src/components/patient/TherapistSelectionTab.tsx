@@ -21,29 +21,18 @@ const TherapistSelectionTab = () => {
     therapists, 
     loading, 
     error, 
-    selectedTherapistId,
-    setSelectedTherapistId, 
-    selectTherapist,
-    isSubmitting
+    selectTherapist
   } = useSimpleTherapistSelection({
     clientState,
     clientDateOfBirth,
     clientChampva
   });
 
-  const handleSubmit = async () => {
-    if (!selectedTherapistId) {
-      toast.error("Please select a therapist to continue");
-      return;
-    }
-    
-    const success = await selectTherapist(selectedTherapistId);
+  const handleTherapistSelection = async (therapistId: string) => {
+    const success = await selectTherapist(therapistId);
     if (success) {
       // Refresh the user data to get the updated status
       await refreshUserData();
-      
-      // Show success message without navigation
-      toast.success("Your therapist has been selected successfully!");
     }
   };
 
@@ -59,29 +48,16 @@ const TherapistSelectionTab = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-start">
-        <div>
-          <h2 className="text-2xl font-semibold mb-2">Select Your Therapist</h2>
-          <p className="text-muted-foreground">
-            {clientState 
-              ? `Showing therapists licensed in ${clientState} who can work with you.`
-              : 'Choose a therapist who you feel would be the best fit for your needs.'}
-          </p>
-          <p className="text-muted-foreground mt-3">
-            Our care team is constantly growing. As we hire more clinicians, they will show up here and you will be notified. We personally believe that your care should be in your hands. And you should be able to select your own therapist. Please reach out to the clinician of your choosing to discuss scheduling.
-          </p>
-        </div>
-        <Button 
-          onClick={handleSubmit} 
-          disabled={!selectedTherapistId || isSubmitting}
-        >
-          {isSubmitting ? (
-            <>
-              <Loader className="h-4 w-4 animate-spin mr-2" />
-              Processing...
-            </>
-          ) : "Confirm Selection"}
-        </Button>
+      <div>
+        <h2 className="text-2xl font-semibold mb-2">Select Your Therapist</h2>
+        <p className="text-muted-foreground">
+          {clientState 
+            ? `Showing therapists licensed in ${clientState} who can work with you.`
+            : 'Choose a therapist who you feel would be the best fit for your needs.'}
+        </p>
+        <p className="text-muted-foreground mt-3">
+          Our care team is constantly growing. As we hire more clinicians, they will show up here and you will be notified. We personally believe that your care should be in your hands. And you should be able to select your own therapist. Please reach out to the clinician of your choosing to discuss scheduling.
+        </p>
       </div>
 
       {loading && (
@@ -136,8 +112,7 @@ const TherapistSelectionTab = () => {
               bio={therapist.clinician_bio}
               imageUrl={therapist.clinician_image_url}
               email={therapist.clinician_email || 'Contact clinic for email'}
-              isSelected={selectedTherapistId === therapist.id}
-              onSelect={setSelectedTherapistId}
+              onSelectTherapist={handleTherapistSelection}
             />
           ))}
         </div>
