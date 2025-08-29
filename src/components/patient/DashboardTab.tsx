@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import TherapistInfoCard from '@/components/therapist/TherapistInfoCard';
 import AppointmentCard from './AppointmentCard';
 import PHQ9Template from '@/components/templates/PHQ9Template';
-import VideoSessionDialog from './VideoSessionDialog';
+
 import { getSafeTimezone } from '@/utils/dateFormatting';
 import { startOfDay, endOfDay, addDays, parseISO } from 'date-fns';
 import { formatInTimeZone } from 'date-fns-tz';
@@ -26,8 +26,6 @@ const DashboardTab = () => {
   const [cancelLoading, setCancelLoading] = useState<string | null>(null);
   const [phq9Open, setPHQ9Open] = useState(false);
   const [currentAppointmentId, setCurrentAppointmentId] = useState<string>('');
-  const [videoDialogOpen, setVideoDialogOpen] = useState(false);
-  const [currentVideoUrl, setCurrentVideoUrl] = useState<string | null>(null);
 
   // Check for available therapists
   const { hasAvailableTherapists, loading: therapistCheckLoading } = useTherapistAvailabilityCheck({
@@ -101,9 +99,8 @@ const DashboardTab = () => {
         // Skip PHQ9, go straight to video
         const { success, url } = await getOrCreateVideoRoom(appointmentId);
         if (success && url) {
-          setCurrentVideoUrl(url);
-          setVideoDialogOpen(true);
-          toast.success('Video session opened');
+          window.open(url, '_blank');
+          toast.success('Video session opened in new tab');
         } else {
           toast.error('Failed to start video session');
         }
@@ -126,9 +123,8 @@ const DashboardTab = () => {
       try {
         const { success, url } = await getOrCreateVideoRoom(currentAppointmentId);
         if (success && url) {
-          setCurrentVideoUrl(url);
-          setVideoDialogOpen(true);
-          toast.success('PHQ9 completed and video session opened');
+          window.open(url, '_blank');
+          toast.success('PHQ9 completed and video session opened in new tab');
         } else {
           toast.error('PHQ9 saved but failed to start video session');
         }
@@ -377,12 +373,6 @@ const DashboardTab = () => {
         />
       )}
 
-      {/* Video Session Dialog */}
-      <VideoSessionDialog
-        open={videoDialogOpen}
-        onOpenChange={setVideoDialogOpen}
-        videoUrl={currentVideoUrl}
-      />
     </div>;
 };
 export default DashboardTab;
