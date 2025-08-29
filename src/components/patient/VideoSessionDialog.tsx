@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -7,7 +7,8 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { ExternalLink, Loader2 } from "lucide-react";
+import { ExternalLink, Loader2, Maximize } from "lucide-react";
+import { toast } from "@/hooks/use-toast";
 
 interface VideoSessionDialogProps {
   open: boolean;
@@ -18,6 +19,7 @@ interface VideoSessionDialogProps {
 const VideoSessionDialog = ({ open, onOpenChange, videoUrl }: VideoSessionDialogProps) => {
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const handleIframeLoad = () => {
     setIsLoading(false);
@@ -34,6 +36,41 @@ const VideoSessionDialog = ({ open, onOpenChange, videoUrl }: VideoSessionDialog
     }
   };
 
+  const requestFullscreen = (el: HTMLElement) => {
+    if (el.requestFullscreen) el.requestFullscreen();
+    else if ((el as any).webkitRequestFullscreen) (el as any).webkitRequestFullscreen();
+  };
+
+  // Reconnect logic for Daily.js
+  useEffect(() => {
+    if (!videoUrl || !open) return;
+
+    const handleConnectionError = () => {
+      toast({
+        title: "Connection Issue",
+        description: "Connection dropped. Reconnecting...",
+        variant: "destructive",
+      });
+      
+      // Basic reconnect attempt by reloading the iframe
+      setIsLoading(true);
+      setHasError(false);
+    };
+
+    // Listen for iframe load errors which could indicate connection issues
+    window.addEventListener('message', (event) => {
+      if (event.data?.type === 'daily-error' && event.data?.errorMsg) {
+        if (event.data.errorMsg.includes('network') || event.data.errorMsg.includes('track lost')) {
+          handleConnectionError();
+        }
+      }
+    });
+
+    return () => {
+      window.removeEventListener('message', handleConnectionError);
+    };
+  }, [videoUrl, open]);
+
   if (!videoUrl) return null;
 
   return (
@@ -46,7 +83,20 @@ const VideoSessionDialog = ({ open, onOpenChange, videoUrl }: VideoSessionDialog
           </DialogDescription>
         </DialogHeader>
         
-        <div className="flex-1 relative bg-muted rounded-lg overflow-hidden">
+        <div 
+          ref={containerRef}
+          className="flex-1 relative bg-muted rounded-lg overflow-hidden"
+          style={{ padding: 0, margin: 0 }}
+        >
+          <Button
+            onClick={() => containerRef.current && requestFullscreen(containerRef.current)}
+            className="absolute z-10 top-2 right-2"
+            size="sm"
+            variant="outline"
+          >
+            <Maximize className="h-4 w-4" />
+          </Button>
+
           {isLoading && (
             <div className="absolute inset-0 flex items-center justify-center bg-background/80 backdrop-blur-sm z-10">
               <div className="text-center space-y-3">
@@ -72,11 +122,12 @@ const VideoSessionDialog = ({ open, onOpenChange, videoUrl }: VideoSessionDialog
             <iframe
               src={videoUrl}
               className="w-full h-full border-0"
-              allow="camera; microphone; fullscreen; display-capture"
+              allow="camera;microphone;fullscreen;display-capture"
               allowFullScreen
               onLoad={handleIframeLoad}
               onError={handleIframeError}
               title="Video Session"
+              style={{ border: 'none' }}
             />
           )}
         </div>
