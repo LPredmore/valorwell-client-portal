@@ -126,14 +126,14 @@ const DocumentsTab: React.FC = () => {
         />
       ) : (
         <Tabs defaultValue={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="mb-6">
-            <TabsTrigger value="assignments" className="flex items-center gap-1">
+          <TabsList className="mb-4 sm:mb-6 grid w-full grid-cols-2 h-auto">
+            <TabsTrigger value="assignments" className="flex flex-col sm:flex-row items-center gap-1 sm:gap-2 py-3 text-xs sm:text-sm">
               <ClipboardCheck className="h-4 w-4" />
-              Assigned Documents
+              <span>Assigned</span>
             </TabsTrigger>
-            <TabsTrigger value="documents" className="flex items-center gap-1">
+            <TabsTrigger value="documents" className="flex flex-col sm:flex-row items-center gap-1 sm:gap-2 py-3 text-xs sm:text-sm">
               <FileText className="h-4 w-4" />
-              Completed Documents
+              <span>Completed</span>
             </TabsTrigger>
           </TabsList>
           

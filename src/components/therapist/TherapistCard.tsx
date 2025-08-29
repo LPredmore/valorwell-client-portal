@@ -26,10 +26,10 @@ const TherapistCard = ({
   return (
     <Card className="transition-all mb-6 w-full hover:bg-gray-50"
     >
-      <CardContent className="p-6 flex flex-col">
-        <div className="flex items-center mb-6">
+      <CardContent className="p-4 sm:p-6 flex flex-col">
+        <div className="flex flex-col sm:flex-row items-center sm:items-start mb-4 sm:mb-6 text-center sm:text-left">
           {imageUrl ? (
-            <div className="w-20 h-20 rounded-full overflow-hidden flex-shrink-0 border border-gray-200">
+            <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full overflow-hidden flex-shrink-0 border border-gray-200 mb-3 sm:mb-0">
               <img 
                 src={imageUrl} 
                 alt={`${name}'s profile`} 
@@ -40,11 +40,11 @@ const TherapistCard = ({
               />
             </div>
           ) : (
-            <div className="w-20 h-20 rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0">
-              <User className="w-10 h-10 text-gray-500" />
+            <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0 mb-3 sm:mb-0">
+              <User className="w-10 h-10 sm:w-12 sm:h-12 text-gray-500" />
             </div>
           )}
-          <h3 className="text-2xl font-semibold ml-5">{name || 'Unnamed Therapist'}</h3>
+          <h3 className="text-xl sm:text-2xl font-semibold sm:ml-5">{name || 'Unnamed Therapist'}</h3>
         </div>
 
         <div className="text-gray-700 mb-4">
@@ -57,15 +57,16 @@ const TherapistCard = ({
           )}
         </div>
 
-        <div className="flex items-center justify-between mt-4">
-          <div className="flex items-center gap-2 text-gray-600 bg-gray-50 px-3 py-2 rounded">
-            <Mail className="h-4 w-4" />
-            <span className="text-sm">Email for Availability: {email}</span>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mt-4 gap-3 sm:gap-4">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 text-gray-600 bg-gray-50 px-3 py-3 sm:py-2 rounded w-full sm:w-auto">
+            <Mail className="h-4 w-4 flex-shrink-0" />
+            <span className="text-sm break-all">Email for Availability: {email}</span>
           </div>
           <Button 
             onClick={() => onSelectTherapist(id)}
             disabled={isSubmitting}
-            className="ml-4"
+            className="w-full sm:w-auto sm:ml-4 min-h-[44px]"
+            size="lg"
           >
             {isSubmitting ? (
               <>

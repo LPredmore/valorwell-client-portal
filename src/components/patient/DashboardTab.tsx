@@ -243,9 +243,9 @@ const DashboardTab = () => {
     !clientData?.client_assigned_therapist && 
     clientData?.client_is_profile_complete === 'true' &&
     hasAvailableTherapists;
-  return <div className="space-y-6">
-      <div className="mb-8">
-        <h2 className="text-3xl font-bold mb-2">
+  return <div className="space-y-4 sm:space-y-6">
+      <div className="mb-4 sm:mb-8">
+        <h2 className="text-2xl sm:text-3xl font-bold mb-2 leading-tight">
           Welcome back{clientData?.client_preferred_name || clientData?.client_first_name ? `, ${clientData.client_preferred_name || clientData.client_first_name}` : ''}!
         </h2>
       </div>
@@ -294,7 +294,7 @@ const DashboardTab = () => {
                   <p className="mt-2 text-sm text-muted-foreground">Loading appointments...</p>
                 </div>
               ) : todayAppointments.length > 0 ? (
-                <div className="space-y-4">
+                <div className="space-y-3 sm:space-y-4">
                   {todayAppointments.map((appointment) => (
                     <AppointmentCard
                       key={appointment.id}
@@ -327,7 +327,7 @@ const DashboardTab = () => {
                   <p className="mt-2 text-sm text-muted-foreground">Loading appointments...</p>
                 </div>
               ) : futureAppointments.length > 0 ? (
-                <div className="space-y-4">
+                <div className="space-y-3 sm:space-y-4">
                   {futureAppointments.map((appointment) => (
                     <AppointmentCard
                       key={appointment.id}

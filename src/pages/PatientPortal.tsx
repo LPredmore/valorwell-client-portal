@@ -11,28 +11,28 @@ import TherapistSelectionTab from '@/components/patient/TherapistSelectionTab';
 const PatientPortal: React.FC = () => {
   return (
     <NewLayout>
-      <div className="container mx-auto px-4 py-8">
+      <div className="container mx-auto px-4 sm:px-6 py-4 sm:py-8">
         <Tabs defaultValue="dashboard" className="w-full">
-          <TabsList className="grid w-full grid-cols-5 mb-8">
-            <TabsTrigger value="dashboard" className="flex items-center gap-2">
+          <TabsList className="grid w-full grid-cols-5 mb-6 sm:mb-8 h-auto">
+            <TabsTrigger value="dashboard" className="flex flex-col sm:flex-row items-center gap-1 sm:gap-2 py-3 text-xs sm:text-sm">
               <Home className="h-4 w-4" />
-              <span className="hidden sm:inline">Dashboard</span>
+              <span>Dashboard</span>
             </TabsTrigger>
-            <TabsTrigger value="profile" className="flex items-center gap-2">
+            <TabsTrigger value="profile" className="flex flex-col sm:flex-row items-center gap-1 sm:gap-2 py-3 text-xs sm:text-sm">
               <User className="h-4 w-4" />
-              <span className="hidden sm:inline">My Profile</span>
+              <span>Profile</span>
             </TabsTrigger>
-            <TabsTrigger value="documents" className="flex items-center gap-2">
+            <TabsTrigger value="documents" className="flex flex-col sm:flex-row items-center gap-1 sm:gap-2 py-3 text-xs sm:text-sm">
               <FileText className="h-4 w-4" />
-              <span className="hidden sm:inline">Documents</span>
+              <span>Documents</span>
             </TabsTrigger>
-            <TabsTrigger value="insurance" className="flex items-center gap-2">
+            <TabsTrigger value="insurance" className="flex flex-col sm:flex-row items-center gap-1 sm:gap-2 py-3 text-xs sm:text-sm">
               <Shield className="h-4 w-4" />
-              <span className="hidden sm:inline">Insurance</span>
+              <span>Insurance</span>
             </TabsTrigger>
-            <TabsTrigger value="therapist" className="flex items-center gap-2">
+            <TabsTrigger value="therapist" className="flex flex-col sm:flex-row items-center gap-1 sm:gap-2 py-3 text-xs sm:text-sm">
               <UserCheck className="h-4 w-4" />
-              <span className="hidden sm:inline">Therapist</span>
+              <span>Therapist</span>
             </TabsTrigger>
           </TabsList>
           
