@@ -190,31 +190,45 @@ const AuthProtectedRoute: React.FC<AuthProtectedRouteProps> = ({
     return <Navigate to="/login" replace />;
   }
 
-  // For clients, handle the blocking of new clients if specified
-  // ENHANCED PROTECTION: Explicitly check for "New" status, null status, undefined status, incomplete profile
-  // Making sure we treat non-loaded status as "New" for safety
-  const isNewOrIncompleteClient = 
-    (clientStatus === 'New' || 
-    clientStatus === null || 
-    clientStatus === undefined) && 
-    clientProfile?.client_is_profile_complete !== true;
+  // Enhanced client status check with explicit profile completion validation
+  const isProfileComplete = clientProfile?.client_is_profile_complete === true;
+  const hasCompletedStatus = clientStatus === 'Profile Complete' || clientStatus === 'Therapist Selected' || clientStatus === 'Active';
   
-  // Allow "Therapist Selected" status to access protected routes
-  if (clientStatus === 'Therapist Selected') {
-    console.log("[AuthProtectedRoute] Client has Therapist Selected status, granting access");
-  } 
-  // CRITICAL FIX: When authentication is fully loaded (not in loading state),
-  // if we're blocking new clients, AND the client is new or has incomplete profile,
-  // AND we're not already on the profile setup page, redirect to profile setup
-  else if (blockNewClients && 
+  // A client is considered "ready" if EITHER:
+  // 1. They have an explicit completed status (Profile Complete, Therapist Selected, Active), OR
+  // 2. They have the profile complete flag set to true
+  const isClientReady = hasCompletedStatus || isProfileComplete;
+  
+  // Enhanced logging for debugging profile completion issues
+  console.log("[AuthProtectedRoute] Client readiness check:", {
+    clientStatus,
+    isProfileComplete,
+    hasCompletedStatus,
+    isClientReady,
+    blockNewClients,
+    currentPath: location.pathname,
+    authState,
+    isLoading,
+    authInitialized
+  });
+  
+  // ENHANCED PROTECTION: Only block clients who are definitively incomplete
+  // Block if:
+  // 1. We're blocking new clients AND
+  // 2. Authentication is fully loaded AND
+  // 3. Client is NOT ready (doesn't have completed status OR profile complete flag) AND
+  // 4. We're not already on the profile setup page
+  if (blockNewClients && 
       !isLoading && 
       authInitialized && 
-      isNewOrIncompleteClient && 
+      !isClientReady && 
       location.pathname !== '/profile-setup') {
-    console.log("[AuthProtectedRoute] Blocking new/incomplete client, redirecting to profile setup", {
+    
+    console.log("[AuthProtectedRoute] Blocking incomplete client, redirecting to profile setup", {
       clientStatus, 
-      isNewOrIncompleteClient, 
-      profileComplete: clientProfile?.client_is_profile_complete
+      isProfileComplete,
+      hasCompletedStatus,
+      isClientReady
     });
     
     // Show a toast message to inform the user
@@ -222,6 +236,18 @@ const AuthProtectedRoute: React.FC<AuthProtectedRouteProps> = ({
     
     // Redirect to profile setup
     return <Navigate to="/profile-setup" replace />;
+  }
+  
+  // If client is ready, ensure they don't get redirected back to profile setup
+  if (isClientReady && location.pathname === '/profile-setup') {
+    console.log("[AuthProtectedRoute] Client profile is complete, redirecting away from profile setup", {
+      clientStatus,
+      isProfileComplete,
+      hasCompletedStatus
+    });
+    
+    // Redirect completed clients away from profile setup
+    return <Navigate to="/patient-portal" replace />;
   }
 
   // Access granted

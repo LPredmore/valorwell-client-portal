@@ -755,21 +755,84 @@ const ProfileSetup = () => {
 
   const handleSubmit = async () => { 
     const values = form.getValues(); 
-    if (!clientId) { toast({ title: "Error", description: "No client record found. Please contact support.", variant: "destructive" }); return; }
+    if (!clientId) { 
+      toast({ title: "Error", description: "No client record found. Please contact support.", variant: "destructive" }); 
+      return; 
+    }
+    
     try {
-      const { error } = await supabase.from('clients').update({
+      console.log("[ProfileSetup] Starting profile completion process", { clientId });
+      
+      // First, update the profile with completion status
+      const { error: updateError } = await supabase.from('clients').update({
           client_self_goal: values.client_self_goal || null, 
           client_referral_source: values.client_referral_source || null,
           client_status: 'Profile Complete', // Change status from "New" to "Profile Complete"
           client_is_profile_complete: true 
         }).eq('id', clientId);
-      if (error) throw error; 
+
+      if (updateError) {
+        console.error("[ProfileSetup] Error updating profile completion:", updateError);
+        toast({ 
+          title: "Profile Update Error", 
+          description: "Failed to save profile completion. Please try again.", 
+          variant: "destructive" 
+        });
+        return;
+      }
+
+      console.log("[ProfileSetup] Profile completion status updated successfully");
+
+      // Verify the update was successful by fetching the updated record
+      const { data: verificationData, error: verificationError } = await supabase
+        .from('clients')
+        .select('client_status, client_is_profile_complete')
+        .eq('id', clientId)
+        .single();
+
+      if (verificationError) {
+        console.error("[ProfileSetup] Error verifying profile completion:", verificationError);
+        // Don't fail the process, just log the issue
+        console.warn("[ProfileSetup] Could not verify profile completion, but proceeding");
+      } else {
+        console.log("[ProfileSetup] Profile completion verified:", verificationData);
+        
+        // Double-check that the completion was saved correctly
+        if (verificationData.client_status !== 'Profile Complete' || !verificationData.client_is_profile_complete) {
+          console.error("[ProfileSetup] Profile completion verification failed", verificationData);
+          toast({ 
+            title: "Verification Error", 
+            description: "Profile completion could not be verified. Please try again.", 
+            variant: "destructive" 
+          });
+          return;
+        }
+      }
+
       console.log("[ProfileSetup] Profile completed successfully in DB. Refreshing auth context...");
-      await refreshUserData(); 
-      toast({ title: "Profile complete!", description: "Your information has been saved. Redirecting...", });
+      
+      // Refresh user data to ensure auth context has latest profile status
+      if (refreshUserData) {
+        await refreshUserData();
+        console.log("[ProfileSetup] Auth context refreshed after profile completion");
+      }
+      
+      toast({ 
+        title: "Profile Complete!", 
+        description: "Your profile has been completed successfully. Redirecting to therapist selection...", 
+      });
+      
       console.log("[ProfileSetup] Navigating to /therapist-selection");
       navigate('/therapist-selection');
-    } catch (error: any) { console.error("[ProfileSetup] Error updating profile (final step) or refreshing context:", error); toast({ title: "Error updating profile", description: error.message || "An unexpected error occurred.", variant: "destructive" }); }
+      
+    } catch (error: any) { 
+      console.error("[ProfileSetup] Error updating profile (final step) or refreshing context:", error); 
+      toast({ 
+        title: "Error Completing Profile", 
+        description: error.message || "An unexpected error occurred while completing your profile.", 
+        variant: "destructive" 
+      }); 
+    }
   };
 
   const renderStepOne = () => { 

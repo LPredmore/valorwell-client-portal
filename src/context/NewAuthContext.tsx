@@ -203,15 +203,36 @@ export const AuthProvider: React.FC<{
     }
   };
 
-  // Match the refreshUserData return type with the interface
+  // Enhanced refreshUserData to ensure proper data consistency
   const refreshUserDataWrapper = async (): Promise<void> => {
     DebugUtils.log(sessionId, '[AuthProvider] Manually refreshing user data');
-    await AuthService.refreshSession();
-    // After refreshing the session, explicitly reload client data
-    if (userId) {
-      clientDataAttempts.current = 0; // Reset attempts counter
-      await loadClientData(userId);
-      DebugUtils.log(sessionId, '[AuthProvider] Client data explicitly reloaded after session refresh');
+    
+    try {
+      // Set loading state during refresh to prevent race conditions
+      setIsLoading(true);
+      
+      // First refresh the auth session
+      await AuthService.refreshSession();
+      
+      // Explicitly reload client data with fresh state
+      if (userId) {
+        clientDataAttempts.current = 0; // Reset attempts counter
+        DebugUtils.log(sessionId, '[AuthProvider] Reloading client data after session refresh');
+        
+        // Force a fresh data load from database
+        await loadClientData(userId);
+        
+        DebugUtils.log(sessionId, '[AuthProvider] Client data refresh completed', { 
+          clientStatus, 
+          profileComplete: clientProfile?.client_is_profile_complete 
+        });
+      }
+    } catch (error) {
+      DebugUtils.error(sessionId, '[AuthProvider] Error during refreshUserData', error);
+      throw error;
+    } finally {
+      // Ensure loading state is cleared even if there's an error
+      setIsLoading(false);
     }
   };
 
