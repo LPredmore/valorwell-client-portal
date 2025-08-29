@@ -10,6 +10,8 @@ import VideoSessionDialog from './VideoSessionDialog';
 import { getSafeTimezone } from '@/utils/dateFormatting';
 import { startOfDay, endOfDay, addDays, parseISO } from 'date-fns';
 import { formatInTimeZone } from 'date-fns-tz';
+import { useTherapistAvailabilityCheck } from '@/hooks/useTherapistAvailabilityCheck';
+import { UserCheck } from 'lucide-react';
 const DashboardTab = () => {
   const {
     user
@@ -26,6 +28,13 @@ const DashboardTab = () => {
   const [currentAppointmentId, setCurrentAppointmentId] = useState<string>('');
   const [videoDialogOpen, setVideoDialogOpen] = useState(false);
   const [currentVideoUrl, setCurrentVideoUrl] = useState<string | null>(null);
+
+  // Check for available therapists
+  const { hasAvailableTherapists, loading: therapistCheckLoading } = useTherapistAvailabilityCheck({
+    clientState: clientData?.client_state,
+    clientDateOfBirth: clientData?.client_date_of_birth,
+    clientChampva: clientData?.client_champva
+  });
 
   // Fetch appointments
   const fetchAppointments = async (clientId: string, timezone: string) => {
@@ -224,7 +233,7 @@ const DashboardTab = () => {
         </div>
       </div>;
   }
-  if (isLoading) {
+  if (isLoading || therapistCheckLoading) {
     return <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center">
           <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-gray-900 mx-auto"></div>
@@ -232,6 +241,12 @@ const DashboardTab = () => {
         </div>
       </div>;
   }
+
+  // Check if we should show therapist selection prompt
+  const shouldShowTherapistSelection = 
+    !clientData?.client_assigned_therapist && 
+    clientData?.client_is_profile_complete === true &&
+    hasAvailableTherapists;
   return <div className="space-y-6">
       <div className="mb-8">
         <h2 className="text-3xl font-bold mb-2">
@@ -253,74 +268,93 @@ const DashboardTab = () => {
         </CardContent>
       </Card>
 
-      {/* Today's Appointments Section */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Today's Appointments</CardTitle>
-          <CardDescription>Your scheduled appointments for today</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {appointmentsLoading ? (
-            <div className="text-center py-4">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
-              <p className="mt-2 text-sm text-muted-foreground">Loading appointments...</p>
-            </div>
-          ) : todayAppointments.length > 0 ? (
-            <div className="space-y-4">
-              {todayAppointments.map((appointment) => (
-                <AppointmentCard
-                  key={appointment.id}
-                  appointment={appointment}
-                  clientTimezone={clientData?.client_time_zone}
-                  isToday={true}
-                  onStartSession={handleStartSession}
-                  isSessionLoading={sessionLoading === appointment.id}
-                />
-              ))}
-            </div>
-          ) : (
-            <p className="text-muted-foreground text-center py-4">
-              No appointments scheduled for today
+      {shouldShowTherapistSelection ? (
+        /* Therapist Selection Prompt */
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <UserCheck className="h-5 w-5" />
+              Choose Your Therapist
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-muted-foreground">
+              In order to get started with your care, please go to the Therapist tab and select the therapist of your choosing. Once you've selected a therapist, they can schedule with you.
             </p>
-          )}
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      ) : (
+        <>
+          {/* Today's Appointments Section */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Today's Appointments</CardTitle>
+              <CardDescription>Your scheduled appointments for today</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {appointmentsLoading ? (
+                <div className="text-center py-4">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
+                  <p className="mt-2 text-sm text-muted-foreground">Loading appointments...</p>
+                </div>
+              ) : todayAppointments.length > 0 ? (
+                <div className="space-y-4">
+                  {todayAppointments.map((appointment) => (
+                    <AppointmentCard
+                      key={appointment.id}
+                      appointment={appointment}
+                      clientTimezone={clientData?.client_time_zone}
+                      isToday={true}
+                      onStartSession={handleStartSession}
+                      isSessionLoading={sessionLoading === appointment.id}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <p className="text-muted-foreground text-center py-4">
+                  No appointments scheduled for today
+                </p>
+              )}
+            </CardContent>
+          </Card>
 
-      {/* Future Appointments Section */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Upcoming Appointments</CardTitle>
-          <CardDescription>Your future scheduled appointments</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {appointmentsLoading ? (
-            <div className="text-center py-4">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
-              <p className="mt-2 text-sm text-muted-foreground">Loading appointments...</p>
-            </div>
-          ) : futureAppointments.length > 0 ? (
-            <div className="space-y-4">
-              {futureAppointments.map((appointment) => (
-                <AppointmentCard
-                  key={appointment.id}
-                  appointment={appointment}
-                  clientTimezone={clientData?.client_time_zone}
-                  isToday={false}
-                  onStartSession={handleStartSession}
-                  isSessionLoading={false}
-                  showCancelButton={isMoreThan24HoursAway(appointment.start_at)}
-                  onCancelAppointment={handleCancelAppointment}
-                  isCancelLoading={cancelLoading === appointment.id}
-                />
-              ))}
-            </div>
-          ) : (
-            <p className="text-muted-foreground text-center py-4">
-              No upcoming appointments scheduled
-            </p>
-          )}
-        </CardContent>
-      </Card>
+          {/* Future Appointments Section */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Upcoming Appointments</CardTitle>
+              <CardDescription>Your future scheduled appointments</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {appointmentsLoading ? (
+                <div className="text-center py-4">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
+                  <p className="mt-2 text-sm text-muted-foreground">Loading appointments...</p>
+                </div>
+              ) : futureAppointments.length > 0 ? (
+                <div className="space-y-4">
+                  {futureAppointments.map((appointment) => (
+                    <AppointmentCard
+                      key={appointment.id}
+                      appointment={appointment}
+                      clientTimezone={clientData?.client_time_zone}
+                      isToday={false}
+                      onStartSession={handleStartSession}
+                      isSessionLoading={false}
+                      showCancelButton={isMoreThan24HoursAway(appointment.start_at)}
+                      onCancelAppointment={handleCancelAppointment}
+                      isCancelLoading={cancelLoading === appointment.id}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <p className="text-muted-foreground text-center py-4">
+                  No upcoming appointments scheduled
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        </>
+      )}
 
       {/* Assigned Therapist Section */}
       {therapistData && <TherapistInfoCard name={therapistData.clinician_professional_name || `${therapistData.clinician_first_name || ''} ${therapistData.clinician_last_name || ''}`.trim()} bio={therapistData.clinician_bio} imageUrl={therapistData.clinician_image_url} email={therapistData.clinician_email || 'Contact clinic for email'} />}
