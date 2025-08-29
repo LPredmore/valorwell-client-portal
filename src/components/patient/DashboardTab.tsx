@@ -245,7 +245,7 @@ const DashboardTab = () => {
   // Check if we should show therapist selection prompt
   const shouldShowTherapistSelection = 
     !clientData?.client_assigned_therapist && 
-    clientData?.client_is_profile_complete === true &&
+    clientData?.client_is_profile_complete === 'true' &&
     hasAvailableTherapists;
   return <div className="space-y-6">
       <div className="mb-8">
