@@ -5,7 +5,7 @@ import { calculateAge } from '@/utils/dateUtils';
 interface UseTherapistAvailabilityCheckProps {
   clientState?: string;
   clientDateOfBirth?: string;
-  clientChampva?: boolean;
+  clientChampva?: string;
 }
 
 export const useTherapistAvailabilityCheck = ({
@@ -27,38 +27,54 @@ export const useTherapistAvailabilityCheck = ({
       try {
         setLoading(true);
         
-        // Calculate client age
-        const clientAge = calculateAge(clientDateOfBirth);
-        const isMinor = clientAge < 18;
-
-        // Build the query with same logic as useSimpleTherapistSelection
-        let query = supabase
+        // Query active clinicians who are accepting new clients - matching useSimpleTherapistSelection
+        const { data, error } = await supabase
           .from('clinicians')
-          .select('id')
-          .eq('clinician_status', 'active')
-          .eq('clinician_is_accepting_new_clients', true)
-          .contains('clinician_licensed_states', [clientState]);
-
-        // Add age-based filtering
-        if (isMinor) {
-          query = query.eq('clinician_accepts_children', true);
-        } else {
-          query = query.eq('clinician_accepts_adults', true);
-        }
-
-        // Add CHAMPVA filtering
-        if (clientChampva) {
-          query = query.eq('clinician_accepts_champva', true);
-        }
-
-        const { data, error } = await query.limit(1);
-
+          .select('id, clinician_licensed_states, clinician_min_client_age')
+          .eq('clinician_status', 'Active')
+          .eq('clinician_accepting_new_clients', 'Yes');
+        
         if (error) {
           console.error('Error checking therapist availability:', error);
           setHasAvailableTherapists(false);
-        } else {
-          setHasAvailableTherapists(data && data.length > 0);
+          return;
         }
+        
+        // Apply the same filtering logic as useSimpleTherapistSelection
+        let filteredTherapists = data || [];
+        
+        // State filtering - exact same logic
+        if (clientState && filteredTherapists.length > 0) {
+          filteredTherapists = filteredTherapists.filter(therapist => 
+            therapist.clinician_licensed_states && 
+            therapist.clinician_licensed_states.some(state => 
+              state.toLowerCase() === clientState.toLowerCase()
+            )
+          );
+        }
+        
+        // Age filtering - exact same logic
+        if (clientDateOfBirth && filteredTherapists.length > 0) {
+          const clientAge = calculateAge(clientDateOfBirth);
+          
+          if (clientAge !== null && !isNaN(clientAge)) {
+            filteredTherapists = filteredTherapists.filter(therapist => 
+              !therapist.clinician_min_client_age || 
+              clientAge >= therapist.clinician_min_client_age
+            );
+          }
+        }
+        
+        // CHAMPVA filtering - exact same logic
+        if (filteredTherapists.length > 0) {
+          const hasChampva = clientChampva && clientChampva.trim() !== '';
+          
+          if (!hasChampva) {
+            filteredTherapists = [];
+          }
+        }
+        
+        setHasAvailableTherapists(filteredTherapists.length > 0);
       } catch (error) {
         console.error('Error in therapist availability check:', error);
         setHasAvailableTherapists(false);
