@@ -7,7 +7,7 @@ import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Check, ArrowLeft, ArrowRight } from 'lucide-react';
-import Layout from '@/components/layout/Layout';
+import NewLayout from '@/components/layout/NewLayout';
 import { supabase } from '@/integrations/supabase/client';
 import FormFieldWrapper from '@/components/ui/FormFieldWrapper';
 import { useToast } from '@/hooks/use-toast';
@@ -986,7 +986,7 @@ const ProfileSetup = () => {
   };
 
   return (
-    <Layout>
+    <NewLayout>
       <div className="max-w-5xl mx-auto">
         <Card className="border-valorwell-200 shadow-xl">
           <CardHeader className="bg-gradient-to-r from-valorwell-500 to-valorwell-600 text-white rounded-t-lg p-6">
@@ -1058,7 +1058,7 @@ const ProfileSetup = () => {
           </CardContent>
         </Card>
       </div>
-    </Layout>
+    </NewLayout>
   );
 };
 
