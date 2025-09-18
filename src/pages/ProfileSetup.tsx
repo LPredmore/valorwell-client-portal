@@ -311,10 +311,8 @@ const ProfileSetup = () => {
         });
       } else {
         console.log(`[ProfileSetup] Successfully saved ${String(fieldName)} immediately.`);
-        if (refreshUserData) {
-            console.log(`[ProfileSetup] Refreshing auth context after immediate save of ${String(fieldName)}`);
-            await refreshUserData();
-        }
+        // Note: Removed refreshUserData() call to prevent page refresh on field changes
+        // Auth context will be refreshed only when necessary (e.g., profile completion)
       }
     } catch (error) {
       console.error(`[ProfileSetup] Exception in handleImmediateSave for ${String(fieldName)}:`, error);
