@@ -549,7 +549,7 @@ const ProfileSetup = () => {
       }).eq('id', clientId);
       if (error) throw error;
       toast({ title: "Personal information saved", description: "Your identity details have been updated." });
-      if (refreshUserData) await refreshUserData(); 
+      // Note: Removed refreshUserData() call to prevent page refresh during step navigation
       navigateToStep(2);
     } catch (error: any) { console.error("[ProfileSetup] Error saving identity data:", error); toast({ title: "Error saving data", description: error.message, variant: "destructive" }); }
   };
@@ -618,7 +618,10 @@ const ProfileSetup = () => {
           dataSaved = true;
         } catch (e: any) { saveError = true; console.error("[ProfileSetup] Error saving step 2 data:", e); toast({ title: "Error saving data", description: e.message, variant: "destructive" }); }
       } else { console.warn("[ProfileSetup] Step 2: ClientId not available, data not saved."); }
-      if (!saveError) { if (dataSaved && refreshUserData) await refreshUserData(); navigateToStep(3); }
+      if (!saveError) { 
+        // Note: Removed refreshUserData() call to prevent page refresh during step navigation
+        navigateToStep(3); 
+      }
     } else if (currentStep === 3) {
         if (clientId) { 
             let step3Data: Record<string, any> = {};
@@ -680,7 +683,7 @@ const ProfileSetup = () => {
             } else { dataSaved = true; }
         }
         if (!saveError) { 
-            if (dataSaved && refreshUserData) await refreshUserData();
+            // Note: Removed refreshUserData() call to prevent page refresh during step navigation
             if (vaCoverage === "TRICARE" && otherInsurance === "No") navigateToStep(6);
             else if (otherInsurance === "Yes" && (vaCoverage === "TRICARE" || vaCoverage === "CHAMPVA")) navigateToStep(4);
             else navigateToStep(6);
@@ -712,7 +715,7 @@ const ProfileSetup = () => {
             }
         }
         if (!saveError) {
-          if (dataSaved && refreshUserData) await refreshUserData();
+          // Note: Removed refreshUserData() call to prevent page refresh during step navigation
           if (form.getValues('hasMoreInsurance') === "Yes") navigateToStep(5);
           else navigateToStep(6);
         }
@@ -743,7 +746,7 @@ const ProfileSetup = () => {
             }
         }
         if (!saveError) {
-          if (dataSaved && refreshUserData) await refreshUserData();
+          // Note: Removed refreshUserData() call to prevent page refresh during step navigation
           navigateToStep(6);
         }
     } else if (currentStep === 6) {
