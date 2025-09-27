@@ -19,8 +19,29 @@ export const formatInClientTimezone = (
   format: string = 'MM/dd/yyyy h:mm a'
 ): string => {
   try {
-    const utcDate = parseISO(utcTimestamp);
-    return formatInTimeZone(utcDate, clientTimezone, format);
+    // Debug the conversion process
+    console.log('🔧 formatInClientTimezone Debug:', {
+      input: utcTimestamp,
+      timezone: clientTimezone,
+      format
+    });
+    
+    // Handle timezone-aware ISO strings by treating them as UTC
+    let cleanUtcString = utcTimestamp;
+    if (utcTimestamp.includes('+') || utcTimestamp.endsWith('Z')) {
+      // Strip timezone info and ensure it's treated as UTC
+      cleanUtcString = utcTimestamp.replace(/[+-]\d{2}:\d{2}$|Z$/, '') + 'Z';
+    }
+    
+    console.log('🔧 Cleaned UTC string:', cleanUtcString);
+    
+    const utcDate = parseISO(cleanUtcString);
+    console.log('🔧 Parsed UTC date:', utcDate.toISOString());
+    
+    const result = formatInTimeZone(utcDate, clientTimezone, format);
+    console.log('🔧 Final result:', result);
+    
+    return result;
   } catch (error) {
     console.error('Error formatting date:', error);
     return 'Invalid date';
