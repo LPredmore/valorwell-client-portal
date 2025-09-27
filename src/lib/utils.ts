@@ -61,3 +61,40 @@ export function createPdfAttributes(value: string, fieldName?: string): object {
     'data-field-name': fieldName || '',
   };
 }
+
+/**
+ * Validates if a string is a valid UUID format
+ * @param val The string to validate
+ * @returns True if valid UUID format, false otherwise
+ */
+export function isUuid(val: string | null | undefined): boolean {
+  if (!val || typeof val !== 'string') return false;
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val);
+}
+
+/**
+ * Validates therapist assignment value before database operations
+ * @param therapistId The therapist ID to validate
+ * @param fieldName Optional field name for error context
+ * @returns Validation result with success flag and error message
+ */
+export function validateTherapistAssignment(
+  therapistId: string | null | undefined, 
+  fieldName: string = 'therapist assignment'
+): { isValid: boolean; error?: string; sanitizedValue: string | null } {
+  // Allow null assignments (unassigned)
+  if (!therapistId) {
+    return { isValid: true, sanitizedValue: null };
+  }
+
+  // Validate UUID format
+  if (!isUuid(therapistId)) {
+    return {
+      isValid: false,
+      error: `Invalid ${fieldName}: must be a valid UUID format, not email or other text`,
+      sanitizedValue: null
+    };
+  }
+
+  return { isValid: true, sanitizedValue: therapistId };
+}
