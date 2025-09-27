@@ -1474,7 +1474,15 @@ export type Database = {
           stripe_customer_id?: string | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "fk_client_assigned_therapist"
+            columns: ["client_assigned_therapist"]
+            isOneToOne: false
+            referencedRelation: "clinicians"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       clinical_documents: {
         Row: {
@@ -3585,8 +3593,9 @@ export type Database = {
         }[]
       }
       debug_client_therapist_matching: {
-        Args: { p_therapist_id: string }
+        Args: { p_therapist_id?: string }
         Returns: {
+          assignment_status: string
           client_id: string
           client_name: string
           therapist_id: string
