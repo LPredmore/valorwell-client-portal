@@ -7,6 +7,58 @@ import { formatInTimeZone, toZonedTime } from 'date-fns-tz';
  */
 
 /**
+ * Robust timezone converter with multiple fallback methods
+ * @param utcTimestamp - ISO string timestamp in UTC
+ * @param clientTimezone - IANA timezone identifier
+ * @param format - desired format pattern
+ * @returns Formatted date string in client's timezone
+ */
+const convertWithNativeAPI = (utcTimestamp: string, clientTimezone: string, format: string): string | null => {
+  try {
+    const utcDate = new Date(utcTimestamp);
+    
+    // Use native Intl.DateTimeFormat for timezone conversion
+    if (format === 'h:mm a' || format === 'H:mm') {
+      const timeFormatter = new Intl.DateTimeFormat('en-US', {
+        timeZone: clientTimezone,
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: format === 'h:mm a'
+      });
+      return timeFormatter.format(utcDate);
+    }
+    
+    if (format === 'MM/dd/yyyy h:mm a') {
+      const dateTimeFormatter = new Intl.DateTimeFormat('en-US', {
+        timeZone: clientTimezone,
+        month: '2-digit',
+        day: '2-digit',
+        year: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true
+      });
+      return dateTimeFormatter.format(utcDate);
+    }
+    
+    if (format === 'MM/dd/yyyy') {
+      const dateFormatter = new Intl.DateTimeFormat('en-US', {
+        timeZone: clientTimezone,
+        month: '2-digit',
+        day: '2-digit',
+        year: 'numeric'
+      });
+      return dateFormatter.format(utcDate);
+    }
+    
+    return null; // Format not supported by native API
+  } catch (error) {
+    console.warn('Native API conversion failed:', error);
+    return null;
+  }
+};
+
+/**
  * Formats a UTC timestamp string to display in the client's timezone
  * @param utcTimestamp - ISO string timestamp in UTC (e.g., "2025-07-03T06:00:00.000Z")
  * @param clientTimezone - IANA timezone identifier (e.g., "America/Chicago")
@@ -19,27 +71,30 @@ export const formatInClientTimezone = (
   format: string = 'MM/dd/yyyy h:mm a'
 ): string => {
   try {
-    // Debug the conversion process
     console.log('🔧 formatInClientTimezone Debug:', {
       input: utcTimestamp,
       timezone: clientTimezone,
       format
     });
     
-    // Handle timezone-aware ISO strings by treating them as UTC
+    // Method 1: Try native browser API first (most reliable)
+    const nativeResult = convertWithNativeAPI(utcTimestamp, clientTimezone, format);
+    if (nativeResult) {
+      console.log('🔧 Native API result:', nativeResult);
+      return nativeResult;
+    }
+    
+    // Method 2: Fallback to date-fns-tz with proper UTC handling
     let cleanUtcString = utcTimestamp;
     if (utcTimestamp.includes('+') || utcTimestamp.endsWith('Z')) {
-      // Strip timezone info and ensure it's treated as UTC
       cleanUtcString = utcTimestamp.replace(/[+-]\d{2}:\d{2}$|Z$/, '') + 'Z';
     }
     
-    console.log('🔧 Cleaned UTC string:', cleanUtcString);
+    console.log('🔧 Fallback to date-fns-tz with cleaned string:', cleanUtcString);
     
     const utcDate = parseISO(cleanUtcString);
-    console.log('🔧 Parsed UTC date:', utcDate.toISOString());
-    
     const result = formatInTimeZone(utcDate, clientTimezone, format);
-    console.log('🔧 Final result:', result);
+    console.log('🔧 date-fns-tz result:', result);
     
     return result;
   } catch (error) {
