@@ -185,6 +185,13 @@ const DashboardTab = () => {
           console.error("User is not authenticated.");
           return;
         }
+        
+        // Debug timezone data
+        console.log('🕐 DashboardTab Debug - User timezone data:', {
+          userId: user.id,
+          userTimezone: user.user_metadata?.timezone,
+          browserTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone
+        });
 
         // Fetch client data
         const {
@@ -196,6 +203,13 @@ const DashboardTab = () => {
           toast.error("Failed to load client data.");
         } else {
           setClientData(client);
+          
+          // Debug client timezone data
+          console.log('🕐 DashboardTab Debug - Client timezone data:', {
+            clientId: client.id,
+            clientTimezone: client.client_time_zone,
+            fetchingAppointments: !!client
+          });
 
           // If client has an assigned therapist, fetch therapist data
           if (client?.client_assigned_therapist) {

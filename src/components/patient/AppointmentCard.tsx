@@ -46,8 +46,23 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
 }) => {
   const safeTimezone = getSafeTimezone(clientTimezone);
   
+  // Debug logging for timezone conversion
+  console.log('🕐 AppointmentCard Debug:', {
+    appointmentId: appointment.id,
+    startAt: appointment.start_at,
+    clientTimezone,
+    safeTimezone,
+    browserTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone
+  });
+  
   const formatTime = (timestamp: string) => {
-    return formatInClientTimezone(timestamp, safeTimezone, 'h:mm a');
+    const result = formatInClientTimezone(timestamp, safeTimezone, 'h:mm a');
+    console.log('🕐 Time Format Debug:', {
+      input: timestamp,
+      timezone: safeTimezone,
+      output: result
+    });
+    return result;
   };
 
   const formatDate = (timestamp: string) => {
