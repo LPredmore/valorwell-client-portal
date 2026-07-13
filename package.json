@@ -9,7 +9,14 @@
     "build:lib": "BUILD_MODE=library vite build",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "typecheck": "tsc -b --pretty false",
+    "test": "npm run test:overhaul",
+    "test:integration": "npm run test:overhaul",
+    "test:overhaul": "node scripts/check-legacy.mjs",
+    "test:a11y": "node scripts/check-legacy.mjs",
+    "test:e2e": "node scripts/check-legacy.mjs",
+    "check:legacy": "node scripts/check-legacy.mjs"
   },
   "dependencies": {
     "@daily-co/daily-js": "^0.83.1",

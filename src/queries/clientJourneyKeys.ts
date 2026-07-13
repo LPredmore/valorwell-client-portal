@@ -1,0 +1,16 @@
+export const clientJourneyKeys = {
+  all: ['clientJourney'] as const,
+  identity: () => [...clientJourneyKeys.all, 'identity'] as const,
+  readiness: () => [...clientJourneyKeys.all, 'readiness'] as const,
+  policy: () => [...clientJourneyKeys.all, 'policy'] as const,
+  insuranceRecords: () => [...clientJourneyKeys.all, 'insuranceRecords'] as const,
+  insuranceEligibility: () => [...clientJourneyKeys.all, 'insuranceEligibility'] as const,
+  therapistOptions: () => [...clientJourneyKeys.all, 'therapistOptions'] as const,
+  waitState: () => [...clientJourneyKeys.all, 'waitState'] as const,
+  activeRelationship: () => [...clientJourneyKeys.all, 'activeRelationship'] as const,
+  appointments: () => [...clientJourneyKeys.all, 'appointments'] as const,
+  appointmentSlots: (relationshipId?: string) => [...clientJourneyKeys.all, 'appointmentSlots', relationshipId ?? 'none'] as const,
+  messages: () => [...clientJourneyKeys.all, 'messages'] as const,
+  approvedBillingDisplay: () => [...clientJourneyKeys.all, 'approvedBillingDisplay'] as const,
+  dashboardNextAction: () => [...clientJourneyKeys.all, 'dashboardNextAction'] as const,
+};

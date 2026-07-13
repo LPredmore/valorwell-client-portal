@@ -1,0 +1,10 @@
+export * as appointmentAdapter from './appointmentAdapter';
+export * as identityAdapter from './identityAdapter';
+export * as insuranceAdapter from './insuranceAdapter';
+export * as matchingAdapter from './matchingAdapter';
+export * as messagingAdapter from './messagingAdapter';
+export * as policyAdapter from './policyAdapter';
+export * as readinessAdapter from './readinessAdapter';
+export * as registrationAdapter from './registrationAdapter';
+export * as relationshipAdapter from './relationshipAdapter';
+export * as schedulingAdapter from './schedulingAdapter';
